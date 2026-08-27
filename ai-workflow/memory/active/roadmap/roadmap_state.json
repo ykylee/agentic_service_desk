@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "generated_by": "workflow_kit.common.state.roadmap.generate_roadmap_state",
+  "generated_at": "2026-08-27",
+  "milestones": [
+    {
+      "id": "M-001",
+      "title": "컨셉 정리",
+      "sdlc_phase": "concept",
+      "declared_status": "in_progress",
+      "derived_status": "planned",
+      "progress": 0.0,
+      "total_leaves": 2,
+      "done_leaves": 0,
+      "deliverables_missing": [
+        "ai-workflow/memory/active/PURPOSE.md"
+      ],
+      "wbs": [
+        {
+          "id": "WBS-1.1",
+          "title": "PURPOSE.md 4-element 채움",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 0,
+          "children": []
+        },
+        {
+          "id": "WBS-1.2",
+          "title": "컨셉 노트 — 핵심 개념·용어·경계",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 0,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "M-002",
+      "title": "요구사항 정리",
+      "sdlc_phase": "requirements",
+      "declared_status": "planned",
+      "derived_status": "planned",
+      "progress": 0.0,
+      "total_leaves": 1,
+      "done_leaves": 0,
+      "deliverables_missing": [
+        "docs/REQUIREMENTS.md"
+      ],
+      "wbs": [
+        {
+          "id": "WBS-2.1",
+          "title": "요구사항 문서 작성",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 0,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "M-003",
+      "title": "설계",
+      "sdlc_phase": "design",
+      "declared_status": "planned",
+      "derived_status": "planned",
+      "progress": 0.0,
+      "total_leaves": 1,
+      "done_leaves": 0,
+      "deliverables_missing": [
+        "docs/architecture"
+      ],
+      "wbs": [
+        {
+          "id": "WBS-3.1",
+          "title": "설계 문서 / ADR 작성",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 0,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "M-004",
+      "title": "구현",
+      "sdlc_phase": "implementation",
+      "declared_status": "planned",
+      "derived_status": "planned",
+      "progress": 0.0,
+      "total_leaves": 1,
+      "done_leaves": 0,
+      "deliverables_missing": [],
+      "wbs": [
+        {
+          "id": "WBS-4.1",
+          "title": "구현 (설계 확정 후 leaf 로 분해한다)",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 0,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "current_milestone_id": "M-001",
+  "exempt_tasks": [],
+  "issues": []
+}

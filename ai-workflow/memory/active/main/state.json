@@ -1,0 +1,60 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-08-27",
+  "purpose_digest": null,
+  "purpose_digest_rev": null,
+  "source_of_truth": {
+    "project_profile_path": "docs/PROJECT_PROFILE.md",
+    "session_handoff_path": "ai-workflow/memory/active/main/session_handoff.md",
+    "work_backlog_index_path": "ai-workflow/memory/active/main/work_backlog.md",
+    "daily_backlog_dir": null,
+    "tasks_dir": null,
+    "sessions_dir": null,
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-27.md",
+    "repository_assessment_path": null
+  },
+  "project": {
+    "project_name": "Agentic Service Desk",
+    "document_home": "README.md",
+    "operations_path": null,
+    "backlog_path": "ai-workflow/memory/active/backlog/",
+    "handoff_path": null,
+    "environment_path": "<ai-workflow/memory/active/repository_assessment.md>"
+  },
+  "commands": {
+    "quick_tests": "TODO: 빠른 테스트 명령 입력",
+    "isolated_tests": "TODO: 격리 테스트 명령 입력",
+    "runtime_checks": null
+  },
+  "session": {
+    "current_baseline": "TODO: Summarize the current session focus.",
+    "current_axis": "TODO: Summarize the current session focus.",
+    "current_focus": "TASK-001 표준 AI 워크플로우 초기 도입",
+    "in_progress_items": [
+      "TASK-001 표준 AI 워크플로우 초기 도입"
+    ],
+    "blocked_items": [],
+    "planned_items": [],
+    "recent_done_items": [],
+    "unknown_status_items": [],
+    "environment_constraints": []
+  },
+  "backlog": {
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-27.md",
+    "task_count": 1,
+    "in_progress_items": [],
+    "blocked_items": [],
+    "done_items": []
+  },
+  "next_documents": [
+    "docs/PROJECT_PROFILE.md",
+    "ai-workflow/memory/active/main/session_handoff.md",
+    "ai-workflow/memory/active/main/work_backlog.md",
+    "ai-workflow/memory/active/main/backlog/2026-08-27.md"
+  ],
+  "repository_assessment": {
+    "path": null,
+    "present": false
+  },
+  "schema_version_memory_entries": "1"
+}
