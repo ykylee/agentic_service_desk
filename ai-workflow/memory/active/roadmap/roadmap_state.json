@@ -8,28 +8,30 @@
       "title": "컨셉 정리",
       "sdlc_phase": "concept",
       "declared_status": "in_progress",
-      "derived_status": "planned",
-      "progress": 0.0,
+      "derived_status": "in_progress",
+      "progress": 0.5,
       "total_leaves": 2,
-      "done_leaves": 0,
-      "deliverables_missing": [
-        "ai-workflow/memory/active/PURPOSE.md"
-      ],
+      "done_leaves": 1,
+      "deliverables_missing": [],
       "wbs": [
         {
           "id": "WBS-1.1",
           "title": "PURPOSE.md 4-element 채움",
-          "derived_status": "planned",
-          "linked_task_ids": [],
+          "derived_status": "done",
+          "linked_task_ids": [
+            "TASK-2026-08-27-main-002"
+          ],
           "total_leaves": 1,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": []
         },
         {
           "id": "WBS-1.2",
           "title": "컨셉 노트 — 핵심 개념·용어·경계",
-          "derived_status": "planned",
-          "linked_task_ids": [],
+          "derived_status": "in_progress",
+          "linked_task_ids": [
+            "TASK-2026-08-27-main-001"
+          ],
           "total_leaves": 1,
           "done_leaves": 0,
           "children": []
