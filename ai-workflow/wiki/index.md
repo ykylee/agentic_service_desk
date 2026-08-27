@@ -16,9 +16,9 @@
 
 ### [[concepts/agentic-service-desk-concept]]  {#agentic-service-desk-concept}
 
-- 상태: draft v0.9
-- 요약: 이 시스템의 SSOT 컨셉 노트. 시스템 정의 · 지식의 두 원천(소스코드/QnA) · llm-wiki·OKF 차용 · 에이전트 기반 지식 구축 · 산출 5단계 파이프라인 · QnA 수명주기 · 콘텐츠 제작 · 운영자 대시보드 · 논리 아키텍처 · 용어 · 경계 · 미결 쟁점 33건.
-- 먼저 읽을 곳: `§0 TL;DR` (확정 결정 12가지 · 실패 방식 · 최우선 미결 6건)
+- 상태: draft v0.12
+- 요약: 이 시스템의 SSOT 컨셉 노트. 모 시스템 프로파일과 운영 국면 · 지식의 두 원천(소스코드/QnA)과 커버리지 공백 · llm-wiki·OKF 차용 · 에이전트 기반 지식 구축 · 산출 5단계 파이프라인 · QnA 수명주기와 티켓 · 콘텐츠 제작 · 운영자 대시보드 · 논리 아키텍처 · 용어 · 경계 · 미결 쟁점.
+- 먼저 읽을 곳: `§0 TL;DR` (확정 결정 15가지 · 실패 방식 8종 · 최우선 미결 7건)
 - 관련: [`PURPOSE.md`](../memory/active/PURPOSE.md), [`roadmap M-001`](../memory/active/roadmap/M-001-concept.md)
 
 ## entities  {#entities}
