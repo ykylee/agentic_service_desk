@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 16 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 16 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 17 완료 — 4.4(S2) 시작.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 17 완료 — 4.4(S2) 시작.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-026 — WBS-4.4.1 검색",
       "TASK-2026-08-28-main-025 — WBS-4.3.4 승격 경로 A",
       "TASK-2026-08-28-main-024 — WBS-4.3.5 대시보드 확장 (Q1 티켓 대기열)",
       "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-020 — WBS-4.2.7 대시보드 최소",
       "TASK-2026-08-28-main-019 — WBS-4.2.6 Lint",
       "TASK-2026-08-28-main-018 — WBS-4.2.5 모순 표시와 사람 편집 보존",
-      "TASK-2026-08-28-main-017 — WBS-4.2.4 Ingest 에이전트",
-      "TASK-2026-08-28-main-016 — WBS-4.2.3 산출물 필터"
+      "TASK-2026-08-28-main-017 — WBS-4.2.4 Ingest 에이전트"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 26,
+    "task_count": 27,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -79,7 +79,8 @@
       "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록",
       "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록",
       "TASK-2026-08-28-main-024 — WBS-4.3.5 대시보드 확장 (Q1 티켓 대기열)",
-      "TASK-2026-08-28-main-025 — WBS-4.3.4 승격 경로 A"
+      "TASK-2026-08-28-main-025 — WBS-4.3.4 승격 경로 A",
+      "TASK-2026-08-28-main-026 — WBS-4.4.1 검색"
     ]
   },
   "next_documents": [

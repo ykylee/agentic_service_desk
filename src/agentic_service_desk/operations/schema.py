@@ -225,6 +225,18 @@ CREATE TABLE IF NOT EXISTS ingested_answer (
     ingested_at      TEXT NOT NULL
 );
 
+-- 지식 항목의 임베딩 (ADR-004).
+-- **항목 수가 수백~수천이라 전수 임베딩이 부담되지 않는다.** 증분 인덱싱의 복잡도를
+-- 지금 떠안지 않고 ingest 주기에 맞춰 통째로 다시 만든다.
+-- 벡터를 운영 DB 에 두는 이유는 지식 저장소가 git 이기 때문이다 — 생성물을 커밋하면
+-- diff 가 벡터로 가득 차 "어느 커밋이 지식을 바꿨는가"가 읽히지 않는다.
+CREATE TABLE IF NOT EXISTS knowledge_embedding (
+    item_id   TEXT PRIMARY KEY,  -- 경로가 아니라 불변 id (ADR-002)
+    vector    TEXT NOT NULL,     -- JSON 실수 배열
+    model     TEXT NOT NULL,     -- 어느 모델로 만들었나. 바뀌면 통째로 다시 만든다
+    built_at  TEXT NOT NULL
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (

@@ -26,6 +26,8 @@ from agentic_service_desk.ingest.qna import QnaCollector
 from agentic_service_desk.ingest.run import IngestRun
 from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
 from agentic_service_desk.knowledge.lint import Lint
+from agentic_service_desk.knowledge.search import rebuild_embedding_index
+from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.drafter import Drafter
@@ -77,6 +79,7 @@ class BatchRunner:
         self._draft_resolutions()
         self._ingest()
         self._lint()
+        self._reindex()
 
     def _sync_source(self) -> None:
         """소스 저장소를 갱신하고 **무엇이 바뀌었는지**만 알아 둔다 (WBS-4.2.1).
@@ -274,6 +277,48 @@ class BatchRunner:
 
         for note in _lint_notes(report):
             print(f"[worker] {note}")
+
+
+    def _reindex(self) -> None:
+        """임베딩 인덱스를 다시 만든다 (WBS-4.4.1, ADR-004).
+
+        **ingest·Lint 뒤에 돈다** — 방금 바뀐 지식이 반영돼야 한다. 통째로 다시
+        만드는 것은 항목이 수백~수천이라 부담되지 않기 때문이고, 부분 갱신은 어느
+        항목이 낡은 벡터를 들고 있는지를 계속 추적해야 한다.
+
+        **실패해도 배치를 세우지 않는다.** 개발 환경에서 이 경로가 레이트 리밋으로
+        막혀 있고(O57), 임베딩 없이도 검색은 키워드·표현 사전으로 돈다. 다만
+        조용히 넘어가지는 않는다 — 인덱스가 없는 것과 검색이 임베딩을 안 쓰는 것은
+        로그에서 구분돼야 한다.
+        """
+        if not self._cfg.llm_embedding_model:
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            indexed = rebuild_embedding_index(
+                conn,
+                repo,
+                build_embedding_provider(
+                    self._cfg.embedding_provider,
+                    self._cfg.embedding_base_url or self._cfg.llm_base_url,
+                    self._cfg.llm_embedding_model,
+                    self._cfg.llm_api_key,
+                ),
+                self._cfg.llm_embedding_model,
+            )
+        except Exception as exc:  # noqa: BLE001 — 제공자가 어떤 오류를 낼지 우리가 정하지 않는다
+            print(f"[worker] 임베딩 인덱스 실패: {exc}")
+            print("[worker]   검색은 키워드·표현 사전으로 계속 돈다 (ADR-004)")
+            return
+        finally:
+            conn.close()
+        if indexed:
+            print(f"[worker] 임베딩 인덱스 {indexed}건 재생성")
 
 
 def _lint_notes(report) -> list[str]:  # noqa: ANN001
