@@ -1,0 +1,33 @@
+[project]
+name = "agentic-service-desk"
+version = "0.1.0"
+description = "모 시스템의 소스코드와 QnA 이력을 지식베이스로 구축하고, 그 지식으로 답변과 콘텐츠를 생산하는 고객지원 서브시스템"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "jinja2",
+    "pydantic-settings",
+    "httpx",
+]
+
+[project.scripts]
+# ADR-001 · NFR-6 — 온라인과 배치는 같은 코드베이스, 다른 프로세스다.
+asd-web = "agentic_service_desk.web.__main__:main"
+asd-worker = "agentic_service_desk.worker.__main__:main"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_service_desk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

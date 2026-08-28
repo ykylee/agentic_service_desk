@@ -15,15 +15,15 @@
   },
   "project": {
     "project_name": "Agentic Service Desk",
-    "document_home": "README.md",
+    "document_home": "ai-workflow/wiki/index.md",
     "operations_path": null,
-    "backlog_path": "ai-workflow/memory/active/backlog/",
+    "backlog_path": "ai-workflow/memory/active/<branch>/backlog/",
     "handoff_path": null,
-    "environment_path": "<ai-workflow/memory/active/repository_assessment.md>"
+    "environment_path": "ai-workflow/memory/active/project_status_assessment.md"
   },
   "commands": {
-    "quick_tests": "TODO: 빠른 테스트 명령 입력",
-    "isolated_tests": "TODO: 격리 테스트 명령 입력",
+    "quick_tests": "uv run pytest -q",
+    "isolated_tests": "uv run pytest tests/ -q",
     "runtime_checks": null
   },
   "session": {
@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
       "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
       "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
@@ -48,7 +49,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 6,
+    "task_count": 7,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -57,7 +58,8 @@
       "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
       "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
-      "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해"
+      "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
+      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격"
     ]
   },
   "next_documents": [
