@@ -27,6 +27,7 @@
 - 빠른 테스트: `uv run pytest -q`
 - 격리 테스트: `uv run pytest tests/ -q`
 - 실행 확인: `uv run asd-web` 후 `curl -s localhost:8000/health`
+- 하네스 동기화: `uv run asd sync-harness` (`.env` → `~/.pi/agent/models.json`, ADR-009)
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: `uv run pytest -q` 통과. 경계(어댑터·산출물 필터)를 건드리면 해당 NFR 을 함께 확인한다
