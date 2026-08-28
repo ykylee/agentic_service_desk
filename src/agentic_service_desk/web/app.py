@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
+from agentic_service_desk.content import registry as content_registry
 from agentic_service_desk.web import metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
@@ -42,6 +43,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """앱을 만든다. 설정을 인자로 받는 이유는 테스트에서 갈아 끼우기 위해서다."""
     cfg = settings or load_settings()
     app = FastAPI(title="Agentic Service Desk", version=__version__)
+
+    # **선언은 기동 때 한 번 읽고 검사한다** (FR-42, §7.5). 요청마다 읽으면 잘못된
+    # 선언이 화면 하나에서만 터져, 어느 요청이 그것을 밟는지에 따라 있다가 없어진다.
+    content_types = content_registry.load(cfg.content_types_path)
 
     def dashboard() -> tuple[Dashboard, object]:
         """요청마다 새로 연다.
@@ -137,7 +142,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "screens": [
                     _knowledge_screen(board.knowledge_status()),
                     metrics.qna_status(conn),
-                    metrics.content_status(),
+                    metrics.content_status(content_types),
                     metrics.agent_status(conn),
                     metrics.phase_status(conn, stage=cfg.stage, phase=cfg.phase),
                 ],

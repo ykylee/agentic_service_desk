@@ -1,0 +1,51 @@
+# 콘텐츠 타입 선언 (§7.2·§7.5, FR-42).
+#
+# **여기 있는 것이 전부 선언이다** — 타입을 더해도 코드는 늘지 않는다. 다섯을
+# 적으면 §5 의 5단계 파이프라인이 그대로 돈다: 주 입력 · 트리거 · 성격 · 게재처 ·
+# 검수 강도.
+#
+# 검수자는 적지 않는다. 콘텐츠는 **국면과 무관하게 전수 사람 승인**이다 (FR-39) —
+# 타입이 고를 수 있는 것이 아니다. 언어도 적지 않는다: 1차 언어로 쓴다 (FR-43).
+#
+# 성격이 자리를 정한다 (§7.3 → §7.7). 살아있는 문서는 문서 면(upsert), 발행물은
+# 발행 면(create)이며, 어긋나게 적으면 등록이 거부된다.
+
+[faq]
+title = "FAQ"
+input = "qna_stats"
+nature = "living"
+# 반복 질문 분포가 임계에 닿으면 (§7.2). 주기로도 돈다 — 임계만 두면 분포가
+# 완만할 때 영영 갱신되지 않는다.
+trigger = { period_days = 7, threshold = "repeat_questions", threshold_value = 3 }
+destination = { place = "document", path = "faq/index" }
+# 살아있는 문서는 변경분 검수다 (§5.5.5) — 매 갱신마다 전문을 다시 읽을 수 없고,
+# 그렇게 두면 검수가 훑어 넘기는 습관이 된다.
+review = { scope = "diff" }
+
+[guide]
+title = "시스템 사용 가이드"
+input = "knowledge"
+nature = "living"
+# 코드가 바뀌면 가이드가 틀려진다 — 주기만으로는 그 사이가 비어 있다.
+trigger = { period_days = 14, threshold = "source_changed", threshold_value = 1 }
+destination = { place = "document", path = "guide/index" }
+review = { scope = "diff" }
+
+[column]
+title = "칼럼"
+input = "both"
+nature = "issued"
+trigger = { period_days = 30 }
+destination = { place = "publication" }
+# P6~P8 은 칼럼에만 붙는다 (§7.6.4) — P1~P5 는 사실 진술을 전제하므로 그대로
+# 쓰이지 않는다. P6 가치 판단 · P7 관찰의 일반화 · P8 정책처럼 읽히는 서술.
+review = { scope = "full", final_check = true, extra_rejections = ["P6", "P7", "P8"] }
+
+[newsletter]
+title = "뉴스레터"
+input = "both"
+nature = "issued"
+trigger = { period_days = 30 }
+# **발송하지 않고 게시한다** (§7.7.3). 그래서 수신자 명단이 필요 없다.
+destination = { place = "publication" }
+review = { scope = "full", final_check = true }

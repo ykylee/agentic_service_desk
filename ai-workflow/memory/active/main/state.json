@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리",
       "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)",
       "TASK-2026-08-28-main-039 — WBS-4.5.8 지표와 대시보드 확장",
       "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로",
       "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적",
       "TASK-2026-08-28-main-033 — WBS-4.5.3 답변 이력",
-      "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행",
-      "TASK-2026-08-28-main-031 — WBS-4.5.1 게재"
+      "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 41,
+    "task_count": 42,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -94,7 +94,8 @@
       "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B",
       "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
       "TASK-2026-08-28-main-039 — WBS-4.5.8 지표와 대시보드 확장",
-      "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)"
+      "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)",
+      "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리"
     ]
   },
   "next_documents": [

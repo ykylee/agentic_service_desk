@@ -23,6 +23,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass, field
 
+from agentic_service_desk.content import registry
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
 
@@ -251,14 +252,42 @@ def agent_status(conn: sqlite3.Connection) -> Status:
     )
 
 
-def content_status() -> Status:
-    """콘텐츠 현황 (§8.3). **아직 만들지 않았다.**"""
+def content_status(reg: registry.Registry) -> Status:
+    """콘텐츠 현황 (§8.3).
+
+    **등록된 것과 만들어진 것은 다르다.** 타입 레지스트리가 섰다고 콘텐츠가
+    생긴 것은 아니므로, 화면은 지금 무엇이 선언돼 있는지까지만 말하고 제작·게재
+    수는 그것이 생긴 뒤에 센다 — 0 을 내면 "만들었는데 하나도 없다"로 읽힌다.
+    """
+    rows = [
+        (
+            t.title,
+            f"{'살아있는 문서' if t.living else '발행물'} · "
+            f"{'문서 면' if t.destination.place is registry.Place.DOCUMENT else '발행 면'}"
+            f"({t.destination.place.operation}) · "
+            f"검수 {'변경분' if t.review.scope is registry.Scope.DIFF else '전문'}"
+            + (" + 발행 직전 최종 확인" if t.review.final_check else "")
+            + (
+                f" · 추가 반려 {'·'.join(t.review.extra_rejections)}"
+                if t.review.extra_rejections
+                else ""
+            ),
+        )
+        for t in reg.all()
+    ]
+    rows.append(
+        (
+            "제작·게재",
+            "**아직 없다** — 레지스트리는 섰지만 제작은 WBS-4.6.2 부터다 (FR-36). "
+            "**등록된 것과 만들어진 것은 다르므로** 0 을 내지 않는다",
+        )
+    )
     return Status(
         title="콘텐츠 현황",
-        question="콘텐츠가 최신인가",
-        rows=[],
-        note="콘텐츠 제작은 S4~S5 다 (WBS-4.6~4.7). **비어 있는 것과 아직 만들지 "
-        "않은 것은 다르므로** 숫자 대신 이 사실을 적어 둔다.",
+        question="어떤 콘텐츠가 돌고 있고 최신인가",
+        rows=rows,
+        note="검수자는 타입이 고르지 않는다 — 콘텐츠는 **국면과 무관하게 전수 사람 "
+        "승인**이다 (FR-39). 타입이 고르는 것은 범위와 추가 반려 사유뿐이다.",
     )
 
 
