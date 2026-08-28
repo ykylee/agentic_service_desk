@@ -37,7 +37,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness, extract_json
-from agentic_service_desk.knowledge.search import Hit, Search, rerank, tokenize
+from agentic_service_desk.knowledge.search import Hit, Search, _matches, rerank, tokenize
 
 
 class Stage(enum.StrEnum):
@@ -86,17 +86,88 @@ class Analysis:
     """기존 QnA 와의 중복·유사 후보. 반복 질문 탐지와 FAQ 승격의 재료다."""
 
 
+CONFIRMED_COVERAGE = 0.6
+"""`확인됨` 이 성립하려면 진술의 낱말이 근거 원문에 이만큼은 있어야 한다.
+
+**모델은 제 확신을 부풀린다.** 라이브에서 모든 진술을 `확인됨` 으로 매겨 약한 지점이
+0 이 됐는데, 그러면 이 표시가 아무것도 가리키지 못해 **없는 것과 같아진다** (§5.6.5).
+
+다행히 `확인됨` 의 정의("근거 원문에 그대로 있다")는 **셀 수 있다.** 문장은 바꿔 쓴
+것이므로 글자 그대로 같을 수는 없지만, 원문에 없던 낱말이 절반을 넘으면 그것은
+"그대로 있는" 문장이 아니다.
+
+이 값은 **실데이터로 다시 맞춰야 한다** — 표본 둘로 고른 값이다.
+"""
+
+
+class Confidence(enum.StrEnum):
+    """근거 강도 — **세 단계뿐이다** (ADR-007 결정 3, §5.6.5).
+
+    사람이 답할 질문은 하나다: **어디를 봐야 하는가.** 잘게 나눌수록 다시 전부 읽게
+    되어 목적을 잃으므로 셋에서 멈춘다.
+    """
+
+    CONFIRMED = "확인됨"
+    """근거 원문에 그대로 있다. **넘어가도 된다.**"""
+
+    INFERRED = "추론"
+    """여러 근거를 엮어 도출했다. **여기를 본다.**"""
+
+    THIN = "근거 얇음"
+    """단일·간접 근거뿐이다. **여기를 먼저 본다.**"""
+
+    @property
+    def needs_review(self) -> bool:
+        return self is not Confidence.CONFIRMED
+
+
+@dataclass(frozen=True)
+class Statement:
+    """진술 하나와 그 근거 강도.
+
+    **진술 단위로 붙인다** (ADR-007 결정 3). 문단 단위면 어디가 약한지 알 수 없고,
+    단어 단위면 화면이 시끄러워 결국 안 보게 된다.
+    """
+
+    text: str
+    confidence: Confidence
+    grounding: tuple[str, ...] = ()
+    """이 진술이 기댄 항목. **`확인됨` 은 하나라도 있어야 한다.**"""
+
+
 @dataclass(frozen=True)
 class Draft:
     """3단계 산출 — 초안과 근거."""
 
-    body: str
+    statements: tuple[Statement, ...]
+    """진술과 그 강도. 본문은 이것을 이어 붙인 것이다."""
+
     grounding: tuple[str, ...]
     """근거로 쓴 지식 항목 id. **비어 있으면 초안이 아니다** (D3)."""
 
     unanswered: tuple[str, ...] = ()
     """**모른다고 밝힌 부분** (FR-19). 비어 있는 것이 늘 좋은 것은 아니다 —
     질문이 여러 갈래인데 전부 답했다면 억지 완성을 의심해야 한다."""
+
+    @property
+    def body(self) -> str:
+        """게재될 본문. 강도 표시는 **운영자 화면에만** 붙고 이용자에게는 가지 않는다."""
+        return "\n\n".join(s.text for s in self.statements)
+
+    @property
+    def weak_points(self) -> tuple[Statement, ...]:
+        """사람이 볼 곳 (FR-23 검증 — 약한 근거 지점이 표시된다).
+
+        **매번 다른 자리가 표시되므로 화면을 눈으로 훑어 넘기기 어렵다** —
+        습관화를 깨는 것이 이 표시의 부수 효과다 (§5.6.5).
+        """
+        return tuple(s for s in self.statements if s.confidence.needs_review)
+
+    @property
+    def all_confirmed(self) -> bool:
+        """전부 확인됨인가. **참이라고 안심할 일은 아니다** — 초안이 자기 확신을
+        과장했을 수 있고, 그것을 보는 것이 §5.6.6 의 관측 지표다."""
+        return not self.weak_points
 
 
 @dataclass
@@ -196,13 +267,24 @@ _RULES = """당신은 사내 시스템의 질문에 답한다. **근거로 준 �
    질문이 근거와 다른 주제일 때가 그렇다. 조금이라도 답할 것이 있으면 true 다.
 4. **{language} 로 쓴다.** 다만 근거를 인용할 때는 **원문 그대로** 옮긴다.
 5. 근거로 실제로 쓴 항목의 id 만 `grounding` 에 넣는다. 목록에 없는 id 를 만들지 않는다.
+6. **답을 진술 단위로 쪼개고 각각에 근거 강도를 붙인다.** 사람이 답할 질문은 하나다 —
+   어디를 봐야 하는가. 셋 중 하나로 고른다.
+
+   - `확인됨` — 근거 원문에 **그대로 있다.** 읽는 사람이 넘어가도 되는 문장이다.
+   - `추론` — 여러 근거를 **엮어 도출**했다. 근거는 있지만 그 문장 그대로는 없다.
+   - `근거 얇음` — 단일·간접 근거뿐이다.
+
+   **자기 확신을 부풀리지 않는다.** 전부 `확인됨` 으로 매기면 이 표시가 아무것도
+   가리키지 못해 없는 것과 같아진다. 근거 원문을 다시 보고 정직하게 고른다.
+   진술마다 그 문장이 실제로 기댄 항목 id 를 `grounding` 에 적는다.
 
 출력은 **JSON 하나만** 낸다. 설명이나 사고 과정을 붙이지 않는다.
 
 {
   "answerable": true,
-  "body": "답변 본문",
-  "grounding": ["k-..."],
+  "statements": [
+    {"text": "한 문장 또는 한 진술", "confidence": "확인됨", "grounding": ["k-..."]}
+  ],
   "unanswered": ["모른다고 밝힌 부분"]
 }"""
 
@@ -224,31 +306,148 @@ def build_prompt(question: str, hits: list[Hit], language: str) -> str:
     )
 
 
-def parse_draft(text: str, allowed_ids: set[str]) -> Draft | None:
+def parse_draft(
+    text: str,
+    allowed_ids: set[str],
+    stale_ids: set[str] | None = None,
+    source_text: dict[str, str] | None = None,
+) -> Draft | None:
     """응답을 초안으로 바꾼다. `None` 이면 **답을 만들지 않겠다는 결정**이다.
 
     지어낸 근거 id 는 버린다 — 없는 것을 가리키는 근거는 Lint 의 끊어진 링크가 되고,
     그때는 이미 답이 나간 뒤다.
+
+    `source_text` 가 없으면 **`확인됨` 을 확인할 수 없다.** 확인할 수 없는 것을
+    확인됐다고 두지 않으므로 모든 진술이 `추론` 이하로 내려간다 — 파이프라인은 늘
+    원문을 함께 넘긴다.
     """
     payload = extract_json(text)
-    body = str(payload.get("body") or "").strip()
-    if not payload.get("answerable", True) or not body:
+    if not payload.get("answerable", True):
         return None
 
-    grounding = tuple(
-        str(g) for g in (payload.get("grounding") or []) if str(g) in allowed_ids
+    statements = _statements(
+        payload, allowed_ids, stale_ids or set(), source_text or {}
     )
+    if not statements:
+        return None
+
+    grounding = tuple(dict.fromkeys(g for s in statements for g in s.grounding))
     if not grounding:
         # 근거를 하나도 안 가리켰다. 답이 근거에서 나온 것인지 알 수 없으므로
         # 초안으로 받지 않는다 (D3) — 검수 이전에 형식으로 걸러 낸다.
         return None
     return Draft(
-        body=body,
+        statements=statements,
         grounding=grounding,
         unanswered=tuple(
             str(u).strip() for u in (payload.get("unanswered") or []) if str(u).strip()
         ),
     )
+
+
+def _statements(
+    payload: dict,
+    allowed_ids: set[str],
+    stale_ids: set[str],
+    source_text: dict[str, str],
+) -> tuple[Statement, ...]:
+    raw = payload.get("statements")
+    if not isinstance(raw, list) or not raw:
+        return _fallback_statement(payload, allowed_ids)
+
+    out: list[Statement] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        grounding = tuple(
+            str(g) for g in (item.get("grounding") or []) if str(g) in allowed_ids
+        )
+        out.append(
+            Statement(
+                text=text,
+                confidence=_confidence_of(
+                    item.get("confidence"), text, grounding, stale_ids, source_text
+                ),
+                grounding=grounding,
+            )
+        )
+    return tuple(out)
+
+
+def _confidence_of(
+    raw: object,
+    text: str,
+    grounding: tuple[str, ...],
+    stale_ids: set[str],
+    source_text: dict[str, str],
+) -> Confidence:
+    """모델이 매긴 강도를 받되 **세 경우에는 내린다.**
+
+    ① **근거를 못 댔으면 `확인됨` 일 수 없다.** "근거 원문에 그대로 있다"는 주장인데
+       가리키는 원문이 없다. 형식으로 확인 가능한 거짓말이므로 여기서 막는다.
+
+    ② **낡은 근거에 기댄 진술도 `확인됨` 일 수 없다.** 인용 자체는 정확하더라도
+       그 원문이 지금도 맞는지는 모른다 — 낡은 지식을 현재형으로 단정하는 것이
+       P4 반려 사유다. 이 표시가 답하는 질문은 "어디를 봐야 하는가" 이므로,
+       stale 에 기댄 문장이 **넘어가도 되는 칸에 놓이면 안 된다.**
+
+    ③ **원문에 없는 말로 이뤄진 진술도 `확인됨` 일 수 없다.** 모델은 제 확신을
+       부풀리므로 자기 신고를 그대로 믿지 않는다 — 다행히 이 등급의 정의는 셀 수
+       있다 (`CONFIRMED_COVERAGE`).
+
+    올리지는 않는다. 모델이 스스로 낮게 매긴 것은 그대로 둔다 — 자기 불확실성을
+    표시하라고 시켰는데 그 표시를 우리가 뒤집으면 시킨 의미가 없다.
+    """
+    try:
+        confidence = Confidence(str(raw).strip())
+    except ValueError:
+        # 모르는 값이면 안전한 쪽으로 — 읽는 사람이 보게 둔다.
+        return Confidence.THIN
+
+    if confidence is not Confidence.CONFIRMED:
+        return confidence
+    if not grounding:
+        return Confidence.THIN
+    if any(g in stale_ids for g in grounding):
+        return Confidence.INFERRED
+    if _coverage(text, grounding, source_text) < CONFIRMED_COVERAGE:
+        return Confidence.INFERRED
+    return Confidence.CONFIRMED
+
+
+def _coverage(text: str, grounding: tuple[str, ...], source_text: dict[str, str]) -> float:
+    """진술의 낱말 중 근거 원문에 있는 비율.
+
+    `_matches` 를 그대로 쓴다 — 검색이 조사 변형을 넘는 방식과 같아야 "원문에 있다"의
+    뜻이 두 곳에서 갈리지 않는다.
+    """
+    tokens = set(tokenize(text))
+    if not tokens:
+        return 1.0
+    source = set()
+    for g in grounding:
+        source |= set(tokenize(source_text.get(g, "")))
+    if not source:
+        return 0.0
+    return sum(1 for t in tokens if _matches(t, source)) / len(tokens)
+
+
+def _fallback_statement(payload: dict, allowed_ids: set[str]) -> tuple[Statement, ...]:
+    """`statements` 없이 `body` 만 온 경우.
+
+    통째로 **`근거 얇음`** 한 진술로 받는다. 어디가 강하고 약한지 알 수 없는데
+    강하다고 매기면 표시가 거짓이 되므로, 모를 때는 **보게 두는 쪽**으로 틀린다.
+    """
+    body = str(payload.get("body") or "").strip()
+    if not body:
+        return ()
+    grounding = tuple(
+        str(g) for g in (payload.get("grounding") or []) if str(g) in allowed_ids
+    )
+    return (Statement(text=body, confidence=Confidence.THIN, grounding=grounding),)
 
 
 # --- 실행기 -----------------------------------------------------------------
@@ -333,8 +532,12 @@ class AnswerPipeline:
 
         prompt = build_prompt(question, hits, analysis.language)
         allowed = {h.item.id for h in hits}
+        stale = {h.item.id for h in hits if h.is_stale}
+        source_text = {h.item.id: f"{h.item.title} {h.item.body}" for h in hits}
         try:
-            draft = parse_draft(self._harness.run(prompt).text, allowed)
+            draft = parse_draft(
+                self._harness.run(prompt).text, allowed, stale, source_text
+            )
         except (AgentOutputError, RuntimeError) as exc:
             outcome.halted = Halt.GENERATION_FAILED
             outcome.stages.append(
@@ -360,8 +563,8 @@ class AnswerPipeline:
             StageRecord(
                 stage=Stage.GENERATE,
                 detail=(
-                    f"초안 {len(draft.body)}자 · 근거 {len(draft.grounding)}건 · "
-                    f"경계 {len(draft.unanswered)}건"
+                    f"진술 {len(draft.statements)}개 (약한 지점 {len(draft.weak_points)}) · "
+                    f"근거 {len(draft.grounding)}건 · 경계 {len(draft.unanswered)}건"
                 ),
             )
         )
