@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.7,
+      "progress": 0.725,
       "total_leaves": 40,
-      "done_leaves": 28,
+      "done_leaves": 29,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -375,10 +375,10 @@
         {
           "id": "WBS-4.5",
           "title": "S3 게재와 추적",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 8,
-          "done_leaves": 7,
+          "done_leaves": 8,
           "children": [
             {
               "id": "WBS-4.5.1",
@@ -460,10 +460,12 @@
             {
               "id": "WBS-4.5.8",
               "title": "지표와 대시보드 확장",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-039"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

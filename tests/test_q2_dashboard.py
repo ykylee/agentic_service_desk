@@ -234,17 +234,16 @@ class TestDistributionIsSplitByReviewer:
     """§8.3·§5.5.6 — 섞으면 읽을 수 없다."""
 
     def test_주체별로_가른다(self, tmp_path) -> None:
-        # 반려율이 신뢰 지표인 것은 **사람 판정**일 때이고, 자동 검수의 학습 자료가
-        # 되는 것도 사람 판정 기록이다.
+        """반려율이 신뢰 지표인 것은 **사람 판정**일 때이고, 자동 검수의 학습 자료가
+        되는 것도 사람 판정 기록이다.
+
+        에이전트 판정은 초안을 큐에 올릴 때 **함께 기록된다** — 초안에만 적어 두면
+        판정이 *물건*에는 있고 *사건*에는 없어 분포가 영원히 비어 보인다
+        (WBS-4.5.8 의 라이브 지표가 잡았다).
+        """
         draft_id, _ = _queued(tmp_path, verdict=Verdict(passed=False, reason=Reject.P1))
         conn = _conn(tmp_path)
-        from agentic_service_desk.pipeline.review import ReviewInput, record
-
-        record(
-            conn,
-            review=ReviewInput(draft_body="x", grounding=(), source_text={}),
-            verdict=Verdict(passed=False, reason=Reject.P1, checked_by="agent"),
-        )
+        assert distribution(conn, reviewed_by="agent").rejected == 1
         conn.close()
 
         TestClient(create_app(_settings(tmp_path))).post(

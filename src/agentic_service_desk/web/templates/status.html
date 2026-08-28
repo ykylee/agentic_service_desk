@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}현황{% endblock %}
+{% block body %}
+<h1>현황</h1>
+<p class="dim small">
+  <strong>현황 숫자는 주인공이 아니다</strong> (§8.1) — 대기열이 주인공이고, 여기 있는
+  숫자는 <strong>대기열이 왜 쌓였는지를 설명하는 보조 정보</strong>다.
+  <a href="/">대기열로 돌아가기</a>
+</p>
+
+<h2>핵심 지표</h2>
+<p class="dim small">
+  국면별 임계와 함께 봐야 하지만 <strong>그 수치는 아직 정해지지 않았다</strong> (O8) —
+  실데이터 없이 정할 수 없고, 지어내 붙이면 <strong>1국면의 정상 상태가 빨간불이 된다.</strong>
+</p>
+<table>
+  <tr><th style="width:11rem">지표</th><th style="width:5rem">값</th><th>읽는 법</th></tr>
+  {% for m in core %}
+  <tr>
+    <td>{{ m.label }}</td>
+    <td>{% if m.value is none %}<span class="dim">—</span>{% else %}<strong>{{ m.percent }}</strong>{% endif %}</td>
+    <td class="small">{{ m.reading }}
+      {% if m.value is none %}<br><span class="dim">아직 셀 것이 없다 — 0% 와 다르다.</span>
+      {% else %}<span class="dim">(분모 {{ m.denominator }})</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% for s in screens %}
+<h2>{{ s.title }}</h2>
+<p class="dim small">{{ s.question }}</p>
+{% if s.rows %}
+<table>
+  {% for label, value in s.rows %}
+  <tr><th style="width:11rem">{{ label }}</th><td class="small">{{ value }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% if s.note %}<p class="dim small">{{ s.note }}</p>{% endif %}
+{% endfor %}
+{% endblock %}

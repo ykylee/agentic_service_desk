@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
+from agentic_service_desk.web import metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
@@ -121,6 +122,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return RedirectResponse("/queues/Q4", status_code=303)
+
+    @app.get("/status")
+    def status(request: Request):  # noqa: ANN201
+        """현황 다섯 종 + 핵심 지표 여섯 (FR-47·58).
+
+        **대기열과 화면을 나눈다** (§8.1). 한 화면에 섞으면 숫자가 대기열을 밀어내고,
+        그러면 운영자가 처리해야 할 것이 현황 사이에 묻힌다.
+        """
+        board, conn = dashboard()
+        try:
+            ctx = {
+                "core": metrics.core(conn),
+                "screens": [
+                    _knowledge_screen(board.knowledge_status()),
+                    metrics.qna_status(conn),
+                    metrics.content_status(),
+                    metrics.agent_status(conn),
+                    metrics.phase_status(conn, stage=cfg.stage, phase=cfg.phase),
+                ],
+            }
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "status.html", shell() | ctx)
 
     @app.get("/queues/Q1")
     def q1(request: Request):  # noqa: ANN201
@@ -534,6 +558,37 @@ def _chosen_invalidation(  # noqa: ANN001
     if not period_days.strip().isdigit() or int(period_days) <= 0:
         raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
     return Invalidation(kind=parsed, period_days=int(period_days))
+
+
+def _knowledge_screen(status) -> metrics.Status:  # noqa: ANN001
+    """지식베이스 현황 (§8.3). 이미 있던 것을 다섯 종의 한 자리로 옮긴다."""
+    return metrics.Status(
+        title="지식베이스 현황",
+        question="지식이 자라고 있는가, 썩고 있는가",
+        rows=[
+            ("지식 항목", f"{status.total}건"),
+            (
+                "출처 구성",
+                f"소스코드 {status.from_source} · QnA {status.from_qna} — "
+                "**한쪽으로 쏠리면 다른 쪽 수집이 막혔다는 신호**다 (D2)",
+            ),
+            (
+                "stale 비율",
+                f"{status.stale_ratio:.0%} ({status.stale}건) — 표시일 뿐 "
+                "**삭제하지 않는다** (FR-8). 게재물로 번지는 것은 Q5 가 든다",
+            ),
+            ("미해결 모순", f"{status.open_contradictions}건 — Q4 가 그 목록이다"),
+            (
+                "최근 ingest",
+                " / ".join(m for _, m in status.recent_ingests[:3]) or "아직 없다",
+            ),
+        ],
+        note=(
+            f"읽을 수 없는 파일 {len(status.broken_files)}건 — frontmatter 가 깨졌다."
+            if status.broken_files
+            else ""
+        ),
+    )
 
 
 def _correcting(conn) -> set[str]:  # noqa: ANN001

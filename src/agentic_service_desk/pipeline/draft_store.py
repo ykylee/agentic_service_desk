@@ -114,6 +114,10 @@ def save(
     **에이전트가 반려한 것도 올린다.** 버리면 사람이 뒤집을 기회가 사라지고, 무엇보다
     자동 판정이 틀렸을 때 그것을 알 길이 없어진다 — 1국면 사람 판정 기록이 2국면 자동
     검수의 기준이 된다는 §5.5.3 이 성립하려면 양쪽이 다 남아야 한다.
+
+    **에이전트 판정도 검수 기록에 남긴다** (FR-22, §5.5.6). 초안에만 적어 두면 그
+    판정이 *물건*에는 있고 *사건*에는 없어, 반려 사유 분포와 자동·사람 일치율이
+    영원히 비어 보인다 — WBS-4.5.8 의 라이브 지표가 그것을 잡았다.
     """
     draft_id = f"ad-{uuid.uuid4().hex[:12]}"
     conn.execute(
@@ -149,6 +153,17 @@ def save(
         ),
     )
     conn.commit()
+    if verdict is not None:
+        # `source_text` 는 검수 기록에 저장되지 않으므로(스키마가 본문과 근거만
+        # 든다) 여기서 다시 만들어도 잃는 것이 없다.
+        record(
+            conn,
+            review=ReviewInput(
+                draft_body=draft.body, grounding=draft.grounding, source_text={}
+            ),
+            verdict=verdict,
+            qna_item_id=qna_item_id,
+        )
     return draft_id
 
 
