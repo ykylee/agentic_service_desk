@@ -151,6 +151,25 @@ class TestStale:
         assert repo.find(item.id) is not None
         assert repo.find(item.id).item.body == "등급으로 정해진다."
 
+    def test_stale_은_대기열로_가지_않는다(self, tmp_path) -> None:
+        # Q5 는 "근거가 낡은 **게재 답변·살아있는 문서**"의 정정 후보이지 지식 항목
+        # 자체가 아니다(§8.2). S0 에서는 Q5 가 화면에 뜨지도 않으므로(FR-59)
+        # 티켓을 찍으면 **보이지 않는 대기열이 쌓인다.**
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        origin, mirror = _origin(tmp_path)
+        item = _item(
+            repo,
+            provenance=[Provenance(commit=mirror.head(), path="limit.py")],
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=("limit.py",)),
+        )
+        _commit_more(origin)
+        mirror.fetch()
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert item.id in report.marked_stale        # 표시는 된다 (FR-8)
+        assert report.findings == []                 # 대기열로는 안 간다
+        assert conn.execute("SELECT COUNT(*) FROM ticket").fetchone()[0] == 0
+
     def test_방금_갱신한_항목은_stale_이_아니다(self, tmp_path) -> None:
         # **출처는 갱신할 때마다 쌓인다.** 쌓인 것을 전부 보면 오래된 출처 이후로는
         # 당연히 경로가 바뀌었으므로 **갱신된 항목이 영원히 stale 이 된다** —

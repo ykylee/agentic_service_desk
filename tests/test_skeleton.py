@@ -9,7 +9,8 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from agentic_service_desk.config import Settings
-from agentic_service_desk.web.app import _queues_for_stage, create_app
+from agentic_service_desk.web.app import create_app
+from agentic_service_desk.web.dashboard import queues_for_stage
 
 
 def _settings(**over: object) -> Settings:
@@ -37,25 +38,30 @@ class TestSettings:
         assert cfg.knowledge_dir != cfg.operations_db.parent / cfg.operations_db.name
 
 
+def _ids(stage: str) -> list[str]:
+    """단계별 대기열 id. 정의가 `web.dashboard` 로 옮겨졌다 (WBS-4.2.7)."""
+    return [q.id for q in queues_for_stage(stage)]
+
+
 class TestStageQueues:
     def test_S0_에는_대기열이_둘뿐이다(self) -> None:
         # FR-59 — 켜지지 않은 기능의 대기열은 표시하지 않는다.
-        assert _queues_for_stage("S0") == ["Q4", "Q8"]
+        assert _ids("S0") == ["Q4", "Q8"]
 
     def test_단계가_오를수록_대기열이_늘_뿐_줄지_않는다(self) -> None:
         prev: set[str] = set()
         for stage in ("S0", "S1", "S2", "S3", "S4", "S5"):
-            cur = set(_queues_for_stage(stage))
+            cur = set(_ids(stage))
             assert prev <= cur, f"{stage} 에서 대기열이 사라졌다"
             prev = cur
 
     def test_게재는_S3_부터다(self) -> None:
         # Q5(정정)·Q6(암묵적 해결 확인)은 게재가 있어야 생긴다.
-        assert "Q5" not in _queues_for_stage("S2")
-        assert "Q5" in _queues_for_stage("S3")
+        assert "Q5" not in _ids("S2")
+        assert "Q5" in _ids("S3")
 
     def test_모르는_단계는_가장_안전한_쪽으로_떨어진다(self) -> None:
-        assert _queues_for_stage("없는단계") == ["Q4", "Q8"]
+        assert _ids("없는단계") == ["Q4", "Q8"]
 
 
 class TestWebApp:
@@ -63,10 +69,16 @@ class TestWebApp:
         client = TestClient(create_app(_settings()))
         assert client.get("/health").json()["status"] == "ok"
 
-    def test_현재_단계와_대기열을_보여준다(self) -> None:
-        body = TestClient(create_app(_settings(stage="S1"))).get("/").json()
-        assert body["stage"] == "S1"
-        assert body["queues"] == ["Q1", "Q4", "Q8"]
+    def test_현재_단계와_대기열을_보여준다(self, tmp_path) -> None:
+        cfg = _settings(
+            stage="S1",
+            operations_db=tmp_path / "ops.sqlite3",
+            knowledge_dir=tmp_path / "knowledge",
+        )
+        html = TestClient(create_app(cfg)).get("/").text
+        assert "단계 S1" in html
+        for qid in ("Q1", "Q4", "Q8"):
+            assert qid in html
 
 
 class TestWorker:

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>지식베이스 현황</h1>
+<p class="dim small">지식이 자라고 있는가, 썩고 있는가 (§8.3)</p>
+
+<div class="cards">
+  <div class="card"><div class="dim small">지식 항목</div><div class="n">{{ s.total }}</div></div>
+  <div class="card">
+    <div class="dim small">stale 비율</div>
+    <div class="n {% if s.stale_ratio > 0.3 %}warn{% endif %}">{{ '%.0f'|format(s.stale_ratio * 100) }}%</div>
+    <div class="dim small">{{ s.stale }}건</div>
+  </div>
+  <div class="card">
+    <div class="dim small">출처 구성</div>
+    <div class="n">{{ '%.0f'|format(s.source_ratio * 100) }}%</div>
+    <div class="dim small">소스 {{ s.from_source }} · QnA {{ s.from_qna }}</div>
+  </div>
+  <div class="card">
+    <div class="dim small">미해결 모순</div>
+    <div class="n {% if s.open_contradictions %}warn{% else %}ok{% endif %}">{{ s.open_contradictions }}</div>
+    <div class="dim small">Q4</div>
+  </div>
+</div>
+
+{% if s.lint_findings or s.broken_files %}
+<h2>Lint 소견</h2>
+<ul class="small">
+  {% for kind, n in s.lint_findings.items() %}<li>{{ kind }} — {{ n }}건</li>{% endfor %}
+  {% for f in s.broken_files %}<li class="warn">읽을 수 없는 지식 파일 — <code>{{ f }}</code></li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2>최근 ingest 이력</h2>
+{% if s.recent_ingests %}
+<table>
+  <tr><th style="width:11rem">시각</th><th>내용</th></tr>
+  {% for when, subject in s.recent_ingests %}<tr><td class="dim small">{{ when }}</td><td>{{ subject }}</td></tr>{% endfor %}
+</table>
+{% else %}
+<p class="dim">아직 없다. 배치가 한 번도 지식을 바꾸지 않았다.</p>
+{% endif %}
+
+<h2>대기열</h2>
+<p class="dim small">
+  켜진 단계({{ stage }})의 것만 보인다 — 여덟을 다 늘어놓으면 실제로 밀린 것이 그 사이에 묻힌다 (FR-59).
+</p>
+<table>
+  <tr><th style="width:3rem"></th><th>대기열</th><th style="width:5rem">건수</th><th>방치 비용</th></tr>
+  {% for q in queues %}
+  <tr>
+    <td><a href="/queues/{{ q.id }}">{{ q.id }}</a></td>
+    <td>{{ q.title }}<div class="dim small">{{ q.what }}</div></td>
+    <td class="{% if counts[q.id] %}warn{% endif %}">{{ counts[q.id] }}</td>
+    <td class="dim small">{{ q.neglect_cost }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

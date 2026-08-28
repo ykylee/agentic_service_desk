@@ -6,10 +6,16 @@ llm-wiki 의 3연산 중 셋째다. Ingest 가 지식을 짓고 Query 가 꺼내
 | 검사 | 무엇이 잘못됐는가 | 어디로 |
 |---|---|---|
 | 모순 미해결 | 사람과 에이전트의 판단이 어긋난 채 남아 있다 | Q4 (이미 티켓이 있다) |
-| stale | 출처 커밋 이후 근거가 바뀌었다 | 항목에 표시 + Q5 |
+| stale | 출처 커밋 이후 근거가 바뀌었다 | 항목에 **표시** + 현황의 stale 비율 |
 | 고아 | 번들 목록에 등재되지 않아 **소비자에게 보이지 않는다** | 목록 재생성 |
 | 끊어진 링크 | 답변이 가리키는 지식 항목이 없다 | Q5 |
 | 참조 부재 | 지식 항목의 출처 커밋이 저장소에 없다 | Q5 |
+
+**stale 은 대기열로 가지 않는다.** Q5 는 "근거가 낡은 **게재 답변·살아있는 문서**"의
+정정 후보이지 지식 항목 자체가 아니다(§8.2). 지식 항목의 stale 은 §8.3 의 **현황
+지표**이며, 그것이 게재물로 번져 Q5 가 되는 것은 stale 전파(WBS-4.5.7)의 몫이다.
+지금 티켓을 찍으면 S0 에서는 Q5 가 화면에 뜨지도 않아(FR-59) **보이지 않는 대기열이
+쌓인다.**
 
 **아무것도 삭제하지 않는다.** 깨진 링크를 지우면 그 답변이 무엇에 근거했는지가
 함께 사라진다 — 답은 이미 사람에게 나갔는데 근거만 없어지는 것이다. 지우는 대신
@@ -44,9 +50,11 @@ RESOLVED = "resolved"
 
 
 class Kind(enum.StrEnum):
-    """소견의 종류."""
+    """대기열로 올라가는 소견의 종류.
 
-    STALE = "stale"
+    stale 이 여기 없는 것이 요점이다 — 그것은 대기열이 아니라 현황 지표다.
+    """
+
     BROKEN_LINK = "broken_link"
     MISSING_REFERENCE = "missing_reference"
 
@@ -131,7 +139,7 @@ class Lint:
         report.open_contradictions = len(contradiction.list_open(self._conn))
 
         report.findings.extend(self._check_references(stored))
-        report.findings.extend(self._check_stale(stored, report))
+        self._check_stale(stored, report)
         report.findings.extend(self._check_broken_links(stored))
         report.indexed, report.index_rewritten = self._rebuild_index(stored)
 
@@ -174,8 +182,8 @@ class Lint:
 
     # --- stale ------------------------------------------------------------
 
-    def _check_stale(self, stored: list[StoredItem], report: LintReport) -> list[Finding]:
-        """근거가 낡았는가 (FR-8). **표시만 한다 — 삭제하지 않는다.**
+    def _check_stale(self, stored: list[StoredItem], report: LintReport) -> None:
+        """근거가 낡았는가 (FR-8). **표시만 한다 — 삭제하지도, 대기열로 올리지도 않는다.**
 
         `linked` 는 커밋 기준으로 본다 — 출처 커밋 이후 그 경로가 바뀌었는가.
         **소스코드 원천이 있어서 시간이 아니라 커밋으로 판정된다**는 것이 일반 위키
@@ -183,22 +191,15 @@ class Lint:
 
         `periodic` 은 묶을 대상이 없을 때의 대비책이므로 시간으로 본다.
         """
-        findings: list[Finding] = []
         changed_cache: dict[str, set[str]] = {}
-
         for s in stored:
             if s.item.stale:
-                continue  # 이미 표시돼 있다. 다시 올리지 않는다
-            reason = self._stale_reason(s, changed_cache)
-            if not reason:
+                continue  # 이미 표시돼 있다
+            if not self._stale_reason(s, changed_cache):
                 continue
             s.item.stale = True
             self._repo.save(s.item, at=s.path)
             report.marked_stale.append(s.item.id)
-            findings.append(
-                Finding(kind=Kind.STALE, subject=s.item.id, detail=reason)
-            )
-        return findings
 
     def _stale_reason(self, s: StoredItem, cache: dict[str, set[str]]) -> str | None:
         inv = s.item.invalidation

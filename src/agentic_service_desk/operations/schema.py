@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS contradiction (
 -- 메워져 우선순위를 매길 수 없게 된다 (§8.6).
 CREATE TABLE IF NOT EXISTS lint_finding (
     key        TEXT PRIMARY KEY,  -- kind + 대상. 같은 소견을 다시 열지 않기 위한 열쇠
-    kind       TEXT NOT NULL,     -- stale | broken_link | missing_reference
+    kind       TEXT NOT NULL,     -- broken_link | missing_reference
     subject    TEXT NOT NULL,     -- 지식 항목 id 또는 답변 이력 id
     detail     TEXT NOT NULL,
     ticket_id  TEXT,              -- Q5 대기열의 자리 (source=correction)

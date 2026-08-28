@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.25,
+      "progress": 0.275,
       "total_leaves": 40,
-      "done_leaves": 10,
+      "done_leaves": 11,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -158,10 +158,10 @@
         {
           "id": "WBS-4.2",
           "title": "S0 수집과 지식베이스 구축",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 7,
-          "done_leaves": 6,
+          "done_leaves": 7,
           "children": [
             {
               "id": "WBS-4.2.1",
@@ -232,10 +232,12 @@
             {
               "id": "WBS-4.2.7",
               "title": "대시보드 최소",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-020"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

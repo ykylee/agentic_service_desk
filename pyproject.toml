@@ -12,6 +12,8 @@ dependencies = [
     # 지식 항목의 OKF frontmatter (FR-55). uvicorn[standard] 에 딸려 오지만
     # 우리가 직접 쓰므로 명시한다 — 전이 의존은 언제 사라져도 이상하지 않다.
     "pyyaml",
+    # 대시보드의 판정 버튼이 form POST 를 쓴다 (§8.5.5 — 화면은 지목과 판정만).
+    "python-multipart",
 ]
 
 [project.scripts]

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Q4 모순{% endblock %}
+{% block body %}
+<h1>Q4 — 모순</h1>
+<p class="dim small">
+  사람이 고친 지식과 에이전트의 판단이 어긋났다. <strong>어느 쪽도 지워지지 않았다</strong> —
+  판정은 사람이 한다 (§8.5.4). 고칠 것이 있으면 <strong>파일을 평소 쓰는 편집기로</strong> 연다 (§8.5.5).
+</p>
+
+{% if not rows %}
+<p class="ok">미해결 모순이 없다.</p>
+{% endif %}
+
+{% for r in rows %}
+<h2>{{ r.item_title }}</h2>
+<p class="dim small">
+  {% if r.item_path %}<code>{{ r.item_path }}</code>{% else %}<span class="warn">항목 파일이 없다</span>{% endif %}
+  · <code>{{ r.item_id }}</code> · 발견 {{ r.detected_at }}
+</p>
+<div class="sides">
+  <div class="side">
+    <h4>사람이 쓴 것 (지금 지식베이스에 있는 것)</h4>
+    <div>{{ r.human_body or '(비어 있다)' }}</div>
+  </div>
+  <div class="side">
+    <h4>에이전트의 판단 — {{ r.agent_title }}</h4>
+    <div>{{ r.agent_body }}</div>
+    <p class="dim small">근거: {{ r.agent_grounds }}</p>
+  </div>
+</div>
+<p style="margin-top:.6rem">
+  {% for value, label in [('kept_human', '사람 쪽이 옳다'), ('took_agent', '에이전트 쪽이 옳다'), ('merged', '양쪽을 합쳐 고쳤다')] %}
+  <form method="post" action="/queues/Q4/{{ r.id }}/resolve">
+    <input type="hidden" name="resolution" value="{{ value }}">
+    <button type="submit">{{ label }}</button>
+  </form>
+  {% endfor %}
+</p>
+<p class="dim small">
+  판정 결과의 분포가 지표다 — 에이전트가 자주 이기면 사람 편집이, 반대면 ingest 프롬프트가 틀리고 있다는 뜻이다.
+</p>
+{% endfor %}
+{% endblock %}
