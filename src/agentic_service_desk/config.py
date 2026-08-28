@@ -51,6 +51,15 @@ class Settings(BaseSettings):
         default=60,
         description="QnA 폴링 주기 (NFR-7). 주기가 답변 지연에 그대로 더해진다.",
     )
+    bot_accounts: str = Field(
+        default="",
+        description=(
+            "이 시스템이 게재에 쓰는 계정. 쉼표로 여럿. **되먹임 차단의 유일한 기준**이다 "
+            "(D7). 비어 있으면 산출물 필터가 **동작을 거부한다** — 목록이 없으면 봇 답변이 "
+            "사람 답변으로 보여 §5.3 이 조용히 무력화되기 때문이다. mock 으로 개발할 때는 "
+            "`svc-agentic-desk` 를 넣는다."
+        ),
+    )
 
     # --- LLM (ADR-005) ----------------------------------------------------
     llm_base_url: str = Field(
