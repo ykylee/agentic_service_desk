@@ -13,7 +13,8 @@ from __future__ import annotations
 import httpx
 
 from agentic_service_desk.llm.arbiter import YieldSignal
-from agentic_service_desk.llm.gateway import Priority
+from agentic_service_desk.llm.embeddings import EmbeddingProvider, build_embedding_provider
+from agentic_service_desk.llm.gateway import EmbeddingPurpose, Priority
 from agentic_service_desk.llm.policy import (
     DataExposure,
     RemoteEndpointRejected,
@@ -38,7 +39,7 @@ class ChatLlmGateway:
         model: str,
         arbiter: YieldSignal,
         *,
-        embedding_model: str = "",
+        embeddings: EmbeddingProvider | None = None,
         api_key: str = "",
         allow_remote: bool = False,
         exposure: DataExposure | None = None,
@@ -51,7 +52,7 @@ class ChatLlmGateway:
         )
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._embedding_model = embedding_model or model
+        self._embeddings = embeddings
         self._arbiter = arbiter
         self._timeout = timeout
         self._headers = {"Content-Type": "application/json"}
@@ -87,25 +88,36 @@ class ChatLlmGateway:
     # --- 임베딩 -----------------------------------------------------------
 
     def embed(
-        self, texts: list[str], *, priority: Priority = Priority.BATCH
+        self,
+        texts: list[str],
+        *,
+        purpose: EmbeddingPurpose,
+        priority: Priority = Priority.BATCH,
     ) -> list[list[float]]:
-        """임베딩 (ADR-004 의 두 축 중 하나)."""
-        with httpx.Client(timeout=self._timeout) as client:
-            res = client.post(
-                f"{self._base_url}/embeddings",
-                headers=self._headers,
-                json={"model": self._embedding_model, "input": texts},
-            )
-            res.raise_for_status()
-            return [row["embedding"] for row in res.json()["data"]]
+        """임베딩 (ADR-004 의 두 축 중 하나).
+
+        제공자에 위임한다 — **채팅과 임베딩은 같은 형식이 아닐 수 있다.**
+        """
+        if self._embeddings is None:
+            raise NotImplementedError("임베딩 제공자가 설정되지 않았다")
+        if priority is Priority.ONLINE:
+            with self._arbiter.online_in_use():
+                return self._embeddings.embed(texts, purpose)
+        return self._embeddings.embed(texts, purpose)
 
 
 def build_gateway(settings, arbiter: YieldSignal) -> ChatLlmGateway:  # noqa: ANN001
     """설정에서 게이트웨이를 만든다. 허용 판정이 여기서 한 번에 일어난다."""
+    embed_url = settings.embedding_base_url or settings.llm_base_url
     return ChatLlmGateway(
         base_url=settings.llm_base_url,
         model=settings.llm_model,
-        embedding_model=settings.llm_embedding_model,
+        embeddings=build_embedding_provider(
+            settings.embedding_provider,
+            embed_url,
+            settings.llm_embedding_model,
+            settings.llm_api_key,
+        ),
         api_key=settings.llm_api_key,
         arbiter=arbiter,
         allow_remote=settings.llm_allow_remote,

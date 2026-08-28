@@ -13,6 +13,19 @@ import enum
 from typing import Protocol
 
 
+class EmbeddingPurpose(enum.StrEnum):
+    """임베딩을 어느 쪽으로 쓰는가 (ADR-004).
+
+    지식 항목을 **색인**할 때와 질문으로 **질의**할 때는 다른 일이다.
+    """
+
+    INDEX = "index"
+    """지식 항목을 검색 대상으로 넣는다."""
+
+    QUERY = "query"
+    """질문으로 찾는다."""
+
+
 class Priority(enum.IntEnum):
     """낮은 값이 먼저다."""
 
@@ -35,6 +48,20 @@ class LlmGateway(Protocol):
         """
         ...
 
-    def embed(self, texts: list[str], *, priority: Priority = Priority.BATCH) -> list[list[float]]:
-        """임베딩. 검색(ADR-004)의 두 축 중 하나다."""
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        purpose: EmbeddingPurpose,
+        priority: Priority = Priority.BATCH,
+    ) -> list[list[float]]:
+        """임베딩. 검색(ADR-004)의 두 축 중 하나다.
+
+        `purpose` 를 받는 이유는 **색인과 질의가 다른 일**이기 때문이다 — 같은 문장이라도
+        찾히는 쪽으로 넣을 때와 찾는 쪽으로 넣을 때 최적 표현이 다를 수 있다.
+
+        OpenAI 형식은 이 구분을 노출하지 않지만 일부 제공자는 요구한다. 제공자가
+        무시하더라도 **인터페이스에는 두는 것이 맞다** — 우리 설계(ADR-004)에 이미
+        있는 구분이고, 나중에 넣으려면 호출부를 전부 고쳐야 한다.
+        """
         ...

@@ -61,6 +61,18 @@ class Settings(BaseSettings):
     llm_embedding_model: str = Field(
         default="", description="임베딩 모델. 실제 데이터를 다룰 때는 로컬이어야 한다 (NFR-1)."
     )
+    embedding_provider: str = Field(
+        default="openai_compatible",
+        description=(
+            "임베딩 제공자 형식 — `openai_compatible` | `minimax`. **채팅과 다를 수 있다.** "
+            "채팅은 OpenAI 호환이 사실상 표준이 됐지만 임베딩은 그렇지 않다 "
+            "(MiniMax 는 `texts`+`type` 을 받고 `vectors` 를 준다)."
+        ),
+    )
+    embedding_base_url: str = Field(
+        default="",
+        description="임베딩 엔드포인트. 비우면 `llm_base_url` 을 쓴다.",
+    )
     llm_api_key: str = Field(
         default="", description="원격 제공자를 쓸 때의 키. 로컬 런타임에는 대개 불필요하다."
     )

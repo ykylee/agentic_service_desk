@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-011 — MiniMax API 조사와 임베딩 제공자 분리",
       "TASK-2026-08-28-main-010 — NFR-1 집행 정밀화 — 개발 환경 원격 LLM 허용",
       "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock",
       "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
       "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
-      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
-      "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰"
+      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 11,
+    "task_count": 12,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -64,7 +64,8 @@
       "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
       "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
       "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock",
-      "TASK-2026-08-28-main-010 — NFR-1 집행 정밀화 — 개발 환경 원격 LLM 허용"
+      "TASK-2026-08-28-main-010 — NFR-1 집행 정밀화 — 개발 환경 원격 LLM 허용",
+      "TASK-2026-08-28-main-011 — MiniMax API 조사와 임베딩 제공자 분리"
     ]
   },
   "next_documents": [
