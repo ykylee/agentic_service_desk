@@ -125,6 +125,14 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=7,
+        name="review.kind · content_draft.ticket_id — 콘텐츠 검수 (WBS-4.6.4, FR-39)",
+        statements=(
+            "ALTER TABLE review ADD COLUMN kind TEXT NOT NULL DEFAULT 'answer'",
+            "ALTER TABLE content_draft ADD COLUMN ticket_id TEXT",
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

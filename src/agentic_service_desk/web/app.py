@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -20,6 +22,8 @@ from fastapi.templating import Jinja2Templates
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.content import registry as content_registry
+from agentic_service_desk.content import production as content_production
+from agentic_service_desk.content import review as content_review
 from agentic_service_desk.content import store as content_store
 from agentic_service_desk.web import metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
@@ -154,6 +158,86 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return TEMPLATES.TemplateResponse(request, "status.html", shell() | ctx)
+
+    @app.get("/queues/Q3")
+    def q3(request: Request):  # noqa: ANN201
+        """콘텐츠 검수 대기열 (FR-39·45).
+
+        **작업 대기열이다** — 판정 화면과 달리 항목마다 상세가 있다. diff 를 읽어야
+        누를 수 있는 버튼이고, 그 읽는 행위가 §5.6.1 이 말한 "형식적 승인"을 막는다.
+        """
+        _, conn = dashboard()
+        try:
+            rows = [
+                _content_row(conn, content_types, d)
+                for d in content_store.pending(conn)
+            ]
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "q3.html", shell() | {"rows": rows})
+
+    @app.get("/queues/Q3/{ticket_id}")
+    def q3_detail(request: Request, ticket_id: str):  # noqa: ANN201
+        """**티켓 id 로 연다.** 순위(`next_up`)가 가리키는 것이 티켓이므로 그 자리에서
+        바로 열려야 한다."""
+        _, conn = dashboard()
+        try:
+            detail = _content_detail(cfg, conn, content_types, ticket_id)
+        finally:
+            conn.close()
+        if detail is None:
+            return RedirectResponse("/queues/Q3", status_code=303)
+        return TEMPLATES.TemplateResponse(
+            request,
+            "content.html",
+            shell()
+            | {
+                "d": detail,
+                "reasons": _reasons(
+                    review_domain.ANSWER_REASONS
+                    + tuple(
+                        review_domain.Reject(r)
+                        for r in detail.ctype.review.extra_rejections
+                    )
+                ),
+            },
+        )
+
+    @app.post("/queues/Q3/{ticket_id}/decide")
+    def q3_decide(  # noqa: ANN201
+        ticket_id: str,
+        approved: str = Form(...),
+        reason: str = Form(""),
+        detail: str = Form(""),
+    ):
+        """사람이 판정한다. **여기 자동 승인 경로는 없다** (FR-39)."""
+        _, conn = dashboard()
+        try:
+            draft = content_store.by_ticket(conn, ticket_id)
+            if draft is None:
+                return RedirectResponse("/queues/Q3", status_code=303)
+            is_approved = approved == "1"
+            picked = None
+            if not is_approved:
+                try:
+                    picked = review_domain.Reject(reason)
+                except ValueError:
+                    # 사유 없는 반려는 기록으로 쓸 수 없다 (§5.5.6) — 화면으로
+                    # 되돌려 다시 고르게 한다.
+                    return RedirectResponse(
+                        f"/queues/Q3/{ticket_id}", status_code=303
+                    )
+            content_review.decide(
+                conn,
+                content_types.get(draft.type_id),
+                draft,
+                approved=is_approved,
+                reason=picked,
+                detail=detail,
+            )
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q3", status_code=303)
 
     @app.get("/queues/Q1")
     def q1(request: Request):  # noqa: ANN201
@@ -314,7 +398,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "unmatched": unmatched,
                 "dist": dist,
                 "agent_dist": agent_dist,
-                "reasons": [(str(r), review_domain.DESCRIPTIONS[r]) for r in review_domain.Reject],
+                # P6~P8 은 칼럼 전용이라 여기 두지 않는다 — 고를 수 없는 선택지가
+                # 화면에 늘면 무엇이 이 화면의 사유인지가 흐려진다 (§7.6.4).
+                "reasons": _reasons(review_domain.ANSWER_REASONS),
             },
         )
 
@@ -640,6 +726,10 @@ def _publish(cfg, conn, parent_system, draft_id: str) -> str:  # noqa: ANN001
     return "게재했다."
 
 
+def _reasons(codes) -> list[tuple[str, str]]:  # noqa: ANN001
+    return [(str(r), review_domain.DESCRIPTIONS[r]) for r in codes]
+
+
 def _source_text(cfg, conn, drafts) -> dict[str, str]:  # noqa: ANN001
     """초안이 가리키는 지식 항목의 원문.
 
@@ -658,3 +748,136 @@ def _source_text(cfg, conn, drafts) -> dict[str, str]:  # noqa: ANN001
         for s in repo.scan()[0]
         if s.item.id in wanted
     }
+
+
+@dataclass(frozen=True)
+class _ContentRow:
+    """Q3 목록 한 줄."""
+
+    draft: object
+    type_title: str
+    nature: str
+    age_hours: float
+    summary: str
+
+    @property
+    def age_label(self) -> str:
+        if self.age_hours < 1:
+            return "방금"
+        if self.age_hours < 48:
+            return f"{int(self.age_hours)}시간"
+        return f"{int(self.age_hours / 24)}일"
+
+
+@dataclass(frozen=True)
+class _ContentDetail:
+    """콘텐츠 검수 화면이 필요한 전부."""
+
+    draft: object
+    ctype: object
+    previous: object
+    sources: dict[str, str]
+    stale_ids: frozenset[str]
+    findings: object
+    diff: str
+    churn: float
+    age_hours: float
+
+    @property
+    def type_title(self) -> str:
+        return self.ctype.title
+
+    @property
+    def nature(self) -> str:
+        return "살아있는 문서" if self.ctype.living else "발행물"
+
+    @property
+    def destination(self) -> str:
+        place = self.ctype.destination.place
+        return f"{'문서 면' if self.ctype.living else '발행 면'}({place.operation})"
+
+    @property
+    def diff_review(self) -> bool:
+        """변경분 검수인가 (§5.5.5). **선언이 정한다** (FR-42)."""
+        return self.ctype.review.scope is content_registry.Scope.DIFF
+
+    @property
+    def awaiting_final_check(self) -> bool:
+        return content_review.awaiting_final_check(self.ctype)
+
+    @property
+    def generated_by(self) -> str:
+        return self.draft.generated_by
+
+    @property
+    def age_label(self) -> str:
+        if self.age_hours < 1:
+            return "방금"
+        if self.age_hours < 48:
+            return f"{int(self.age_hours)}시간"
+        return f"{int(self.age_hours / 24)}일"
+
+
+def _content_row(conn, types, draft) -> _ContentRow:  # noqa: ANN001
+    ctype = types.get(draft.type_id)
+    return _ContentRow(
+        draft=draft,
+        type_title=ctype.title,
+        nature="살아있는 문서" if ctype.living else "발행물",
+        age_hours=_hours_since(draft.created_at),
+        summary=(
+            "갱신 — 변경분을 본다" if draft.based_on else "첫 제작 — 전문을 본다"
+        ),
+    )
+
+
+def _content_detail(cfg, conn, types, ticket_id):  # noqa: ANN001, ANN201
+    """티켓에서 초안으로, 초안에서 근거·직전 판본·소견으로.
+
+    **diff 와 변경 비율은 여기서 다시 센다.** 제작 시점에 저장해 두면 직전 판본이
+    바뀌었을 때 화면이 옛 비교를 보여 주는데, 세는 비용이 낮아 저장할 이유가 없다.
+    """
+    draft = content_store.by_ticket(conn, ticket_id)
+    if draft is None:
+        return None
+    ctype = types.get(draft.type_id)
+    sources = _source_text(cfg, conn, [draft])
+    stale = _stale_ids(cfg, draft)
+    previous = content_store.get(conn, draft.based_on) if draft.based_on else None
+    return _ContentDetail(
+        draft=draft,
+        ctype=ctype,
+        previous=previous,
+        sources=sources,
+        stale_ids=stale,
+        findings=content_review.inspect(
+            ctype, draft, source_text=sources, stale_ids=stale
+        ),
+        diff=content_production.diff_of(previous.body, draft.body) if previous else "",
+        churn=content_production.churn(previous.body, draft.body) if previous else 0.0,
+        age_hours=_hours_since(draft.created_at),
+    )
+
+
+def _stale_ids(cfg, draft) -> frozenset[str]:  # noqa: ANN001
+    """근거 중 낡은 것. **화면이 표시하고 P4 가 이것을 본다.**"""
+    repo = KnowledgeRepository(cfg.knowledge_dir)
+    if not repo.root.exists():
+        return frozenset()
+    return frozenset(
+        s.item.id
+        for s in repo.scan()[0]
+        if s.item.id in set(draft.grounding) and s.item.stale
+    )
+
+
+def _hours_since(when: str) -> float:
+    if not when:
+        return 0.0
+    try:
+        at = datetime.fromisoformat(when)
+    except ValueError:
+        return 0.0
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - at).total_seconds() / 3600

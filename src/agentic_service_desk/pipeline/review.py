@@ -73,6 +73,25 @@ class Reject(enum.StrEnum):
     P5 = "P5"
     """근거의 범위를 넘겨 일반화한다 — 한 모듈의 동작을 시스템 전체의 규칙처럼."""
 
+    # --- 칼럼 전용 (§7.6.4) ---
+    # **한 enum 에 둔다.** 반려 사유 분포가 한 표(`review`)에 쌓이므로 분류도 한
+    # 곳이어야 한다 — 나누면 "P 로 시작하는 사유"가 두 벌이 되어 분포를 합쳐 읽을
+    # 수 없다. 답변 경로는 이 셋을 쓰지 않는다: P1~P5 가 사실 진술을 전제하듯
+    # P6~P8 은 **논평**을 전제한다.
+
+    P6 = "P6"
+    """근거로 환원되지 않는 **가치 판단** — "이 방식이 더 낫습니다"."""
+
+    P7 = "P7"
+    """관찰을 **일반 법칙으로 확대** — "N 건 있었다" → "다들 그렇게 씁니다"."""
+
+    P8 = "P8"
+    """조직의 **정책·방침처럼 읽히는 서술** — "앞으로는 ~하십시오".
+
+    **문장 형태만으로 판정된다** (§7.6.4) — 명령형·당위 표현이 신호다. P6·P7 은
+    의미 판정이 필요하다.
+    """
+
 
 DESCRIPTIONS: dict[Reject, str] = {
     Reject.P1: "현재 값을 모르면서 예시로 채웠다",
@@ -80,7 +99,18 @@ DESCRIPTIONS: dict[Reject, str] = {
     Reject.P3: "업계 통념을 이 시스템의 사실처럼 말했다",
     Reject.P4: "낡은 지식을 현재형으로 말했다",
     Reject.P5: "근거의 범위를 넘겨 일반화했다",
+    Reject.P6: "근거로 환원되지 않는 가치 판단이다",
+    Reject.P7: "관찰을 일반 법칙으로 확대했다",
+    Reject.P8: "조직의 정책·방침처럼 읽힌다",
 }
+
+ANSWER_REASONS: tuple[Reject, ...] = (Reject.P1, Reject.P2, Reject.P3, Reject.P4, Reject.P5)
+"""답변에 쓰는 사유. **P6~P8 을 섞지 않는다** — 그 셋은 논평을 전제하므로
+답변 검수자에게 내밀면 고를 수 없는 선택지가 화면에 는다."""
+
+COLUMN_REASONS: tuple[Reject, ...] = (Reject.P6, Reject.P7, Reject.P8)
+"""칼럼 전용 (§7.6.4). 콘텐츠 타입이 **선언으로** 고른다 (FR-42)."""
+
 
 #: 수치가 들어간 토큰. **P1 의 준기계적 판정에 쓴다.**
 #: 숫자를 고른 이유는 문자열 대조로 확정 가능한 부분이 그것이기 때문이다 —
@@ -261,25 +291,35 @@ class Reviewer:
 # --- 기록 -------------------------------------------------------------------
 
 
+ANSWER = "answer"
+CONTENT = "content"
+
+
 def record(
     conn: sqlite3.Connection,
     *,
     review: ReviewInput,
     verdict: Verdict,
     qna_item_id: str | None = None,
+    kind: str = ANSWER,
 ) -> str:
     """검수 결과를 남긴다 (FR-22, §5.5.6).
 
     **반려된 초안도 남긴다.** 버리면 왜 반려됐는지의 분포를 잃는다.
+
+    `kind` 로 답변과 콘텐츠를 가른다. 섞으면 §5.5.6 의 반려율이 무엇을 뜻하는지가
+    달라진다 — 그 숫자는 "사람이 에이전트의 *답변*을 얼마나 믿는가"이고, 콘텐츠는
+    애초에 자동 게재 관문이 없어 **비교 대상이 아니다.**
     """
     review_id = f"rv-{uuid.uuid4().hex[:12]}"
     conn.execute(
         "INSERT INTO review "
-        "(id, qna_item_id, outcome, reason, detail, draft_body, grounding, "
-        " reviewed_by, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, qna_item_id, kind, outcome, reason, detail, draft_body, grounding, "
+        " reviewed_by, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             review_id,
             qna_item_id,
+            kind,
             verdict.outcome,
             str(verdict.reason) if verdict.reason else None,
             verdict.detail,
@@ -324,7 +364,7 @@ class Distribution:
 
 
 def distribution(
-    conn: sqlite3.Connection, *, reviewed_by: str | None = None
+    conn: sqlite3.Connection, *, reviewed_by: str | None = None, kind: str = ANSWER
 ) -> Distribution:
     """검수 분포. `reviewed_by` 로 **판정 주체를 가른다.**
 
@@ -333,11 +373,13 @@ def distribution(
     2국면 자동 검수의 학습 자료가 되는 것은(§5.5.3) **사람 판정 기록**이다.
     에이전트 판정은 기계·의미 층이 무엇을 잡는지를 따로 보여 준다.
     """
-    query = "SELECT outcome, reason FROM review"
-    params: tuple = ()
+    # **답변만 센다.** 콘텐츠 반려가 섞이면 이 비율이 두 가지를 한 숫자에 누른다 —
+    # 콘텐츠는 애초에 자동 게재 관문이 없어 "믿는가"를 물을 대상이 아니다.
+    query = "SELECT outcome, reason FROM review WHERE kind = ?"
+    params: tuple = (kind,)
     if reviewed_by:
-        query += " WHERE reviewed_by = ?"
-        params = (reviewed_by,)
+        query += " AND reviewed_by = ?"
+        params += (reviewed_by,)
 
     out = Distribution()
     for row in conn.execute(query, params):

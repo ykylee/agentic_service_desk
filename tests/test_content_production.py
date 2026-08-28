@@ -470,3 +470,21 @@ class TestLiveDefects:
         assert result.churn == 0.5
         assert "50% 변경" in result.detail
         conn.close()
+
+    def test_하네스가_실패해도_배치를_세우지_않는다(self, tmp_path) -> None:
+        # 라이브에서 pi 타임아웃으로 밟았다: 예외가 위로 올라가면 **그 tick 의
+        # 나머지 타입이 통째로 멈춘다.** 실패는 기록으로 남고 다음 주기에 다시
+        # 시도된다.
+        from agentic_service_desk.ingest.harness_runner import HarnessError
+
+        class _Broken:
+            def run(self, prompt, *, cwd=None):  # noqa: ANN001, ANN202
+                raise HarnessError("pi 가 300초 안에 끝나지 않았다")
+
+        conn = _conn(tmp_path)
+        result = _producer(tmp_path, conn, _Broken()).run(GUIDE)
+
+        assert result.outcome is store.Outcome.GENERATION_FAILED
+        assert "300초" in result.detail
+        assert store.last_run(conn, "guide").last_generated_at is None  # 시계는 안 간다
+        conn.close()

@@ -88,8 +88,14 @@ def core(conn: sqlite3.Connection) -> list[Metric]:
     answered = _count(
         conn, "SELECT count(DISTINCT qna_item_id) c FROM answer_draft"
     )
-    rejected = _count(conn, "SELECT count(*) c FROM review WHERE outcome = 'rejected'")
-    reviewed = _count(conn, "SELECT count(*) c FROM review")
+    # **답변 검수만 센다** (`kind`). 콘텐츠 반려가 섞이면 이 비율이 "사람이
+    # 에이전트의 답변을 얼마나 믿는가"를 더는 뜻하지 않는다 — 콘텐츠는 애초에
+    # 자동 게재 관문이 없어 비교 대상이 아니다.
+    rejected = _count(
+        conn,
+        "SELECT count(*) c FROM review WHERE kind = 'answer' AND outcome = 'rejected'",
+    )
+    reviewed = _count(conn, "SELECT count(*) c FROM review WHERE kind = 'answer'")
 
     return [
         Metric(
@@ -162,7 +168,8 @@ def qna_status(conn: sqlite3.Connection) -> Status:
         conn, "SELECT count(*) c FROM answer_record WHERE state = 'published'"
     )
     auto = _count(
-        conn, "SELECT count(*) c FROM review WHERE reviewed_by = 'gate'"
+        conn,
+        "SELECT count(*) c FROM review WHERE kind = 'answer' AND reviewed_by = 'gate'",
     )
     followups = _count(conn, "SELECT count(*) c FROM raw_followup")
     corrected = _count(
@@ -204,12 +211,14 @@ def agent_status(conn: sqlite3.Connection) -> Status:
         who: (
             _count(
                 conn,
-                "SELECT count(*) c FROM review WHERE reviewed_by = ? AND outcome = 'passed'",
+                "SELECT count(*) c FROM review "
+                "WHERE kind = 'answer' AND reviewed_by = ? AND outcome = 'passed'",
                 (who,),
             ),
             _count(
                 conn,
-                "SELECT count(*) c FROM review WHERE reviewed_by = ? AND outcome = 'rejected'",
+                "SELECT count(*) c FROM review "
+                "WHERE kind = 'answer' AND reviewed_by = ? AND outcome = 'rejected'",
                 (who,),
             ),
         )
@@ -394,7 +403,8 @@ def _agreement(conn: sqlite3.Connection) -> float | None:
         "SELECT qna_item_id, "
         "  max(CASE WHEN reviewed_by = 'agent' THEN outcome END) AS a, "
         "  max(CASE WHEN reviewed_by = 'human' THEN outcome END) AS h "
-        "FROM review WHERE qna_item_id IS NOT NULL GROUP BY qna_item_id"
+        "FROM review WHERE kind = 'answer' AND qna_item_id IS NOT NULL "
+        "GROUP BY qna_item_id"
     ).fetchall()
     both = [r for r in rows if r["a"] and r["h"]]
     if not both:

@@ -163,6 +163,11 @@ CREATE TABLE IF NOT EXISTS answer_draft (
 CREATE TABLE IF NOT EXISTS review (
     id          TEXT PRIMARY KEY,
     qna_item_id TEXT,            -- 답변 검수일 때만. 콘텐츠 검수는 비어 있다
+    -- 무엇을 검수했는가 — answer | content. **섞으면 §5.5.6 의 반려율이 무엇을
+    -- 뜻하는지 달라진다**: 그 숫자는 "사람이 에이전트의 *답변*을 얼마나 믿는가"인데
+    -- 콘텐츠 반려가 섞이면 두 가지가 한 비율에 눌린다. `checked_by` 로 자동 게재를
+    -- 갈라 둔 것과 같은 이유다.
+    kind        TEXT NOT NULL DEFAULT 'answer',
     outcome     TEXT NOT NULL,   -- passed | rejected
     reason      TEXT,            -- P1~P8. 통과에는 없다
     detail      TEXT,
@@ -347,6 +352,9 @@ CREATE TABLE IF NOT EXISTS knowledge_embedding (
 CREATE TABLE IF NOT EXISTS content_draft (
     id           TEXT PRIMARY KEY,
     type_id      TEXT NOT NULL,   -- 레지스트리의 타입 id (faq | guide | column | ...)
+    ticket_id    TEXT,            -- Q3 대기열의 자리 (source=content, §6.4.3).
+                                  -- **Q3 는 작업 대기열이다** (FR-45) — 초안 하나가
+                                  -- 처리 하나이고, 그 기록 단위가 티켓이다
     title        TEXT NOT NULL,
     body         TEXT NOT NULL,
     grounding    TEXT NOT NULL,   -- JSON — 근거로 쓴 지식 항목 id

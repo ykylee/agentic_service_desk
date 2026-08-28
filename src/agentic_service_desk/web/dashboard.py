@@ -59,14 +59,23 @@ class Queue:
     source: str | None = None
     """이 대기열을 채우는 티켓 출처 (§6.4.3). 판정 대기열에는 없다."""
 
+    has_detail: bool = False
+    """항목마다 화면이 따로 있는가.
+
+    작업 대기열이라고 다 있는 것은 아니다 — Q4·Q5 는 목록에서 양쪽을 나란히 보고
+    그 자리에서 판정하므로 상세가 없다. **없는 곳으로 보내면 링크가 엉뚱한 화면을
+    연다**: 예전에는 넷이 모두 티켓 화면으로 갔는데, 모순 티켓의 티켓 화면은
+    "종결 기록 초안을 기다리는 중"이라고 말해 무엇을 해야 하는지 틀리게 알려 줬다.
+    """
+
 
 QUEUES: dict[str, Queue] = {
     "Q1": Queue("Q1", "티켓", "사람 손이 필요한 작업", "높음 — 사람이 기다린다",
-                "작업", HIGH, "qna"),
+                "작업", HIGH, "qna", has_detail=True),
     "Q2": Queue("Q2", "검수 대기 (답변)", "게재 전 답변 초안",
                 "높음 — 답변이 나가지 못한다", "판정", HIGH),
     "Q3": Queue("Q3", "검수 대기 (콘텐츠)", "발행 전 콘텐츠",
-                "중간 — 발행이 밀린다", "작업", MEDIUM, "content"),
+                "중간 — 발행이 밀린다", "작업", MEDIUM, "content", has_detail=True),
     "Q4": Queue("Q4", "모순", "사람이 고친 지식과 에이전트의 판단이 어긋난 것",
                 "높음 — 모순된 지식이 계속 답변에 쓰인다", "작업", HIGH, "contradiction"),
     "Q5": Queue("Q5", "정정 후보", "근거가 낡은 게재 답변·살아있는 문서",
@@ -485,13 +494,17 @@ class Dashboard:
 
     def _work_item(self, t: ticket_domain.Ticket) -> WorkItem:
         queue_id = QUEUE_BY_SOURCE.get(str(t.source), "Q1")
+        queue = QUEUES[queue_id]
         return WorkItem(
-            queue=QUEUES[queue_id],
+            queue=queue,
             ref=t.id,
-            # 작업 대기열 넷이 모두 **티켓 화면**으로 간다 — 상세와 상태 전이가
-            # 필요한 것이 그 화면이고, 출처가 무엇이든 그 점은 같다 (FR-45).
-            href=f"/queues/Q1/{t.id}",
-            label=QUEUES[queue_id].title,
+            # **상세가 있는 대기열만 항목으로 보낸다.** Q4·Q5 는 목록이 곧 판정
+            # 화면이라 그리로 보내고, 티켓 화면으로 보내면 "종결 기록 초안을
+            # 기다리는 중"이라며 하지 않아도 될 일을 시킨다.
+            href=(
+                f"/queues/{queue_id}/{t.id}" if queue.has_detail else f"/queues/{queue_id}"
+            ),
+            label=queue.title,
             age_hours=t.age(),
             ticket=t,
         )

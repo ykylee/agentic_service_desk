@@ -329,7 +329,7 @@ def _clean_review(conn: sqlite3.Connection, qna_item_id: str | None) -> bool:
         "SELECT "
         "  sum(outcome = 'passed') AS passed, "
         "  sum(outcome = 'rejected') AS rejected "
-        "FROM review WHERE qna_item_id = ?",
+        "FROM review WHERE kind = 'answer' AND qna_item_id = ?",
         (qna_item_id,),
     ).fetchone()
     return bool(row["passed"]) and not row["rejected"]

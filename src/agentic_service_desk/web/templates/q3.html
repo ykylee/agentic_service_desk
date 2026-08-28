@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Q3 콘텐츠 검수{% endblock %}
+{% block body %}
+<h1>Q3 — 콘텐츠 검수</h1>
+<p class="dim small">
+  <strong>국면과 무관하게 전수 사람 승인</strong>이다 (FR-39). 답변에 있는 자동 게재
+  관문이 여기에는 <strong>아예 없다</strong> — 빈도가 낮고 노출이 넓고 회수가 어렵다 (§5.5.5).
+</p>
+
+{% if not rows %}
+<p class="ok">검수를 기다리는 콘텐츠가 없다.</p>
+{% endif %}
+
+<table>
+  {% if rows %}
+  <tr><th style="width:9rem">타입</th><th>제목</th><th style="width:6rem">경과</th><th>먼저 볼 것</th></tr>
+  {% endif %}
+  {% for r in rows %}
+  <tr>
+    <td class="small">{{ r.type_title }}<div class="dim small">{{ r.nature }}</div></td>
+    <td><a href="/queues/Q3/{{ r.draft.ticket_id }}">{{ r.draft.title }}</a></td>
+    <td class="small">{{ r.age_label }}</td>
+    <td class="dim small">{{ r.summary }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

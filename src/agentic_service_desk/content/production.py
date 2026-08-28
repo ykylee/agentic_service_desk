@@ -48,6 +48,7 @@ from agentic_service_desk.content import store
 from agentic_service_desk.content.registry import ContentType, Input
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness, extract_json
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.operations import ticket as ticket_domain
 
 LANGUAGE = "한국어"
 """1차 언어 (FR-43, D55). **판정하지 않는다** — 콘텐츠는 한 언어로 유지된다."""
@@ -380,11 +381,15 @@ class ContentProducer:
         allowed = {i.id for i in items}
         try:
             parsed = parse_document(self._harness.run(prompt).text, allowed)
-        except AgentOutputError as exc:
+        except (AgentOutputError, RuntimeError) as exc:
+            # **하네스 실패까지 여기서 받는다.** 콘텐츠 제작은 배치 주기의 한 걸음일
+            # 뿐인데, 모델이 응답하지 않았다고 예외가 위로 올라가면 **그 tick 의
+            # 나머지 타입이 통째로 멈춘다** — 라이브에서 pi 타임아웃으로 밟았다.
+            # 실패는 기록으로 남고 다음 주기에 다시 시도된다.
             return self._record(
                 ctype,
                 store.Outcome.GENERATION_FAILED,
-                f"응답을 읽을 수 없다 — {exc}",
+                f"생성하지 못했다 — {exc}",
                 excluded_stale=stale,
             )
         if parsed is None:
@@ -408,6 +413,10 @@ class ContentProducer:
                 excluded_stale=stale,
             )
 
+        # **티켓을 함께 발행한다** (§6.4.3, FR-45). Q3 는 작업 대기열이라 초안
+        # 하나가 처리 하나이고, 티켓이 있어야 순위(`next_up`)에도 오른다 — 없으면
+        # 콘텐츠만 "다음에 볼 것"에서 빠져 §8.2 가 걱정한 자리로 돌아간다.
+        ticket = ticket_domain.issue(self._conn, source=ticket_domain.Source.CONTENT)
         draft_id = store.save(
             self._conn,
             type_id=ctype.id,
@@ -416,6 +425,7 @@ class ContentProducer:
             grounding=grounding,
             based_on=previous.id if previous else None,
             generated_by=self._generated_by,
+            ticket_id=ticket.id,
         )
         result = self._record(
             ctype,

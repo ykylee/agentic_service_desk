@@ -61,6 +61,10 @@ class ContentDraft:
     based_on: str | None = None
     """직전 판본. **있어야 diff 검수가 성립한다** (§5.5.5)."""
 
+    ticket_id: str | None = None
+    """Q3 대기열의 자리 (§6.4.3). **Q3 는 작업 대기열이다** (FR-45) — 초안 하나가
+    처리 하나이고, 티켓이 그 기록 단위다."""
+
     state: str = PENDING
     generated_by: str = ""
     created_at: str = ""
@@ -74,6 +78,7 @@ def _from_row(row: sqlite3.Row) -> ContentDraft:
         body=row["body"],
         grounding=tuple(json.loads(row["grounding"] or "[]")),
         based_on=row["based_on"],
+        ticket_id=row["ticket_id"],
         state=row["state"],
         generated_by=row["generated_by"] or "",
         created_at=row["created_at"],
@@ -89,12 +94,13 @@ def save(
     grounding: tuple[str, ...],
     based_on: str | None = None,
     generated_by: str = "",
+    ticket_id: str | None = None,
 ) -> str:
     draft_id = f"cd-{uuid.uuid4().hex[:12]}"
     conn.execute(
         "INSERT INTO content_draft "
-        "(id, type_id, title, body, grounding, based_on, state, generated_by, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, type_id, title, body, grounding, based_on, ticket_id, state, "
+        " generated_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             draft_id,
             type_id,
@@ -102,6 +108,7 @@ def save(
             body,
             json.dumps(list(grounding), ensure_ascii=False),
             based_on,
+            ticket_id,
             PENDING,
             generated_by,
             datetime.now(UTC).isoformat(),
@@ -109,6 +116,22 @@ def save(
     )
     conn.commit()
     return draft_id
+
+
+def get(conn: sqlite3.Connection, draft_id: str) -> ContentDraft | None:
+    row = conn.execute(
+        "SELECT * FROM content_draft WHERE id = ?", (draft_id,)
+    ).fetchone()
+    return _from_row(row) if row else None
+
+
+def by_ticket(conn: sqlite3.Connection, ticket_id: str) -> ContentDraft | None:
+    """티켓에서 초안으로. **Q3 화면이 티켓 id 로 열리기 때문이다** — 순위(`next_up`)가
+    가리키는 것이 티켓이므로, 그 자리에서 바로 열려야 한다."""
+    row = conn.execute(
+        "SELECT * FROM content_draft WHERE ticket_id = ?", (ticket_id,)
+    ).fetchone()
+    return _from_row(row) if row else None
 
 
 def pending(conn: sqlite3.Connection, type_id: str | None = None) -> list[ContentDraft]:
