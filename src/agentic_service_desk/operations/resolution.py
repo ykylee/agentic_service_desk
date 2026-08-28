@@ -105,8 +105,22 @@ class Resolution:
     drafted_by: str = "agent"
     confirmed_at: str | None = None
     promoted_item_id: str | None = None
-    """승격된 지식 항목의 불변 id (경로 A). **두 번 올리지 않기 위한 표시**이자
+    """승격된 지식 항목의 불변 id. **두 번 올리지 않기 위한 표시**이자
     "이 종결 기록이 무엇이 되었는가"의 답이다."""
+
+    promoted_by: str | None = None
+    """`human` | `gate` — 누가 올렸는가 (§6.8.4).
+
+    **자동 승격분은 사람이 본 적이 없다.** 그래서 표본 재검증(§5.6.7)의 우선순위가
+    높고, 그 안전망이 성립하려면 어느 것이 자동이었는지 남아 있어야 한다.
+    """
+
+    promotion_declined_at: str | None = None
+    """사람이 Q7 에서 "올리지 않는다"고 판정한 시각.
+
+    남기지 않으면 **기각한 건이 매 주기 다시 뜬다** — 방치해도 사고가 나지 않는
+    대기열에 같은 것이 계속 쌓이면 실제로 볼 것이 그 사이에 묻힌다 (§8.2).
+    """
 
     def __post_init__(self) -> None:
         # 셋은 초안 단계에서도 있어야 한다. 넷째(무효화 조건)만 비워 둔다.
@@ -121,6 +135,11 @@ class Resolution:
     def confirmed(self) -> bool:
         """사람이 무효화 조건을 채웠는가. **닫으려면 참이어야 한다** (FR-13)."""
         return self.invalidation is not None
+
+    @property
+    def settled(self) -> bool:
+        """승격 판정이 끝났는가 — 올렸거나, 올리지 않기로 했거나."""
+        return bool(self.promoted_item_id or self.promotion_declined_at)
 
     @property
     def promotable(self) -> bool:
@@ -178,10 +197,16 @@ def draft(
 def confirm(
     conn: sqlite3.Connection, ticket_id: str, *, invalidation: Invalidation
 ) -> Resolution:
-    """사람이 무효화 조건을 채운다. **이 행위가 곧 승인이다** (§6.5.4).
+    """무효화 조건을 채운다. 사람이 하면 **그 행위가 곧 승인이다** (§6.5.4).
 
     그 답을 쓰려면 초안을 읽을 수밖에 없으므로 검증이 부산물로 실질이 된다 —
     감시 없이 목적을 달성한다.
+
+    **기계가 부르는 경우가 하나 있다** (§6.8.4 조건 1): 근거가 소스코드에 직접
+    연결되면 연결형 무효화 조건을 **도출**할 수 있다. 그때는 사람이 고를 것이 남아
+    있지 않으므로 강제 입력 지점(§5.6.4)이 지키려던 것이 이미 충족된 상태다 —
+    에이전트가 그럴듯한 기본값을 미리 채우는 것과 다르다. 무엇이 도출됐는지는
+    `promoted_by` 가 남긴다.
     """
     resolution = get(conn, ticket_id)
     if resolution is None:
@@ -297,4 +322,25 @@ def _from_row(row: sqlite3.Row) -> Resolution:
         drafted_by=row["drafted_by"],
         confirmed_at=row["confirmed_at"],
         promoted_item_id=row["promoted_item_id"],
+        promoted_by=row["promoted_by"],
+        promotion_declined_at=row["promotion_declined_at"],
     )
+
+
+def decline_promotion(conn: sqlite3.Connection, ticket_id: str) -> bool:
+    """사람이 "이건 지식으로 올리지 않는다"고 판정했다 (Q7, §6.8.1 경로 B).
+
+    **기각도 판정이다.** 남기지 않으면 같은 건이 매 주기 다시 뜨고, 방치해도 사고가
+    나지 않는 대기열에 그것이 쌓이면 **실제로 볼 것이 그 사이에 묻힌다** (§8.2).
+
+    되돌릴 수 있게 두지 않는다 — 되돌릴 일이 있으면 그것은 새 판정이고, 지금은
+    그런 경로를 요구하는 것이 없다.
+    """
+    updated = conn.execute(
+        "UPDATE ticket_resolution SET promotion_declined_at = ? "
+        "WHERE ticket_id = ? AND promoted_item_id IS NULL "
+        "AND promotion_declined_at IS NULL",
+        (_now(), ticket_id),
+    ).rowcount
+    conn.commit()
+    return bool(updated)

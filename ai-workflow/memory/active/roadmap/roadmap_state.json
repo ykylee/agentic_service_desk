@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.65,
+      "progress": 0.675,
       "total_leaves": 40,
-      "done_leaves": 26,
+      "done_leaves": 27,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -378,7 +378,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 8,
-          "done_leaves": 5,
+          "done_leaves": 6,
           "children": [
             {
               "id": "WBS-4.5.1",
@@ -438,10 +438,12 @@
             {
               "id": "WBS-4.5.6",
               "title": "승격 경로 B",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-037"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

@@ -88,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Q2": len(draft_store.pending(conn)),
                 "Q4": status.open_contradictions,
                 "Q6": len(tracking.awaiting_confirmation(conn)),
+                "Q7": len(promotion_domain.awaiting_decision(conn)),
                 "Q8": len(board.knowledge_gaps()),
             }
             next_up = board.next_up(cfg.stage)
@@ -385,6 +386,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return RedirectResponse("/queues/Q6", status_code=303)
+
+    @app.get("/queues/Q7")
+    def q7(request: Request):  # noqa: ANN201
+        """승격 후보 — **판정 화면이다** (§6.4.4).
+
+        보고 무효화 조건을 지정하면 끝난다. "지정"이 이 대기열의 판정 형태다.
+        """
+        board, conn = dashboard()
+        try:
+            rows = promotion_domain.awaiting_decision(conn)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request, "q7.html", shell() | {"rows": rows, "phase": cfg.phase}
+        )
+
+    @app.post("/queues/Q7/{ticket_id}/promote")
+    def q7_promote(  # noqa: ANN201
+        ticket_id: str,
+        choice: str = Form(...),
+        kind: str = Form("linked"),
+        refs: str = Form(""),
+        period_days: str = Form(""),
+    ):
+        """사람이 무효화 조건을 지정해 승격한다 (경로 B, §6.8.1).
+
+        **경로 A 와 같은 행위다** — 무효화 조건을 채우는 것이 곧 승격 승인이다.
+        다른 것은 여기서는 그 앞에 Q7 이라는 판정 한 겹이 있다는 점뿐이고, 그것은
+        이 경로가 **지식으로서 판정된 적이 없기** 때문이다 (§6.8.2).
+        """
+        board, conn = dashboard()
+        try:
+            candidate = promotion_domain.assess(conn, ticket_id)
+            if candidate is None:
+                return RedirectResponse("/queues/Q7", status_code=303)
+            try:
+                invalidation = (
+                    candidate.derived
+                    if choice == "derived" and candidate.derived
+                    else _chosen_invalidation(
+                        candidate.record, choice, kind, refs, period_days
+                    )
+                )
+            except ValueError:
+                # 아무것도 고르지 않았다 — **기본값이 없으므로 여기서 막힌다** (§5.6.4).
+                return RedirectResponse("/queues/Q7", status_code=303)
+            resolution_domain.confirm(conn, ticket_id, invalidation=invalidation)
+            promotion_domain.promote_if_eligible(
+                conn, KnowledgeRepository(cfg.knowledge_dir), ticket_id
+            )
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q7", status_code=303)
+
+    @app.post("/queues/Q7/{ticket_id}/decline")
+    def q7_decline(ticket_id: str):  # noqa: ANN201
+        """올리지 않는다. **기각도 판정이다** — 남기지 않으면 매 주기 다시 뜬다."""
+        board, conn = dashboard()
+        try:
+            resolution_domain.decline_promotion(conn, ticket_id)
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q7", status_code=303)
 
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201

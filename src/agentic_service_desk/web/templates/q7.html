@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Q7 승격 후보{% endblock %}
+{% block body %}
+<h1>Q7 — 승격 후보</h1>
+<p class="dim small">
+  자동 승격 조건을 못 채운 건이다 (§6.8.4). <strong>명시적 해결은 자격이지 판정이
+  아니다</strong> — 이용자의 해결 표시는 "나에게 유효했다"는 증언이지 "이것이 일반적으로
+  옳다"는 판정이 아니고, 우회책을 지식으로 굳히면 <strong>잘못된 처방이 표준이 된다</strong>
+  (§6.8.2).
+  <br>여기가 밀리면 오답이 나가지는 않지만 <strong>지식이 자라지 않는다</strong> —
+  사고 없이 정체하는 실패다 (§6.8.3).
+</p>
+{% if phase < 2 %}
+<p class="dim small">
+  지금은 <strong>1국면이라 자동 승격이 없다</strong> (§6.8.4-b) — 지식베이스가 얇아 판단
+  기준 자체가 없고, 이 시기 승격의 주 경로는 티켓 해결(A)이다. 조건을 다 채운 건도
+  여기 뜬다.
+</p>
+{% endif %}
+
+{% if not rows %}
+<p class="ok">승격 판정을 기다리는 건이 없다.</p>
+{% endif %}
+
+{% for c in rows %}
+<h2>{{ c.record.generalized_question }}</h2>
+<p class="dim small">
+  티켓 <code>{{ c.ticket_id }}</code> ·
+  {% if c.eligible %}<span class="ok">{{ c.reason }}</span>
+  {% else %}<span class="warn">{{ c.reason }}</span>{% endif %}
+</p>
+<div>{{ c.record.answer }}</div>
+<p class="dim small">
+  근거:
+  {% for g in c.record.grounding %}<code>{{ g.kind }}</code> {{ g.ref }}{% if not loop.last %} · {% endif %}{% endfor %}
+  {% if not c.record.code_traceable %}
+  <br><span class="warn">코드에 묶이지 않는다 — 무효화 조건이 <strong>유일한 stale 장치</strong>다 (§6.5.3).</span>
+  {% endif %}
+</p>
+
+<form method="post" action="/queues/Q7/{{ c.ticket_id }}/promote">
+  <p class="small"><strong>무효화 조건</strong> — 무엇이 바뀌면 이 지식이 틀려지는가.
+    <span class="dim">이것을 고르는 것이 곧 승격 승인이다 (§5.6.4).</span></p>
+  {% if c.derived %}
+  <p><label><input type="radio" name="choice" value="derived" checked>
+    코드에서 도출됨 — <code>linked</code> {{ c.derived.refs|join(', ') }}</label></p>
+  {% endif %}
+  {% for cand in c.record.invalidation_candidates %}
+  <p><label><input type="radio" name="choice" value="{{ loop.index0 }}">
+    <code>{{ cand.kind }}</code>
+    {{ cand.refs|join(', ') or (cand.period_days ~ '일') }}</label></p>
+  {% endfor %}
+  <p><label><input type="radio" name="choice" value="custom"> 직접 쓴다</label></p>
+  <p class="small" style="margin-left:1.5rem">
+    <select name="kind">
+      <option value="linked">연결형 — 코드·설정에 묶는다 (원칙)</option>
+      <option value="periodic">주기형 — 묶을 대상이 없을 때</option>
+    </select>
+    <input name="refs" placeholder="연결형: 경로들, 쉼표로" style="font:inherit;padding:.25rem">
+    <input name="period_days" type="number" placeholder="주기형: 일수" style="width:8rem;font:inherit;padding:.25rem">
+  </p>
+  <p><button type="submit">지식으로 올린다</button></p>
+</form>
+<form method="post" action="/queues/Q7/{{ c.ticket_id }}/decline">
+  <p><button type="submit">올리지 않는다</button>
+    <span class="dim small">기각도 판정이다 — 남기지 않으면 매 주기 다시 뜬다.</span></p>
+</form>
+<hr>
+{% endfor %}
+{% endblock %}

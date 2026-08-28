@@ -82,6 +82,14 @@ MIGRATIONS: tuple[Migration, ...] = (
         name="answer_draft.gate_signals — 왜 사람에게 왔는가 (WBS-4.5.5)",
         statements=("ALTER TABLE answer_draft ADD COLUMN gate_signals TEXT",),
     ),
+    Migration(
+        version=4,
+        name="ticket_resolution 승격 판정 — 누가 올렸는가 · 기각 (WBS-4.5.6)",
+        statements=(
+            "ALTER TABLE ticket_resolution ADD COLUMN promoted_by TEXT",
+            "ALTER TABLE ticket_resolution ADD COLUMN promotion_declined_at TEXT",
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

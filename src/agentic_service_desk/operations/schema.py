@@ -80,10 +80,15 @@ CREATE TABLE IF NOT EXISTS ticket_resolution (
     scope               TEXT,
     recurrence          TEXT,
     drafted_by          TEXT NOT NULL DEFAULT 'agent',  -- agent | human
-    confirmed_at        TEXT,            -- 사람이 무효화 조건을 채운 시각
-    promoted_item_id    TEXT,            -- 승격된 지식 항목의 불변 id (경로 A, FR-15).
+    confirmed_at        TEXT,            -- 무효화 조건이 채워진 시각
+    promoted_item_id    TEXT,            -- 승격된 지식 항목의 불변 id (FR-15).
                                          -- 두 번 승격하지 않기 위한 표시이자
                                          -- "이 종결 기록이 무엇이 되었는가"의 답이다
+    promoted_by         TEXT,            -- human | gate — **누가 올렸는가** (§6.8.4).
+                                         -- 자동 승격분은 사람이 본 적이 없으므로
+                                         -- 표본 재검증의 우선순위가 높다 (§6.8.4-a)
+    promotion_declined_at TEXT,          -- 사람이 Q7 에서 "올리지 않는다"고 판정한 시각.
+                                         -- 없으면 기각한 건이 **매 주기 다시 뜬다**
     FOREIGN KEY (ticket_id) REFERENCES ticket (id)
 );
 

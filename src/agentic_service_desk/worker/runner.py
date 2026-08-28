@@ -35,6 +35,7 @@ from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import intake as intake_domain
+from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking as tracking_domain
 from agentic_service_desk.operations.drafter import Drafter
@@ -84,6 +85,7 @@ class BatchRunner:
         self._sync_qna()
         self._intake()
         self._track()
+        self._promote()
         self._release_held_tickets()
         self._draft_resolutions()
         self._ingest()
@@ -287,6 +289,45 @@ class BatchRunner:
                 f"암묵적 해결 {settled.implicit} · 미해결 종료 {settled.gaps}"
                 f" (Q8 지식 공백)"
             )
+
+    def _promote(self) -> None:
+        """승격 경로 B — 조건을 채운 봇 답변이 지식이 된다 (WBS-4.5.6, FR-33).
+
+        **추적 다음에 돈다.** 조건 셋 중 하나가 명시적 해결이고 그것을 방금
+        `_track()` 이 반영했다 — 순서가 뒤집히면 오늘 해결 표시가 눌린 건이 하루 늦게
+        승격된다.
+
+        1국면에는 아무것도 올라가지 않는다 (§6.8.4-b). 그래도 후보는 Q7 에 쌓이고,
+        **무엇이 승격을 기다리는지가 국면을 올릴 판단 재료**가 된다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = promotion_domain.run_auto(
+                conn,
+                repo,
+                phase=self._cfg.phase,
+                relax_clean_review=self._cfg.relax_promotion,
+            )
+        except KnowledgeRepoError as exc:
+            print(f"[worker] 승격 실패: {exc}")
+            return
+        finally:
+            conn.close()
+
+        if report.promoted:
+            print(
+                f"[worker] 자동 승격 {len(report.promoted)}건 — "
+                f"**사람이 본 적이 없다.** 표본 재검증의 우선순위가 높다 (§6.8.4-a)"
+            )
+        for failure in report.failures:
+            print(f"[worker] 승격 실패 — {failure}")
 
     def _release_held_tickets(self) -> None:
         """응답이 온 보류 티켓을 다시 연다 (§6.7.1).
