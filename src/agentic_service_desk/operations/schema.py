@@ -101,6 +101,22 @@ CREATE TABLE IF NOT EXISTS answer_record (
     FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
 
+-- 검수 기록 (FR-22, §5.5.6).
+-- **반려된 초안도 남긴다.** 버리면 왜 반려됐는지의 분포를 잃고, 그 분포가 세 가지로
+-- 쓰인다 — 지식 공백 탐지(P1·P5 가 몰리면 근거가 부족하다), 신뢰 계측(반려율은
+-- 사유별 분포가 있어야 읽힌다), 그리고 2국면 자동 검수의 학습 자료.
+CREATE TABLE IF NOT EXISTS review (
+    id          TEXT PRIMARY KEY,
+    qna_item_id TEXT,            -- 답변 검수일 때만. 콘텐츠 검수는 비어 있다
+    outcome     TEXT NOT NULL,   -- passed | rejected
+    reason      TEXT,            -- P1~P8. 통과에는 없다
+    detail      TEXT,
+    draft_body  TEXT NOT NULL,   -- 반려된 초안의 본문. 이것이 학습 자료가 된다
+    grounding   TEXT NOT NULL,   -- JSON — 그때 무엇을 근거로 삼았는가
+    reviewed_by TEXT NOT NULL,   -- agent | human
+    reviewed_at TEXT NOT NULL
+);
+
 -- 근거 버전 고정 (D20) — 이 표가 stale 전파의 배선이다.
 -- 링크만 두면 지식이 갱신된 뒤 "당시 무엇을 근거로 답했는지"가 사라진다.
 CREATE TABLE IF NOT EXISTS answer_grounding (
