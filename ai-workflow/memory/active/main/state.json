@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 5 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 5 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 6 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 6 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-015 — WBS-4.2.2 QnA 수집",
       "TASK-2026-08-28-main-014 — pi 헤드리스 연결",
       "TASK-2026-08-28-main-013 — WBS-4.2.1 소스 수집",
       "TASK-2026-08-28-main-012 — ADR-009 — LLM 제공자 단일 출처화",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock",
       "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
       "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
-      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
-      "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해"
+      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 15,
+    "task_count": 16,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -68,7 +68,8 @@
       "TASK-2026-08-28-main-011 — MiniMax API 조사와 임베딩 제공자 분리",
       "TASK-2026-08-28-main-012 — ADR-009 — LLM 제공자 단일 출처화",
       "TASK-2026-08-28-main-013 — WBS-4.2.1 소스 수집",
-      "TASK-2026-08-28-main-014 — pi 헤드리스 연결"
+      "TASK-2026-08-28-main-014 — pi 헤드리스 연결",
+      "TASK-2026-08-28-main-015 — WBS-4.2.2 QnA 수집"
     ]
   },
   "next_documents": [

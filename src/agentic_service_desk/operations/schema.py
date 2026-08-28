@@ -2,9 +2,11 @@
 
 **컨셉의 결정이 열(column)로 드러나게** 썼다. 어느 필드가 왜 있는지는 주석이 밝힌다.
 
-가장 중요한 것 둘.
+가장 중요한 것 셋.
     - `qna_item` 과 `ticket` 은 **별개 테이블**이며 상태가 서로를 결정하지 않는다 (D15)
     - `answer_grounding` 이 **근거 버전을 고정**한다 — 링크가 아니라 커밋 해시다 (D20)
+    - `raw_*` 는 **Raw Layer** 다 (FR-52). 수집된 원문이며 질의 대상이 아니라 ingest 입력이다.
+      운영 테이블과 한 파일에 있지만 성격이 다르다 — 이쪽만 보존 기간이 걸린다 (PO-4)
 """
 
 from __future__ import annotations
@@ -84,6 +86,65 @@ CREATE TABLE IF NOT EXISTS content_publication (
     destination  TEXT NOT NULL,   -- doc_surface | publication_surface (D46)
     path         TEXT,            -- 살아있는 문서의 자리
     published_at TEXT NOT NULL
+);
+
+-- ─── Raw Layer — QnA 원문 (FR-52) ────────────────────────────────────────
+-- **수집된 그대로**를 담는다. 판정하지 않고, 해석하지 않고, 걸러내지 않는다.
+-- 걸러내는 것은 ingest 입구의 산출물 필터 하나뿐이다 (NFR-4) — 여기서 미리
+-- 버리면 **통계와 FAQ 후보까지 함께 사라진다** (§5.3). 지식으로 삼지 않는 것과
+-- 기록하지 않는 것은 다르다.
+--
+-- 보존 기간이 걸리는 곳도 여기다 (PO-4 · FR-51). 지식은 남기고 원본은 만료시킨다.
+
+CREATE TABLE IF NOT EXISTS raw_question (
+    id           TEXT PRIMARY KEY,  -- 모 시스템의 질문 id. 우리가 부여하지 않는다
+    title        TEXT,
+    body         TEXT NOT NULL,
+    asker_account TEXT NOT NULL,    -- 사내 식별자. 지식·콘텐츠로 넘어가지 않는다 (PO-3)
+    created_at   TEXT NOT NULL,     -- 모 시스템 기준 시각. QnA 커서가 이 값을 따른다
+    collected_at TEXT NOT NULL      -- 우리가 가져온 시각. 보존 만료의 기준이다 (FR-51)
+);
+
+-- 답변. **`author_account` 가 이 표에서 가장 중요한 열이다** (D7).
+-- 없으면 봇과 사람을 가릴 수 없고, 그러면 §5.3 되먹임 차단이 통째로 무너진다.
+-- NOT NULL 로 둔 것이 그 선언이다 — 계정을 모르는 답변은 적재 자체를 거부한다.
+CREATE TABLE IF NOT EXISTS raw_answer (
+    id             TEXT PRIMARY KEY,
+    question_id    TEXT NOT NULL,
+    body           TEXT NOT NULL,
+    author_account TEXT NOT NULL,   -- 봇/사람 판정의 유일한 근거 (D7)
+    created_at     TEXT NOT NULL,
+    revised_at     TEXT,            -- 정정된 적이 있는가 (PO-1)
+    collected_at   TEXT NOT NULL,
+    FOREIGN KEY (question_id) REFERENCES raw_question (id)
+);
+
+-- 후속 답글. 답변과 나눠 두는 이유는 **의미가 다르기** 때문이다 —
+-- 후속은 파이프라인 재실행의 트리거이고(D9), 답변은 우리가 만든 산출물이다.
+CREATE TABLE IF NOT EXISTS raw_followup (
+    id             TEXT PRIMARY KEY,
+    question_id    TEXT NOT NULL,
+    body           TEXT NOT NULL,
+    author_account TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    collected_at   TEXT NOT NULL,
+    FOREIGN KEY (question_id) REFERENCES raw_question (id)
+);
+
+-- 해결 표시와 그 **등급** (D8, §5.3.1).
+-- 등급이 ingest 자격을 가르므로 해결 사실과 함께 반드시 남는다.
+-- `qna_item.resolution_grade` 와 값이 겹쳐 보이지만 **출처가 다르다** — 저쪽은
+-- 우리가 추적하는 상태이고, 이쪽은 **모 시스템이 알려준 사실**이다. 둘을 한 열로
+-- 합치면 우리 판정(암묵적 해결 타임아웃)이 원문을 덮어쓰게 된다.
+CREATE TABLE IF NOT EXISTS raw_resolution (
+    question_id  TEXT PRIMARY KEY,
+    resolved     INTEGER NOT NULL,  -- 0 | 1
+    grade        TEXT,              -- explicit | implicit. 미해결이면 NULL (D8)
+    method       TEXT,              -- user_marked | operator_closed (§5.3.1-1)
+    resolved_by  TEXT,
+    resolved_at  TEXT,
+    collected_at TEXT NOT NULL,
+    FOREIGN KEY (question_id) REFERENCES raw_question (id)
 );
 
 -- 배치 진행 지점 (ADR-005 · ADR-006)
