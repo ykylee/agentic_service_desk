@@ -58,7 +58,10 @@ class SourceMirror:
 
     def __init__(self, repo_url: str, mirror_dir: Path) -> None:
         self._repo_url = repo_url
-        self._dir = mirror_dir
+        # **절대 경로로 고정한다.** `git clone` 을 부를 때 cwd 를 부모로 두는데,
+        # 상대 경로를 그대로 넘기면 그 cwd 기준으로 다시 풀려 `var/var/...` 가 된다.
+        # 설정 기본값이 상대 경로(`var/source-mirror`)라 실제로 밟는 함정이다.
+        self._dir = Path(mirror_dir).resolve()
 
     # --- git 호출 --------------------------------------------------------
 
