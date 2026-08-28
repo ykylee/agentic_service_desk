@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.knowledge.item import Provenance
+from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
+from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 
 SOURCE = ticket_domain.Source.CONTRADICTION
@@ -130,7 +132,7 @@ def resolve(conn: sqlite3.Connection, contradiction_id: str, *, resolution: str)
     """
     now = _now()
     row = conn.execute(
-        "SELECT ticket_id FROM contradiction WHERE id = ? AND state = ?",
+        "SELECT ticket_id, knowledge_item_id FROM contradiction WHERE id = ? AND state = ?",
         (contradiction_id, OPEN),
     ).fetchone()
     if row is None:
@@ -141,7 +143,9 @@ def resolve(conn: sqlite3.Connection, contradiction_id: str, *, resolution: str)
     )
     conn.commit()
     # 판정 자체가 종결 기록이다 — 무엇을 골랐는지가 `resolution` 에 남는다.
-    _close_ticket(conn, row["ticket_id"], f"모순 판정: {resolution}")
+    _close_ticket(
+        conn, row["ticket_id"], item_id=row["knowledge_item_id"], resolution=resolution
+    )
 
 
 def _to_dict(p: Provenance) -> dict:
@@ -161,18 +165,34 @@ def _from_row(row: sqlite3.Row) -> Contradiction:
     )
 
 
-def _close_ticket(conn: sqlite3.Connection, ticket_id: str, note: str) -> None:
+def _close_ticket(
+    conn: sqlite3.Connection, ticket_id: str, *, item_id: str, resolution: str
+) -> None:
     """모순 티켓을 닫는다.
 
-    티켓 종결은 종결 기록을 요구하는데(§6.4.5), 모순 티켓의 기록은 **판정 그 자체**다 —
-    어느 쪽이 옳았는지가 곧 결론이고 그것은 `contradiction.resolution` 에 남는다.
-    형식을 맞춰 한 줄 남기고 닫는다.
+    **강제 입력 지점을 여기서 사람에게 다시 묻지 않는다** (§5.6.4). 그 장치의 목적은
+    사람이 초안을 읽지 않고 승인하는 것을 막는 것인데, 모순 판정은 **양쪽을 읽어야만
+    누를 수 있는 버튼**이라 그 목적이 이미 달성됐다. 무효화 조건은 그 지식 항목에
+    묶는다 — 항목이 또 바뀌면 이 판정도 다시 봐야 한다.
+
+    이 기록은 승격 대상이 아니다. 모순 판정은 **이미 있는 지식 중 하나를 고르는 일**
+    이지 새 지식을 만드는 일이 아니다.
     """
-    conn.execute(
-        "INSERT INTO ticket_resolution "
-        "(ticket_id, generalized_question, answer, grounding, invalidation) "
-        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(ticket_id) DO NOTHING",
-        (ticket_id, "지식 항목의 모순을 어느 쪽으로 판정하는가", note, "[]", "{}"),
+    resolution_domain.draft(
+        conn,
+        ticket_id=ticket_id,
+        generalized_question="이 지식 항목의 모순을 어느 쪽으로 판정하는가",
+        answer=f"판정: {resolution}",
+        grounding=[
+            resolution_domain.Ground(
+                kind=resolution_domain.GroundKind.PERSON, ref=f"운영자 판정 · {item_id}"
+            )
+        ],
+        drafted_by="human",
     )
-    conn.commit()
+    resolution_domain.confirm(
+        conn,
+        ticket_id,
+        invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=(item_id,)),
+    )
     ticket_domain.transition(conn, ticket_id, ticket_domain.State.CLOSED)

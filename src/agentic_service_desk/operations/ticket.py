@@ -93,11 +93,11 @@ class InvalidTransition(RuntimeError):
 
 
 class ResolutionRequired(RuntimeError):
-    """종결 기록 없이 닫으려 했다 (§6.4.5, FR-13).
+    """종결 기록이 없거나 아직 승인되지 않았다 (§6.4.5, FR-13).
 
     1국면에서는 **티켓 해결의 승격이 지식 성장의 주 경로**다. 그런데 티켓을 "완료"
     체크로 닫는 순간 **승격할 재료가 사라진다** — 그래서 닫는 행위 자체에 기록을
-    묶었다. 기록의 형식은 WBS-4.3.2 가 정한다.
+    묶었다. 기록의 형식은 `operations.resolution` 이 정한다.
     """
 
 
@@ -201,8 +201,9 @@ def transition(conn: sqlite3.Connection, ticket_id: str, to: State | str) -> Tic
         )
     if to is State.CLOSED and not has_resolution(conn, ticket_id):
         raise ResolutionRequired(
-            f"티켓 {ticket_id} 에 종결 기록이 없다. "
-            "닫는 순간 승격할 재료가 사라진다 (§6.4.5, FR-13)"
+            f"티켓 {ticket_id} 를 닫을 수 없다 — 종결 기록이 없거나 **무효화 조건이 "
+            "비어 있다.** 닫는 순간 승격할 재료가 사라지고(§6.4.5, FR-13), 무효화 "
+            "조건이 없으면 그 지식은 영영 낡지 않는다 (FR-14, §6.5.3)"
         )
 
     now = _now().isoformat()
@@ -215,13 +216,15 @@ def transition(conn: sqlite3.Connection, ticket_id: str, to: State | str) -> Tic
 
 
 def has_resolution(conn: sqlite3.Connection, ticket_id: str) -> bool:
-    """종결 기록이 있는가. **형식의 검사는 WBS-4.3.2 의 몫이다.**"""
-    return (
-        conn.execute(
-            "SELECT 1 FROM ticket_resolution WHERE ticket_id = ?", (ticket_id,)
-        ).fetchone()
-        is not None
-    )
+    """닫아도 되는 종결 기록이 있는가.
+
+    **초안만으로는 부족하다.** 무효화 조건이 비어 있으면 그 기록은 아직 사람의
+    승인을 지나지 않았고(§5.6.4), 승인 없이 닫으면 승격 대기로 갈 수 없는 기록만
+    남는다. 형식은 `operations.resolution` 이 정한다.
+    """
+    from agentic_service_desk.operations import resolution
+
+    return resolution.is_confirmed(conn, ticket_id)
 
 
 def queue(conn: sqlite3.Connection) -> list[Ticket]:

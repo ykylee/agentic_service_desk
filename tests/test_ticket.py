@@ -20,7 +20,8 @@ import pytest
 
 from agentic_service_desk.adapters.mock import MockParentSystem
 from agentic_service_desk.ingest.qna import QnaCollector
-from agentic_service_desk.operations import ticket
+from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
+from agentic_service_desk.operations import resolution, ticket
 from agentic_service_desk.operations.schema import connect, initialize
 from agentic_service_desk.operations.ticket import (
     InvalidTransition,
@@ -48,14 +49,19 @@ def _qna(conn, qna_id: str = "q-1", question_id: str = "Q-1") -> str:  # noqa: A
 
 
 def _resolution(conn, ticket_id: str) -> None:  # noqa: ANN001
-    """종결 기록을 한 줄 넣는다. **형식의 검사는 WBS-4.3.2 의 몫이다.**"""
-    conn.execute(
-        "INSERT INTO ticket_resolution "
-        "(ticket_id, generalized_question, answer, grounding, invalidation) "
-        "VALUES (?, '일반화된 질문', '답', '[]', '{}')",
-        (ticket_id,),
+    """닫아도 되는 종결 기록. **초안을 만들고 사람이 무효화 조건을 채운다** (§5.6.4)."""
+    resolution.draft(
+        conn,
+        ticket_id=ticket_id,
+        generalized_question="권한 요청은 어디서 하는가",
+        answer="설정 > 권한에서 신청한다.",
+        grounding=[resolution.Ground(kind=resolution.GroundKind.PERSON, ref="담당자 확인")],
     )
-    conn.commit()
+    resolution.confirm(
+        conn,
+        ticket_id,
+        invalidation=Invalidation(kind=InvalidationKind.PERIODIC, period_days=180),
+    )
 
 
 class TestShape:

@@ -45,15 +45,22 @@ CREATE TABLE IF NOT EXISTS ticket (
 );
 
 -- 종결 기록 — 지식 항목의 초안이다 (D18). 승격을 번역이 아니라 승인으로 만든다.
+--
+-- **`invalidation` 이 NULL 을 허용하는 것이 설계다** (§5.6.4). 에이전트가 채운 초안은
+-- 이 칸을 비운 채로 저장되고, 사람이 채우기 전까지 티켓이 닫히지 않는다. NOT NULL 로
+-- 두면 초안 자체를 저장할 수 없어 "비워 둔 칸"이라는 장치가 성립하지 않는다.
 CREATE TABLE IF NOT EXISTS ticket_resolution (
     ticket_id           TEXT PRIMARY KEY,
     generalized_question TEXT NOT NULL,  -- 개인·상황 요소를 걷어낸 형태 (PO-3 를 여기서 집행한다)
     answer              TEXT NOT NULL,
-    grounding           TEXT NOT NULL,   -- JSON — 근거 목록
-    invalidation        TEXT NOT NULL,   -- JSON — 없으면 승격하지 않는다 (FR-14). 강제 입력 지점 (D26)
+    grounding           TEXT NOT NULL,   -- JSON — 근거 목록. 비어 있으면 초안이 아니다 (D3)
+    invalidation        TEXT,            -- JSON. **비어 있는 것이 초안의 정상 상태다** (§5.6.4)
+    invalidation_candidates TEXT,        -- JSON. 에이전트의 제안. **선택은 사람이 한다**
     cause               TEXT,
     scope               TEXT,
     recurrence          TEXT,
+    drafted_by          TEXT NOT NULL DEFAULT 'agent',  -- agent | human
+    confirmed_at        TEXT,            -- 사람이 무효화 조건을 채운 시각
     FOREIGN KEY (ticket_id) REFERENCES ticket (id)
 );
 

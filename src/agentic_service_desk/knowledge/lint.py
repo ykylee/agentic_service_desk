@@ -39,7 +39,8 @@ from datetime import UTC, datetime, timedelta
 
 from agentic_service_desk.ingest.source import SourceMirror
 from agentic_service_desk.knowledge import contradiction
-from agentic_service_desk.knowledge.item import InvalidationKind, KnowledgeItem
+from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind, KnowledgeItem
+from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.knowledge.repository import KnowledgeRepository, StoredItem
 from agentic_service_desk.operations import ticket as ticket_domain
 
@@ -364,7 +365,8 @@ def resolve(conn: sqlite3.Connection, key: str) -> None:
     """사람이 처리했다. 티켓도 함께 닫는다."""
     now = _now().isoformat()
     row = conn.execute(
-        "SELECT ticket_id, kind FROM lint_finding WHERE key = ? AND state = ?", (key, OPEN)
+        "SELECT ticket_id, kind, subject FROM lint_finding WHERE key = ? AND state = ?",
+        (key, OPEN),
     ).fetchone()
     if row is None:
         return
@@ -372,11 +374,26 @@ def resolve(conn: sqlite3.Connection, key: str) -> None:
         "UPDATE lint_finding SET state = ?, resolved_at = ? WHERE key = ?", (RESOLVED, now, key)
     )
     conn.commit()
-    conn.execute(
-        "INSERT INTO ticket_resolution "
-        "(ticket_id, generalized_question, answer, grounding, invalidation) "
-        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(ticket_id) DO NOTHING",
-        (row["ticket_id"], "Lint 소견을 어떻게 처리하는가", f"처리함: {row['kind']}", "[]", "{}"),
+    # 소견 처리도 종결 기록을 남긴다 (§6.4.5). **승격 대상은 아니다** — 깨진 링크를
+    # 고치는 일은 새 지식을 만드는 일이 아니라 이미 있는 것의 정합성을 되돌리는 일이다.
+    # 그래서 강제 입력 지점(§5.6.4)을 사람에게 다시 묻지 않고, 무효화 조건은 소견이
+    # 가리키던 대상에 묶는다 — 그것이 또 어긋나면 다시 봐야 한다.
+    resolution_domain.draft(
+        conn,
+        ticket_id=row["ticket_id"],
+        generalized_question="이 Lint 소견을 어떻게 처리하는가",
+        answer=f"처리함: {row['kind']}",
+        grounding=[
+            resolution_domain.Ground(
+                kind=resolution_domain.GroundKind.PERSON,
+                ref=f"운영자 처리 · {row['subject']}",
+            )
+        ],
+        drafted_by="human",
     )
-    conn.commit()
+    resolution_domain.confirm(
+        conn,
+        row["ticket_id"],
+        invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=(row["subject"],)),
+    )
     ticket_domain.transition(conn, row["ticket_id"], ticket_domain.State.CLOSED)
