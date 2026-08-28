@@ -27,8 +27,8 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.25**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
-    "current_axis": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.25**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
+    "current_baseline": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.26**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
+    "current_axis": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.26**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
     "current_focus": "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
     "in_progress_items": [
       "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성"
