@@ -104,6 +104,9 @@ class Resolution:
 
     drafted_by: str = "agent"
     confirmed_at: str | None = None
+    promoted_item_id: str | None = None
+    """승격된 지식 항목의 불변 id (경로 A). **두 번 올리지 않기 위한 표시**이자
+    "이 종결 기록이 무엇이 되었는가"의 답이다."""
 
     def __post_init__(self) -> None:
         # 셋은 초안 단계에서도 있어야 한다. 넷째(무효화 조건)만 비워 둔다.
@@ -228,6 +231,8 @@ def _write(conn: sqlite3.Connection, r: Resolution) -> None:
         "grounding = excluded.grounding, invalidation = excluded.invalidation, "
         "invalidation_candidates = excluded.invalidation_candidates, cause = excluded.cause, "
         "scope = excluded.scope, recurrence = excluded.recurrence, "
+        # `promoted_item_id` 는 여기서 건드리지 않는다 — 초안을 다시 써도 승격
+        # 사실이 지워지면 같은 기록이 두 번 지식이 된다.
         "confirmed_at = excluded.confirmed_at",
         (
             r.ticket_id,
@@ -291,4 +296,5 @@ def _from_row(row: sqlite3.Row) -> Resolution:
         recurrence=row["recurrence"],
         drafted_by=row["drafted_by"],
         confirmed_at=row["confirmed_at"],
+        promoted_item_id=row["promoted_item_id"],
     )

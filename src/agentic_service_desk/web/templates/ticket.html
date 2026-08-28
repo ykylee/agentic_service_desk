@@ -37,6 +37,12 @@
   무효화 조건: <code>{{ d.resolution.invalidation.kind }}</code>
   {{ d.resolution.invalidation.refs|join(', ') or (d.resolution.invalidation.period_days ~ '일') }}
 </p>
+{% if d.resolution.promoted_item_id %}
+<p class="ok">
+  지식 항목이 되었다 — <code>{{ d.resolution.promoted_item_id }}</code>.
+  <span class="dim small">채운 것이 곧 승격 승인이라 Q7 을 거치지 않는다 (§6.8.1 경로 A).</span>
+</p>
+{% endif %}
 {% else %}
 <h2>무효화 조건 — 무엇이 바뀌면 이 답이 틀려지는가</h2>
 <p class="dim small">

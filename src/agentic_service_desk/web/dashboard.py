@@ -150,7 +150,12 @@ class TicketDetail:
         """**지금 무엇을 해야 하는가.** 화면이 답을 대신 말해 준다."""
         state = self.item.ticket.state
         if state in (ticket_domain.State.CLOSED, ticket_domain.State.AUTO_CLOSED):
-            return "끝났다. 종결 기록이 남았으니 승격 후보로 간다 (§6.8 A 경로)."
+            if self.resolution and self.resolution.promoted_item_id:
+                return (
+                    f"끝났다. 지식 항목이 되었다 — {self.resolution.promoted_item_id} "
+                    f"(승격 경로 A, §6.8.1)."
+                )
+            return "끝났다. 이 티켓은 승격 대상이 아니다 — 새 지식을 만드는 일이 아니었다."
         if state is ticket_domain.State.HELD:
             return "질문자의 응답을 기다린다 — 후속이 오면 사람 없이 다시 열린다."
         if self.resolution is None:

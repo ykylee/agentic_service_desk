@@ -22,6 +22,7 @@ from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.schema import connect, initialize
@@ -158,6 +159,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             resolution_domain.confirm(conn, ticket_id, invalidation=invalidation)
             ticket_domain.transition(conn, ticket_id, ticket_domain.State.CLOSED)
+            # **채운 것이 곧 승격 승인이다** (§6.8.1 경로 A). Q7 을 거치지 않는다 —
+            # 여기에 또 승인을 붙이면 이중 승인이고, 1인 겸업에게 그 중복이 곧
+            # 대기열 정체다. 자격이 없는 티켓(모순·Lint)은 조용히 넘어간다.
+            promotion_domain.promote_if_eligible(
+                conn, KnowledgeRepository(cfg.knowledge_dir), ticket_id
+            )
         finally:
             conn.close()
         return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)

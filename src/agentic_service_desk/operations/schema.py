@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS ticket_resolution (
     recurrence          TEXT,
     drafted_by          TEXT NOT NULL DEFAULT 'agent',  -- agent | human
     confirmed_at        TEXT,            -- 사람이 무효화 조건을 채운 시각
+    promoted_item_id    TEXT,            -- 승격된 지식 항목의 불변 id (경로 A, FR-15).
+                                         -- 두 번 승격하지 않기 위한 표시이자
+                                         -- "이 종결 기록이 무엇이 되었는가"의 답이다
     FOREIGN KEY (ticket_id) REFERENCES ticket (id)
 );
 
