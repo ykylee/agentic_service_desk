@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.725,
+      "progress": 0.75,
       "total_leaves": 40,
-      "done_leaves": 29,
+      "done_leaves": 30,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -473,18 +473,20 @@
         {
           "id": "WBS-4.6",
           "title": "S4 시스템 사용 가이드",
-          "derived_status": "planned",
+          "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 4,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": [
             {
               "id": "WBS-4.6.1",
               "title": "콘텐츠 타입 레지스트리",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-041"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {
@@ -631,6 +633,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS leaf 가 아닌 아키텍처 결정 — 4.5 를 실데이터로 켜기 전에 닫아야 할 선행 조건이다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-035.md"
+    },
+    {
+      "task_id": "TASK-2026-08-28-main-040",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS-4.3.5/4.5.8 이 남긴 결함 보수 — 새 leaf 가 아니라 이미 done 인 leaf 의 배선 누락",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-040.md"
     }
   ],
   "issues": []
