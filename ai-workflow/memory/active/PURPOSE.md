@@ -1,5 +1,5 @@
 ---
-purpose_version: 28
+purpose_version: 29
 last_purpose_review: 2026-08-27
 ---
 
@@ -10,7 +10,7 @@ last_purpose_review: 2026-08-27
 - 문서 목적: 이 저장소가 *왜* 존재하고 어디로 가는지 (directional intent) 를 정의한다. AI agent 가 session-start / backlog-update / doc-sync 시 read 하여 작업 분류와 scope 판단에 사용한다.
 - 범위: 4-element (Goals / Key Questions / Research Scope / Evolving Thesis)
 - 대상 독자: AI agent, 저장소 maintainer
-- 상태: **beta (v28)** — 컨셉 v0.27 과 정합. **컨셉 단계에서 판단할 것이 모두 닫혔다.** 남은 미결은 M-002 요구사항 / 실데이터 임계값 / M-003 설계 / 운영 중 확인으로 갈린다. 컨셉은 `ai-workflow/wiki/concepts/` 8개 문서로 나뉘어 있다.
+- 상태: **beta (v29)** — 컨셉 **v1.0** 과 정합. **컨셉 단계에서 판단할 것이 모두 닫혔다.** 남은 미결은 M-002 요구사항 / 실데이터 임계값 / M-003 설계 / 운영 중 확인으로 갈린다. 컨셉은 `ai-workflow/wiki/concepts/` 8개 문서로 나뉘어 있다.
 - 최종 수정일: 2026-08-27
 - 관련 문서: [컨셉 노트](../../wiki/concepts/agentic-service-desk-concept.md), [PROJECT_PROFILE.md](../../../docs/PROJECT_PROFILE.md), [roadmap M-001](./roadmap/M-001-concept.md)
 
@@ -69,6 +69,8 @@ last_purpose_review: 2026-08-27
 >   가이드가 FAQ 보다 먼저 온다. 단계 진입 조건에 운영자 부하가 들어간다.
 > - v28: **언어 확정** — 지식 항목을 언어별로 나누지 않고 언어를 산출 시점의
 >   파라미터로 둔다. **컨셉 판단이 모두 닫혔다.**
+> - v29: 컨셉 최종 리뷰 반영 — 모순 다섯 해소, 핵심 루프 재작성, O30(git) 닫힘.
+>   컨셉이 **v1.0** 이 되었다.
 
 ## 1. Goals
 

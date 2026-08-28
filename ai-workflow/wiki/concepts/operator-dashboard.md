@@ -12,7 +12,7 @@ updated: 2026-08-28
 - 문서 목적: 운영자가 판단해야 하는 여덟 지점과 현황 화면. 운영자는 감시자가 아니라 루프의 일부다.
 - 담는 절: §8 (절 번호는 컨셉 문서 전체에서 전역으로 유일하다)
 - 대상 독자: AI agent, 저장소 maintainer
-- 상태: draft
+- 상태: **v1.0** (컨셉 확정)
 - 최종 수정일: 2026-08-28
 - 허브: [`agentic-service-desk-concept`](./agentic-service-desk-concept.md) — **먼저 읽는다**
 
