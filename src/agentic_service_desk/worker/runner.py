@@ -1,9 +1,12 @@
 """배치 루프.
 
-지금은 골격이다 — 주기만 돌고 아무것도 하지 않는다. 실제 작업은 단계에 따라 붙는다.
+    S0 : 소스·QnA 수집 → Ingest → Lint → 임베딩 색인      (WBS-4.2, 4.4.1)
+    S3 : 유입 처리 → 답변 파이프라인 → 종결 기록 초안      (WBS-4.5)
+    S4~: 콘텐츠 제작                                       (WBS-4.6~4.7)
 
-    S0 : 소스·QnA 수집 → 산출물 필터 → Ingest → Lint   (WBS-4.2)
-    S4~: 콘텐츠 제작                                   (WBS-4.6~4.7)
+**한 주기의 순서에는 이유가 있다.** 수집 다음에 유입 처리가 오는 것은 여기가 답변
+파이프라인의 출발점이라 사이가 벌어지면 그만큼 답변이 늦기 때문이고(NFR-7),
+색인이 맨 뒤인 것은 방금 바뀐 지식이 반영돼야 하기 때문이다.
 """
 
 from __future__ import annotations
@@ -26,9 +29,12 @@ from agentic_service_desk.ingest.qna import QnaCollector
 from agentic_service_desk.ingest.run import IngestRun
 from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
 from agentic_service_desk.knowledge.lint import Lint
-from agentic_service_desk.knowledge.search import rebuild_embedding_index
+from agentic_service_desk.knowledge.search import Search, rebuild_embedding_index
+from agentic_service_desk.pipeline.answer import AnswerPipeline
+from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
+from agentic_service_desk.operations import intake as intake_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.drafter import Drafter
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
@@ -75,6 +81,7 @@ class BatchRunner:
         """한 주기. 단계에 따라 할 일이 붙는다."""
         self._sync_source()
         self._sync_qna()
+        self._intake()
         self._release_held_tickets()
         self._draft_resolutions()
         self._ingest()
@@ -144,6 +151,67 @@ class BatchRunner:
             f"명시적 해결 상향 {report.upgraded}건 (다시 훑음 {report.refreshed_questions}건)"
         )
 
+    def _intake(self) -> None:
+        """유입된 질문을 처리 단위로 옮긴다 (WBS-4.5.2, FR-27).
+
+        **수집 직후에 돈다.** 여기가 답변 파이프라인의 출발점이므로, 수집과 사이가
+        벌어지면 그만큼 답변이 늦어진다 (NFR-7).
+
+        **LLM 이 없어도 돈다.** 그때 파이프라인 없이 티켓만 발행하고 사람에게
+        넘긴다 — 질문이 왔는데 아무 기록도 없는 것보다 낫고, 유입 자체가
+        W4(질문이 기록되지 않는다) 관측의 재료다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = intake_domain.run(
+                conn,
+                pipeline=self._answer_pipeline(conn),
+                reviewer=self._reviewer(),
+            )
+        finally:
+            conn.close()
+
+        if not report.changed:
+            return
+        print(
+            f"[worker] 유입 {len(report.admitted)}건 — 자동 종결 {report.auto_closed}건, "
+            f"사람 대기열 {report.to_human}건"
+        )
+        for failure in report.failures:
+            print(f"[worker] 유입 처리 실패 — {failure}")
+
+    def _answer_pipeline(self, conn) -> AnswerPipeline | None:  # noqa: ANN001
+        """답변 파이프라인. **없으면 없는 대로 간다.**
+
+        생성기가 없으면 3단계에서 멈추고 그 건은 사람에게 간다 — 그것이 이 시스템의
+        정상 결과다 (§5.1). 억지로 답을 만들지 않는 것이 요점이므로 여기서 조용히
+        건너뛰는 대신 **파이프라인을 통째로 빼서** 티켓만 남긴다.
+        """
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return None
+        return AnswerPipeline(
+            search=Search(repo=repo, conn=conn),
+            conn=conn,
+            harness=self._harness(),
+        )
+
+    def _reviewer(self) -> Reviewer | None:
+        """4단계 검수기. **검수를 건너뛰는 것과 통과시키는 것은 다르다** (§5.6.1).
+
+        모델이 없으면 기계적 검사(P4·P1)만 돈다 — `Reviewer` 가 그 경우를 이미
+        안다. 검수기 자체를 빼지 않는 이유가 그것이다.
+        """
+        return Reviewer(self._harness())
+
+    def _harness(self) -> PiHarness | None:
+        if not self._cfg.llm_base_url or not self._cfg.llm_model:
+            return None
+        return PiHarness(self._cfg.llm_model, self._cfg.llm_api_key)
+
     def _release_held_tickets(self) -> None:
         """응답이 온 보류 티켓을 다시 연다 (§6.7.1).
 
@@ -175,24 +243,32 @@ class BatchRunner:
         return self._filter
 
     def _draft_resolutions(self) -> None:
-        """수동 등록 건의 종결 기록 초안을 채운다 (WBS-4.3.3, FR-11).
+        """종결 기록 초안을 채운다 — **두 원천이다** (FR-11, FR-27).
+
+        수동 등록 건(WBS-4.3.3)과 **자동 처리 건**(WBS-4.5.2)이 같은 형식으로 남는다.
+        후자가 없으면 §5.3 이 허용한 "명시적 해결된 봇 답변"에 승격할 물건이 없다 —
+        규칙만 있고 올릴 것이 없는 상태였다 (§6.4.3-1).
 
         **등록은 온라인에서 즉시 끝나고 초안은 여기서 만들어진다.** 등록 응답을
         LLM 호출만큼 붙들면 부담이 되돌아와 §1.4.4 의 유인이 상쇄된다.
 
         무효화 조건은 여기서 채우지 않는다 — 사람 몫이다 (§5.6.4).
         """
-        if not self._cfg.llm_base_url or not self._cfg.llm_model:
+        harness = self._harness()
+        if harness is None:
             return
         if not self._cfg.operations_db.exists():
             return
 
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
         conn = connect(self._cfg.operations_db)
         initialize(conn)
         try:
-            report = Drafter(
-                PiHarness(self._cfg.llm_model, self._cfg.llm_api_key)
-            ).run(conn)
+            report = Drafter(harness).run(conn)
+            if repo.root.exists():
+                auto = intake_domain.draft_resolutions(conn, harness, repo)
+                report.drafted.extend(auto.drafted)
+                report.failures.extend(auto.failures)
         except (HarnessError, RuntimeError) as exc:
             print(f"[worker] 종결 기록 초안 실패: {exc}")
             return

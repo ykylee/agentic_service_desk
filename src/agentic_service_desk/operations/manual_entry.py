@@ -109,6 +109,43 @@ def register(
     return Registration(qna_item_id=qna_item_id, ticket_id=ticket.id)
 
 
+def attach(
+    conn: sqlite3.Connection,
+    *,
+    qna_item_id: str,
+    question: str,
+    answer: str,
+    registered_by: str = "",
+) -> None:
+    """이미 열려 있는 티켓에 **담당자가 직접 한 답변**을 붙인다 (WBS-4.5.2).
+
+    파이프라인이 초안을 만들지 못해 Q1 로 온 건이 여기로 온다. 붙이지 않으면
+    **닫을 길이 없다** — 닫는 행위에 종결 기록이 묶여 있고(§6.4.5) 기록의 재료는
+    질문과 답변이기 때문이다. 그 재료가 영영 없으면 대기열이 소화되지 않는다.
+
+    `register()` 와 다른 점은 **새로 만들지 않는다**는 것이다. 저쪽은 모 시스템을
+    거치지 않은 문의를 들이는 입구이고, 이쪽은 이미 들어와 있는 질문에 답을 적는
+    자리다. 원문을 다시 받는 이유는 표가 그것을 함께 들기 때문이며, 화면이 유입
+    원문을 채워 준다.
+
+    **게재하지 않는다.** 사람이 쓴 답을 봇 계정으로 올리면 "AI 가 작성했습니다"가
+    거짓이 된다(PO-2). 모 시스템에 올리는 것은 사람이 직접 한다 — 우리 출구로
+    나가는 것은 파이프라인 산출물뿐이다 (NFR-3).
+    """
+    question, answer = question.strip(), answer.strip()
+    if not question:
+        raise EmptyEntry("질문 원문이 비었다")
+    if not answer:
+        raise EmptyEntry("담당자가 한 답변이 비었다")
+    conn.execute(
+        "INSERT OR REPLACE INTO manual_entry "
+        "(qna_item_id, question, answer, registered_by, registered_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (qna_item_id, question, answer, registered_by or None, _now()),
+    )
+    conn.commit()
+
+
 @dataclass(frozen=True)
 class Entry:
     """등록된 원문. 초안의 재료다."""

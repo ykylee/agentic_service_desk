@@ -456,7 +456,9 @@ def _fallback_statement(payload: dict, allowed_ids: set[str]) -> tuple[Statement
 class AnswerPipeline:
     """질문 하나를 1~3단계에 태운다.
 
-    4·5 단계(검수·게재)는 아직 붙지 않았다 — 여기서 나온 초안은 **아직 나갈 수 없다.**
+    4·5 단계(검수·게재)는 **밖에서 이어 붙인다** — 검수는 `pipeline.review`,
+    게재는 `pipeline.publication` 이고, 유입 처리(`operations.intake`)가 그 셋을
+    한 줄로 꿴다. 여기서 나온 초안은 **아직 나간 것이 아니다.**
     """
 
     def __init__(

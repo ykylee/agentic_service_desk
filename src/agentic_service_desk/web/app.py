@@ -22,6 +22,7 @@ from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
+from agentic_service_desk.operations import intake
 from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
@@ -317,10 +318,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             if is_approved:
                 outcome = _publish(cfg, conn, parent_system, draft_id)
+            elif draft is not None:
+                # **반려는 버리는 것이 아니라 사람에게 보내는 것이다.** 여기서 티켓을
+                # 열지 않으면 반려된 초안이 어느 대기열에도 없이 사라진다 — 실패는
+                # 사람의 대기열로 수렴해야 한다 (§5.1).
+                intake.reopen_for_rejected_draft(conn, draft.qna_item_id)
         finally:
             conn.close()
         suffix = f"?outcome={quote(outcome)}" if outcome else ""
         return RedirectResponse(f"/queues/Q2{suffix}", status_code=303)
+
+    @app.post("/queues/Q1/{ticket_id}/answer")
+    def q1_answer(ticket_id: str, answer: str = Form(...)):  # noqa: ANN201
+        """파이프라인이 답하지 못한 건에 담당자 답변을 적는다 (WBS-4.5.2).
+
+        **여기서 LLM 을 부르지 않는다.** 초안은 배치가 만든다 — 등록 화면과 같은
+        이유로, 적는 행위를 LLM 호출만큼 붙들면 적지 않게 된다 (§1.4.4).
+        """
+        board, conn = dashboard()
+        try:
+            detail = board.ticket_detail(ticket_id)
+            if detail is None or not detail.needs_answer or not detail.question:
+                return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
+            try:
+                manual_entry.attach(
+                    conn,
+                    qna_item_id=detail.item.ticket.qna_item_id,
+                    question=detail.question,
+                    answer=answer,
+                )
+            except manual_entry.EmptyEntry:
+                # 빈 답변은 재료가 되지 않는다. 적지 않은 것과 같으므로 되돌린다.
+                pass
+        finally:
+            conn.close()
+        return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
 
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201

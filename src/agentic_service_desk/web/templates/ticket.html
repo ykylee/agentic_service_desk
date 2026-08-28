@@ -8,6 +8,26 @@
 </p>
 <p><strong>지금 할 일:</strong> {{ d.next_step }}</p>
 
+{% if d.question and not d.entry %}
+<h2>유입된 질문</h2>
+<div>{{ d.question }}</div>
+{% endif %}
+
+{% if d.needs_answer %}
+<h2>담당자 답변 적기</h2>
+<p class="dim small">
+  파이프라인이 초안을 만들지 못했다. <strong>여기에 적지 않으면 종결 기록의 재료가
+  없어 이 티켓은 닫을 길이 없다</strong> (§6.4.5).
+  <br>이용자에게 나가는 답변은 <strong>모 시스템에서 직접</strong> 올린다 — 사람이 쓴 답을
+  봇 계정으로 올리면 "AI 가 작성했습니다"가 거짓이 된다 (PO-2).
+</p>
+<form method="post" action="/queues/Q1/{{ d.item.ticket.id }}/answer">
+  <p><textarea name="answer" rows="6" style="width:100%;font:inherit"
+     placeholder="담당자가 실제로 한 답변" required></textarea></p>
+  <p><button type="submit">적는다</button></p>
+</form>
+{% endif %}
+
 {% if d.entry %}
 <h2>등록된 원문</h2>
 <div class="sides">

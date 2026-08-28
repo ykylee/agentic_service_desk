@@ -144,6 +144,23 @@ class TicketDetail:
     item: WorkItem
     entry: manual_entry.Entry | None
     resolution: resolution_domain.Resolution | None
+    question: str | None = None
+    """유입 원문. **파이프라인이 멈춘 건에는 이것뿐이다** — 초안도 담당자 답변도
+    아직 없으므로, 이것마저 없으면 화면이 무엇을 물었는지조차 말하지 못한다."""
+
+    @property
+    def needs_answer(self) -> bool:
+        """담당자가 직접 답해야 하는가 (WBS-4.5.2).
+
+        파이프라인이 초안을 만들지 못해 열린 티켓이다. **여기서 답을 적지 않으면
+        종결 기록의 재료가 없어 닫을 길이 없다** (§6.4.5).
+        """
+        return (
+            self.entry is None
+            and self.resolution is None
+            and self.item.ticket.state in ticket_domain.QUEUE_VISIBLE
+            and self.item.ticket.source is ticket_domain.Source.QNA
+        )
 
     @property
     def next_step(self) -> str:
@@ -159,6 +176,14 @@ class TicketDetail:
         if state is ticket_domain.State.HELD:
             return "질문자의 응답을 기다린다 — 후속이 오면 사람 없이 다시 열린다."
         if self.resolution is None:
+            if self.needs_answer:
+                # **기다리라고 하지 않는다.** 담당자 답변이 없으면 초안의 재료가
+                # 없어 어떤 배치도 이것을 채우지 않는다 — 오지 않을 것을 기다리게
+                # 하면 대기열이 조용히 막힌다.
+                return (
+                    "파이프라인이 답을 만들지 못했다. **직접 답하고 그 답을 아래에 "
+                    "적는다** — 초안은 다음 배치가 그것으로 만든다."
+                )
             return "종결 기록 초안을 기다리는 중이다 — 다음 배치 주기에 만들어진다."
         if not self.resolution.confirmed:
             return "무효화 조건을 채운다. 그것이 곧 승인이며, 채워야 티켓이 닫힌다."
@@ -328,7 +353,19 @@ class Dashboard:
             item=self._work_item(t),
             entry=entry,
             resolution=resolution_domain.get(self._conn, ticket_id),
+            question=self._origin_question(t.qna_item_id),
         )
+
+    def _origin_question(self, qna_item_id: str | None) -> str | None:
+        """유입 원문. 모 시스템을 거쳐 온 건에만 있다."""
+        if not qna_item_id:
+            return None
+        row = self._conn.execute(
+            "SELECT r.body FROM qna_item q "
+            "JOIN raw_question r ON r.id = q.parent_question_id WHERE q.id = ?",
+            (qna_item_id,),
+        ).fetchone()
+        return row["body"] if row else None
 
     def _work_item(self, t: ticket_domain.Ticket) -> WorkItem:
         queue_id = QUEUE_BY_SOURCE.get(str(t.source), "Q1")
