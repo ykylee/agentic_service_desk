@@ -83,16 +83,21 @@ class TestWorker:
 class TestBoundaries:
     def test_어댑터_프로토콜이_일곱_표면을_선언한다(self) -> None:
         # D34 — 표면이 좁으면 기능이 소리 없이 죽는다. 목록이 줄지 않았는지 지킨다.
+        #
+        # 표면은 일곱이지만 메서드는 여덟이다 — XR-6(콘텐츠 게재)이 두 연산으로
+        # 갈렸다(ADR-008). 살아있는 문서는 upsert(멱등), 발행물은 create(비멱등)이며
+        # 하나의 메서드에 kind 를 넘기면 그 둘이 코드에서 흐려진다.
         from agentic_service_desk.adapters.parent_system import ParentSystem
 
         expected = {
-            "list_questions",      # XR-1
-            "list_answers",        # XR-2 — 대안 없는 항목
-            "list_followups",      # XR-3
-            "get_resolution",      # XR-4
-            "publish_answer",      # XR-5
-            "revise_answer",       # XR-7
-            "publish_content",     # XR-6
+            "list_questions",       # XR-1
+            "list_answers",         # XR-2 — 대안 없는 항목
+            "list_followups",       # XR-3
+            "get_resolution",       # XR-4
+            "publish_answer",       # XR-5
+            "revise_answer",        # XR-7
+            "upsert_document",      # XR-6 · 문서 면
+            "create_publication",   # XR-6 · 발행 면
         }
         assert expected <= set(dir(ParentSystem))
 

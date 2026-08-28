@@ -39,6 +39,14 @@ class Settings(BaseSettings):
         description="모 시스템 내부 API. 비어 있으면 어댑터가 동작을 거부한다.",
     )
     parent_repo_url: str = Field(default="", description="모 시스템 소스 저장소 (읽기 전용).")
+    parent_adapter: str = Field(
+        default="http",
+        description=(
+            "어느 어댑터를 쓸 것인가 — `http` | `mock`. **기본은 실제 연동**이다. "
+            "mock 은 명시적으로 골라야 쓰인다 (ADR-008) — 설정 실수로 mock 이 돌면 "
+            "'질문이 없다'와 구분되지 않는다."
+        ),
+    )
     poll_interval_seconds: int = Field(
         default=60,
         description="QnA 폴링 주기 (NFR-7). 주기가 답변 지연에 그대로 더해진다.",

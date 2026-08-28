@@ -78,6 +78,7 @@
 | [ADR-005](./ADR-005-llm-runtime.md) | 로컬 LLM 구성과 자원 배분 | O9 · O32 |
 | [ADR-006](./ADR-006-source-sync.md) | 소스 보유 형태와 동기화 | O10 |
 | [ADR-007](./ADR-007-dashboard.md) | 대시보드 범위와 상호작용 | O28 · O51 · O55 |
+| [ADR-008](./ADR-008-parent-api-contract.md) | 모 시스템 API 계약은 우리가 정의한다 | — (연결 단계에서 재검토) |
 
 ## §4 요구사항 추적  {#s4-traceability}
 

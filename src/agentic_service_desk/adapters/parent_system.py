@@ -10,22 +10,29 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol, runtime_checkable
+
+from agentic_service_desk.adapters.contract import Answer, Followup, Question, Resolution
 
 
+@runtime_checkable
 class ParentSystem(Protocol):
     """모 시스템이 제공해야 하는 일곱 표면.
 
     구현체는 이 프로토콜을 만족하기만 하면 된다 — HTTP 든 테스트용 가짜든.
+
+    `runtime_checkable` 을 붙인 이유는 **테스트가 계약 준수를 실제로 확인**하게
+    하기 위해서다 (ADR-008). 문서로만 쓴 스키마는 어긋나지만, mock 과 HTTP 구현이
+    같은 프로토콜을 만족하는 것을 시험이 지키면 갈아 끼울 때 터지지 않는다.
     """
 
     # --- 읽기 -------------------------------------------------------------
 
-    def list_questions(self, since: str | None = None) -> list[dict[str, Any]]:
+    def list_questions(self, since: str | None = None) -> list[Question]:
         """XR-1 — 질문 목록·상세. 파이프라인 1단계의 입력이다."""
         ...
 
-    def list_answers(self, question_id: str) -> list[dict[str, Any]]:
+    def list_answers(self, question_id: str) -> list[Answer]:
         """XR-2 — 답변 목록. **작성자 계정을 반드시 포함한다.**
 
         §5.3 되먹임 차단이 이 필드 하나에 의존한다. 봇이 쓴 답변을 봇이 다시 배우지
@@ -33,11 +40,11 @@ class ParentSystem(Protocol):
         """
         ...
 
-    def list_followups(self, question_id: str) -> list[dict[str, Any]]:
+    def list_followups(self, question_id: str) -> list[Followup]:
         """XR-3 — 후속 답글. §6 지속 추적과 파이프라인 재실행의 트리거다."""
         ...
 
-    def get_resolution(self, question_id: str) -> dict[str, Any]:
+    def get_resolution(self, question_id: str) -> Resolution:
         """XR-4 — 해결 표시 상태. **명시적 해결 판정**의 근거다 (D35).
 
         ingest 자격(§5.3.1)과 승격(§6.8)이 모두 여기서 갈린다.
@@ -58,11 +65,21 @@ class ParentSystem(Protocol):
         """
         ...
 
-    def publish_content(self, kind: str, path: str, body: str) -> str:
-        """XR-6 — 콘텐츠 게재.
+    def upsert_document(self, path: str, title: str, body: str) -> str:
+        """XR-6 (문서 면) — 살아있는 문서를 만들거나 갱신한다. **멱등하다.**
 
-        타입이 넷이어도 **자리는 둘이고 연산도 둘이다** (D46) —
-        살아있는 문서는 문서 면에 upsert, 발행물은 발행 면에 create.
+        FAQ · 사용 가이드가 여기로 간다. 갱신이므로 stale 을 흡수할 수 있다(§7.3).
+        """
+        ...
+
+    def create_publication(self, title: str, body: str) -> str:
+        """XR-6 (발행 면) — 발행물의 새 회차를 만든다. **멱등하지 않다.**
+
+        칼럼 · 뉴스레터가 여기로 간다. 회차는 되돌릴 수 없으므로 검수가 더 엄격하다
+        (§5.5.5).
+
+        타입이 넷이어도 **자리는 둘이고 연산도 둘**이다 (D46). 하나의 메서드에
+        `kind` 를 넘기면 그 둘이 코드에서 흐려지므로 나눴다 (ADR-008).
         """
         ...
 

@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock",
       "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
       "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
       "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
       "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
       "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰",
-      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
-      "TASK-2026-08-27-main-002 — M-001 WBS-1.1 — PURPOSE.md 4-element 채움"
+      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 9,
+    "task_count": 10,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -62,7 +62,8 @@
       "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
       "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
       "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
-      "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격"
+      "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
+      "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock"
     ]
   },
   "next_documents": [
