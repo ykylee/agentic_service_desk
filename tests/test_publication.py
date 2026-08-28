@@ -19,17 +19,49 @@ import pytest
 
 from agentic_service_desk.adapters.mock import BOT_ACCOUNT, MockParentSystem
 from agentic_service_desk.adapters.parent_system import ParentSystem
+from agentic_service_desk.knowledge.item import (
+    Invalidation,
+    InvalidationKind,
+    KnowledgeItem,
+    Provenance,
+)
+from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.operations.schema import connect, initialize
 from agentic_service_desk.pipeline import draft_store, publication
 from agentic_service_desk.pipeline.answer import Confidence, Draft, Statement
 
 ACCOUNTS = frozenset({BOT_ACCOUNT})
+COMMIT = "b" * 40
 
 
 def _conn(tmp_path) -> sqlite3.Connection:  # noqa: ANN001
     c = connect(tmp_path / "ops.sqlite3")
     initialize(c)
     return c
+
+
+def _repo(tmp_path, *, commit: bool = True) -> KnowledgeRepository:  # noqa: ANN001
+    """근거가 될 지식 항목 하나를 담은 저장소.
+
+    **커밋까지 한다** — 근거 버전 고정이 커밋 해시이므로(ADR-002 결정 3) 커밋하지
+    않은 저장소에서는 고정할 것이 없다.
+    """
+    repo = KnowledgeRepository(tmp_path / "knowledge")
+    repo.ensure_initialized()
+    repo.save(
+        KnowledgeItem(
+            id="k-1",
+            title="결재 한도 결정 규칙",
+            body="결재 한도는 부서 등급으로 정해진다.",
+            provenance=[Provenance(commit=COMMIT, path="approval/limit.py")],
+            invalidation=Invalidation(
+                kind=InvalidationKind.LINKED, refs=("approval/limit.py",)
+            ),
+        )
+    )
+    if commit:
+        repo.commit("시험용 지식 항목")
+    return repo
 
 
 def _qna(conn: sqlite3.Connection, qid: str, parent_question_id: str | None) -> str:
@@ -124,7 +156,7 @@ class TestComposedBody:
             parent,
             _approved(conn),
             bot_accounts=ACCOUNTS,
-            titles={"k-1": "결재 한도 결정 규칙"},
+            repo=_repo(tmp_path),
         )
         assert isinstance(result, publication.Published)
 
@@ -176,7 +208,7 @@ class TestRefusals:
         draft_id = draft_store.save(
             conn, question="질문", draft=_draft(), qna_item_id="qna-1"
         )
-        result = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS)
+        result = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS, repo=_repo(tmp_path))
         assert isinstance(result, publication.Refused)
         assert result.reason is publication.Refusal.NOT_APPROVED
         assert len(parent.list_answers("Q-1")) == before
@@ -194,7 +226,11 @@ class TestRefusals:
             conn, draft_id, approved=False, reason=Reject.P1, detail="근거 밖"
         )
         result = publication.publish(
-            conn, MockParentSystem(), draft_id, bot_accounts=ACCOUNTS
+            conn,
+            MockParentSystem(),
+            draft_id,
+            bot_accounts=ACCOUNTS,
+            repo=_repo(tmp_path),
         )
         assert isinstance(result, publication.Refused)
         assert result.reason is publication.Refusal.NOT_APPROVED
@@ -209,7 +245,11 @@ class TestRefusals:
         conn = _conn(tmp_path)
         _qna(conn, "qna-1", None)
         result = publication.publish(
-            conn, MockParentSystem(), _approved(conn), bot_accounts=ACCOUNTS
+            conn,
+                MockParentSystem(),
+                _approved(conn),
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
         )
         assert isinstance(result, publication.Refused)
         assert result.reason is publication.Refusal.NO_DESTINATION
@@ -227,7 +267,11 @@ class TestRefusals:
         parent = MockParentSystem()
         before = len(parent.list_answers("Q-1"))
         result = publication.publish(
-            conn, parent, _approved(conn), bot_accounts=frozenset({"다른-계정"})
+            conn,
+            parent,
+            _approved(conn),
+            bot_accounts=frozenset({"다른-계정"}),
+            repo=_repo(tmp_path),
         )
         assert isinstance(result, publication.Refused)
         assert result.reason is publication.Refusal.UNIDENTIFIED_AUTHOR
@@ -243,11 +287,11 @@ class TestExactlyOnce:
         _qna(conn, "qna-1", "Q-1")
         parent = MockParentSystem()
         draft_id = _approved(conn)
-        first = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS)
+        first = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS, repo=_repo(tmp_path))
         assert isinstance(first, publication.Published)
         count = len(parent.list_answers("Q-1"))
 
-        second = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS)
+        second = publication.publish(conn, parent, draft_id, bot_accounts=ACCOUNTS, repo=_repo(tmp_path))
         assert isinstance(second, publication.Refused)
         assert second.reason is publication.Refusal.ALREADY_OUT
         assert len(parent.list_answers("Q-1")) == count
@@ -261,7 +305,11 @@ class TestExactlyOnce:
         conn = _conn(tmp_path)
         _qna(conn, "qna-1", "Q-1")
         publication.publish(
-            conn, MockParentSystem(), _approved(conn), bot_accounts=ACCOUNTS
+            conn,
+                MockParentSystem(),
+                _approved(conn),
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
         )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
@@ -277,7 +325,11 @@ class TestExactlyOnce:
         conn = _conn(tmp_path)
         _qna(conn, "qna-1", "Q-1")
         publication.publish(
-            conn, MockParentSystem(), _approved(conn), bot_accounts=ACCOUNTS
+            conn,
+                MockParentSystem(),
+                _approved(conn),
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
         )
         state = conn.execute(
             "SELECT state FROM qna_item WHERE id = 'qna-1'"
@@ -307,7 +359,11 @@ class TestInFlight:
         _qna(conn, "qna-1", "Q-1")
         with pytest.raises(ConnectionError):
             publication.publish(
-                conn, self._Exploding(), _approved(conn), bot_accounts=ACCOUNTS
+                conn,
+                self._Exploding(),
+                _approved(conn),
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
             )
         rows = publication.unsettled(conn)
         assert len(rows) == 1
@@ -321,10 +377,18 @@ class TestInFlight:
         draft_id = _approved(conn)
         with pytest.raises(ConnectionError):
             publication.publish(
-                conn, self._Exploding(), draft_id, bot_accounts=ACCOUNTS
+                conn,
+                self._Exploding(),
+                draft_id,
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
             )
         retry = publication.publish(
-            conn, MockParentSystem(), draft_id, bot_accounts=ACCOUNTS
+            conn,
+            MockParentSystem(),
+            draft_id,
+            bot_accounts=ACCOUNTS,
+            repo=_repo(tmp_path),
         )
         assert isinstance(retry, publication.Refused)
         assert retry.reason is publication.Refusal.IN_FLIGHT
@@ -336,7 +400,11 @@ class TestInFlight:
         _qna(conn, "qna-1", "Q-1")
         with pytest.raises(ConnectionError):
             publication.publish(
-                conn, self._Exploding(), _approved(conn), bot_accounts=ACCOUNTS
+                conn,
+                self._Exploding(),
+                _approved(conn),
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
             )
         record_id = publication.unsettled(conn)[0].record_id
         assert publication.settle(conn, record_id, parent_answer_id="A-99")
@@ -357,13 +425,21 @@ class TestInFlight:
         draft_id = _approved(conn)
         with pytest.raises(ConnectionError):
             publication.publish(
-                conn, self._Exploding(), draft_id, bot_accounts=ACCOUNTS
+                conn,
+                self._Exploding(),
+                draft_id,
+                bot_accounts=ACCOUNTS,
+                repo=_repo(tmp_path),
             )
         publication.settle(
             conn, publication.unsettled(conn)[0].record_id, parent_answer_id=None
         )
         retry = publication.publish(
-            conn, MockParentSystem(), draft_id, bot_accounts=ACCOUNTS
+            conn,
+            MockParentSystem(),
+            draft_id,
+            bot_accounts=ACCOUNTS,
+            repo=_repo(tmp_path),
         )
         assert isinstance(retry, publication.Published)
         conn.close()
@@ -391,6 +467,7 @@ class TestApprovalPublishes:
 
         conn = _conn(tmp_path)
         _qna(conn, "qna-1", "Q-1")
+        _repo(tmp_path)
         draft_id = draft_store.save(
             conn, question="질문", draft=_draft(), qna_item_id="qna-1"
         )

@@ -71,6 +71,7 @@ def _item(tmp_path) -> KnowledgeItem:
         ),
     )
     repo.save(item)
+    repo.commit("시험용 지식 항목")
     return item
 
 
@@ -294,6 +295,7 @@ class TestResolutionForAutoHandled:
             MockParentSystem(),
             admission.draft_id,
             bot_accounts=frozenset({BOT_ACCOUNT}),
+            repo=KnowledgeRepository(tmp_path / "knowledge"),
         )
         assert isinstance(result, publication.Published)
         return admission

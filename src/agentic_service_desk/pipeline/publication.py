@@ -30,6 +30,23 @@
 반대 순서(내보내고 기록)를 택하면 **게재됐는데 기록이 없는 상태**가 생기고, 그것은
 조용하다 — 아무도 그 답변을 정정할 수 없게 되는데 화면에는 아무 표시도 나지 않는다.
 
+## 근거는 **게재 시점으로 고정해** 함께 남긴다 (FR-28, D20)
+
+게재된 답변의 텍스트는 모 시스템에 남지만 **무엇을 근거로 만들어졌는지는 우리만
+안다**(§6.6). 그것을 링크로만 남기면, 항목이 갱신됐을 때 링크를 따라가 봐야 *지금의*
+지식이 나올 뿐이다.
+
+    필드 2  근거 목록      — 인용한 지식 항목의 불변 id
+    필드 3  근거의 출처    — 그 항목이 **당시** 무엇에서 유래했는가
+    필드 4  근거 버전      — 게재 시점의 **지식베이스 커밋**. 원천 저장소 커밋이 아니다
+
+"그때는 맞았고 지금은 틀리다"와 "그때부터 틀렸다"는 **다른 사고**이고 대응도 다르다 —
+전자는 정상적인 stale 이고 후자는 품질 결함이다. 버전 고정이 둘을 가르며, 게재 시점의
+stale 여부를 함께 적는 것이 후자를 셀 수 있게 한다.
+
+**고정할 수 없으면 게재하지 않는다.** 커밋 없는 저장소에서 없는 해시를 지어내 박으면,
+거짓은 나중에 재현을 시도할 때에야 드러나고 그때는 이미 답변이 나가 있다.
+
 ## 누가 올리는가를 나가기 전에 대조한다
 
 게재 계정이 `ASD_BOT_ACCOUNTS` 에 없으면 **게재하지 않는다.** 목록 밖 계정으로 나간
@@ -41,6 +58,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import sqlite3
 import uuid
 from collections.abc import Mapping, Sequence
@@ -48,6 +66,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.adapters.parent_system import ParentSystem
+from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.pipeline import draft_store
 
 AUTHOR_BOT = "bot"
@@ -94,6 +113,13 @@ class Refusal(enum.StrEnum):
     ALREADY_OUT = "이미 나갔다"
     """한 초안은 한 번만 나간다. 스키마의 부분 유니크 인덱스가 함께 지킨다."""
 
+    UNPINNABLE = "근거 버전을 고정할 수 없다"
+    """지식베이스에 커밋이 없어 게재 시점의 항목 내용을 재현할 수 없다 (FR-28).
+
+    **고정 없이 내보내지 않는다.** 그러면 stale 전파의 배선이 없는 답변이 나가고,
+    나중에 "그때는 맞았는가"를 물을 수 없다 — 물을 수 없으면 정정도 못 한다.
+    """
+
     IN_FLIGHT = "지난 게재가 끝을 보지 못했다"
     """나갔는지 모르는 기록이 남아 있다. **사람이 확인해야 한다** — 여기서 추측해
     다시 보내면 이용자의 질문에 같은 답변이 둘 달린다."""
@@ -127,6 +153,61 @@ class Unsettled:
     qna_item_id: str
     parent_question_id: str | None
     attempted_at: str
+
+
+@dataclass(frozen=True)
+class Pinned:
+    """게재 시점으로 고정된 근거 하나 (§6.6.1 필드 2~4)."""
+
+    item_id: str
+    title: str
+    pinned_commit: str
+    """게재 시점의 **지식베이스** 커밋. 원천 저장소 커밋이 아니다 (ADR-002 결정 3)."""
+
+    source: tuple[str, ...] = ()
+    """그 항목이 **당시** 무엇에서 유래했는가. 항목이 갱신되면 지금 provenance 는
+    달라지므로 여기 박아 둔다 — 그래야 "무엇이 바뀌어 틀리게 됐는가"에 답할 수 있다."""
+
+    stale: bool = False
+    """게재 시점에 이미 낡아 있었는가. **P4 검수가 막는 것이므로 여기 참이 쌓이면
+    검수가 새고 있다는 뜻이다** (§6.6.2)."""
+
+
+def pin(repo: KnowledgeRepository, item_ids: Sequence[str]) -> list[Pinned] | None:
+    """근거를 게재 시점으로 고정한다. **고정할 수 없으면 `None`.**
+
+    커밋이 없는 저장소에서는 값을 지어내지 않는다 — 없는 해시를 박아 두면 나중에
+    재현을 시도할 때에야 거짓이 드러나고, 그때는 이미 답변이 나가 있다.
+
+    항목을 못 찾은 근거는 **자리를 비우지 않고 제목 없이 남긴다**: 근거 목록에서
+    빠지면 그 답변이 실제보다 얇은 근거로 쓰인 것처럼 읽힌다 (ADR-002 결정 4 의
+    Lint 검사가 그 깨진 링크를 나중에 Q5 로 올린다).
+    """
+    head = repo.head()
+    if head is None:
+        return None
+    pinned = []
+    for item_id in item_ids:
+        stored = repo.find(item_id)
+        if stored is None:
+            pinned.append(Pinned(item_id=item_id, title="", pinned_commit=head))
+            continue
+        item = stored.item
+        pinned.append(
+            Pinned(
+                item_id=item_id,
+                title=item.title,
+                pinned_commit=head,
+                source=tuple(
+                    ref
+                    for prov in item.provenance
+                    for ref in (prov.commit, prov.path, prov.qna)
+                    if ref
+                ),
+                stale=item.stale,
+            )
+        )
+    return pinned
 
 
 # --- 본문 조립 (FR-24, PO-2) ------------------------------------------------
@@ -179,7 +260,7 @@ def publish(
     draft_id: str,
     *,
     bot_accounts: frozenset[str],
-    titles: Mapping[str, str] | None = None,
+    repo: KnowledgeRepository,
 ) -> Published | Refused:
     """승인된 초안 하나를 게재한다. **이 시스템에서 답변이 나가는 유일한 문이다.**
 
@@ -225,10 +306,18 @@ def publish(
             return Refused(Refusal.ALREADY_OUT, existing["id"])
         return Refused(Refusal.IN_FLIGHT, existing["id"])
 
+    # **고정을 먼저 한다.** 나간 뒤에 고정하려 하면, 실패했을 때 이미 되돌릴 수 없다.
+    pinned = pin(repo, draft.grounding)
+    if pinned is None:
+        return Refused(
+            Refusal.UNPINNABLE,
+            "지식베이스에 커밋이 없다 — 게재 시점의 근거를 재현할 수 없다",
+        )
+
     body = compose(
         body=draft.body,
         grounding=draft.grounding,
-        titles=titles,
+        titles={p.item_id: p.title for p in pinned if p.title},
         unanswered=draft.unanswered,
     )
 
@@ -236,8 +325,8 @@ def publish(
     conn.execute(
         "INSERT INTO answer_record "
         "(id, qna_item_id, draft_id, body, author_kind, author_account, "
-        " review_outcome, state, attempted_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " generated_by, review_outcome, state, attempted_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             record_id,
             draft.qna_item_id,
@@ -245,10 +334,26 @@ def publish(
             body,
             AUTHOR_BOT,
             account,
+            draft.generated_by or None,
             "passed",
             IN_FLIGHT,
             datetime.now(UTC).isoformat(),
         ),
+    )
+    conn.executemany(
+        "INSERT INTO answer_grounding "
+        "(answer_record_id, knowledge_item_id, pinned_commit, source, stale_at_publish) "
+        "VALUES (?, ?, ?, ?, ?)",
+        [
+            (
+                record_id,
+                p.item_id,
+                p.pinned_commit,
+                json.dumps(list(p.source), ensure_ascii=False),
+                int(p.stale),
+            )
+            for p in pinned
+        ],
     )
     conn.commit()
 
@@ -338,3 +443,40 @@ def record(conn: sqlite3.Connection, record_id: str) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM answer_record WHERE id = ?", (record_id,)
     ).fetchone()
+
+
+def grounding_of(conn: sqlite3.Connection, record_id: str) -> list[Pinned]:
+    """그 답변이 **무엇에 기대어 나갔는가**, 게재 시점 그대로 (§6.6.1 필드 2~4).
+
+    지금의 지식이 아니다 — 그것을 보려면 항목을 열면 된다. 여기 있는 것은
+    **그때의 것**이고, 둘의 차이가 곧 "무엇이 바뀌었는가"다.
+    """
+    rows = conn.execute(
+        "SELECT * FROM answer_grounding WHERE answer_record_id = ? "
+        "ORDER BY knowledge_item_id",
+        (record_id,),
+    ).fetchall()
+    return [
+        Pinned(
+            item_id=r["knowledge_item_id"],
+            title="",
+            pinned_commit=r["pinned_commit"],
+            source=tuple(json.loads(r["source"])),
+            stale=bool(r["stale_at_publish"]),
+        )
+        for r in rows
+    ]
+
+
+def answered_with(conn: sqlite3.Connection, item_id: str) -> list[sqlite3.Row]:
+    """이 지식 항목을 근거로 쓴 **게재된** 답변들. stale 전파의 입구다 (§6.6.3).
+
+    항목이 낡으면 그것으로 답한 게재물이 정정 후보(Q5)가 된다 — 그 목록이 여기서
+    나온다. 전파는 WBS-4.5.7 이 잇는다.
+    """
+    return conn.execute(
+        "SELECT r.* FROM answer_record r "
+        "JOIN answer_grounding g ON g.answer_record_id = r.id "
+        "WHERE g.knowledge_item_id = ? AND r.state = ? ORDER BY r.published_at",
+        (item_id, PUBLISHED),
+    ).fetchall()

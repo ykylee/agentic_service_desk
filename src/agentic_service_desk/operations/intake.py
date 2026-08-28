@@ -236,6 +236,7 @@ def _queue(
         draft=outcome.draft,
         verdict=verdict,
         qna_item_id=qna_item_id,
+        generated_by=outcome.generated_by,
     )
 
 

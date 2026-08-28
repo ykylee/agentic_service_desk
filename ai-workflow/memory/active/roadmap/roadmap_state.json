@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.575,
+      "progress": 0.6,
       "total_leaves": 40,
-      "done_leaves": 23,
+      "done_leaves": 24,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -378,7 +378,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 8,
-          "done_leaves": 2,
+          "done_leaves": 3,
           "children": [
             {
               "id": "WBS-4.5.1",
@@ -405,10 +405,12 @@
             {
               "id": "WBS-4.5.3",
               "title": "답변 이력",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-033"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

@@ -197,6 +197,9 @@ class BatchRunner:
             search=Search(repo=repo, conn=conn),
             conn=conn,
             harness=self._harness(),
+            # 모델 식별자는 **설정에서 온다** — 하네스에게 되물으면 실행기마다 답이
+            # 달라진다. 이 값이 답변 이력의 생성 주체가 된다 (§6.6.1 필드 5).
+            generated_by=self._cfg.llm_model,
         )
 
     def _reviewer(self) -> Reviewer | None:

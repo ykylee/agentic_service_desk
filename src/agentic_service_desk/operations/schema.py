@@ -132,6 +132,10 @@ CREATE TABLE IF NOT EXISTS answer_draft (
     agent_outcome TEXT,           -- passed | rejected. 에이전트 검수 결과
     agent_reason TEXT,            -- P1~P5
     agent_detail TEXT,
+    generated_by TEXT,            -- 어느 모델이 만들었는가 (§6.6.1 필드 5, ADR-005).
+                                  -- **게재 시점이 아니라 생성 시점의 모델**이다 —
+                                  -- 초안이 큐에 머무는 동안 설정이 바뀔 수 있고,
+                                  -- 그러면 모델 교체 추적이 어긋난다
     state        TEXT NOT NULL,   -- pending | approved | rejected
     created_at   TEXT NOT NULL,
     decided_at   TEXT
@@ -153,12 +157,27 @@ CREATE TABLE IF NOT EXISTS review (
     reviewed_at TEXT NOT NULL
 );
 
--- 근거 버전 고정 (D20) — 이 표가 stale 전파의 배선이다.
--- 링크만 두면 지식이 갱신된 뒤 "당시 무엇을 근거로 답했는지"가 사라진다.
+-- 근거 버전 고정 (D20, §6.6) — 이 표가 stale 전파의 배선이다.
+-- 링크만 두면 지식이 갱신된 뒤 "당시 무엇을 근거로 답했는지"가 사라진다. 링크를
+-- 따라가면 **지금의** 지식이 나올 뿐이다.
 CREATE TABLE IF NOT EXISTS answer_grounding (
     answer_record_id  TEXT NOT NULL,
-    knowledge_item_id TEXT NOT NULL,   -- 경로가 아니라 불변 id (ADR-002)
-    pinned_commit     TEXT NOT NULL,   -- 답변 시점의 버전. 이것이 고정이다
+    knowledge_item_id TEXT NOT NULL,   -- 경로가 아니라 불변 id (ADR-002 결정 2)
+    pinned_commit     TEXT NOT NULL,   -- §6.6.1 필드 4 — 게재 시점의 **지식베이스**
+                                       -- 커밋. 원천 저장소 커밋이 아니다. 이것이 있어야
+                                       -- 그 시점의 항목 내용을 재현할 수 있다
+    source            TEXT NOT NULL DEFAULT '[]',  -- §6.6.1 필드 3 — 그 항목이 **당시** 무엇에서
+                                       -- 유래했는가 (커밋·경로·QnA id) 의 JSON.
+                                       -- 항목이 갱신되면 지금 provenance 는 달라지므로
+                                       -- 여기 박아 둬야 "무엇이 바뀌어 틀리게 됐는가"에
+                                       -- 답할 수 있다
+    stale_at_publish  INTEGER NOT NULL DEFAULT 0,
+                                       -- 게재 시점에 이미 stale 이었는가. **"그때는
+                                       -- 맞았고 지금은 틀리다"와 "그때부터 틀렸다"를
+                                       -- 가른다** (§6.6.2) — 전자는 정상적인 stale 이고
+                                       -- 후자는 품질 결함이라 대응이 다르다.
+                                       -- P4 검수가 막는 것이 이것이므로, 여기 1 이
+                                       -- 쌓이면 검수가 새고 있다는 뜻이다
     PRIMARY KEY (answer_record_id, knowledge_item_id),
     FOREIGN KEY (answer_record_id) REFERENCES answer_record (id)
 );

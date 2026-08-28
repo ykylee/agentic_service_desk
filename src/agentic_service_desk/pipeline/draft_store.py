@@ -55,6 +55,10 @@ class PendingDraft:
     agent_outcome: str | None
     agent_reason: str | None
     agent_detail: str
+    generated_by: str
+    """생성 시점의 모델 (§6.6.1 필드 5). 게재 시점이 아니다 — 초안이 큐에 머무는
+    동안 설정이 바뀌면 모델 교체 추적이 어긋난다."""
+
     state: str
     created_at: str
 
@@ -92,6 +96,7 @@ def save(
     draft: Draft,
     verdict: Verdict | None = None,
     qna_item_id: str | None = None,
+    generated_by: str = "",
 ) -> str:
     """초안을 검수 대기열에 올린다.
 
@@ -103,8 +108,8 @@ def save(
     conn.execute(
         "INSERT INTO answer_draft "
         "(id, qna_item_id, question, statements, grounding, unanswered, "
-        " agent_outcome, agent_reason, agent_detail, state, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " agent_outcome, agent_reason, agent_detail, generated_by, state, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             draft_id,
             qna_item_id,
@@ -125,6 +130,7 @@ def save(
             verdict.outcome if verdict else None,
             str(verdict.reason) if verdict and verdict.reason else None,
             verdict.detail if verdict else "",
+            generated_by,
             PENDING,
             datetime.now(UTC).isoformat(),
         ),
@@ -204,6 +210,7 @@ def _from_row(row: sqlite3.Row) -> PendingDraft:
         agent_outcome=row["agent_outcome"],
         agent_reason=row["agent_reason"],
         agent_detail=row["agent_detail"] or "",
+        generated_by=row["generated_by"] or "",
         state=row["state"],
         created_at=row["created_at"],
     )

@@ -265,6 +265,24 @@ class KnowledgeRepository:
             at.unlink()
         return target
 
+    def head(self) -> str | None:
+        """지금 지식베이스의 커밋 해시. **근거 버전 고정의 값이다** (D20, ADR-002 결정 3).
+
+        커밋이 하나도 없으면 `None` 이다 — 방금 만들어진 저장소이거나 `save()` 만
+        하고 커밋하지 않은 상태다. **그때는 고정할 것이 없다**: 항목 내용을 나중에
+        재현할 방법이 없으므로, 없는 값을 지어내는 대신 없다고 말한다. 게재 관문이
+        그 사실을 받아 거부한다 (FR-28).
+        """
+        if not self._root.exists():
+            # 지식베이스가 아직 없다. **터지지 않는다** — 게재 관문이 이 값을 보고
+            # 판정해야 하는데, 여기서 예외를 던지면 "고정할 수 없다"가 "게재 중
+            # 사고"로 둔갑해 사람이 모 시스템을 확인하러 가게 된다.
+            return None
+        try:
+            return self._git("rev-parse", "HEAD").strip() or None
+        except (KnowledgeRepoError, OSError):
+            return None
+
     def last_commit_date(self, path: Path) -> str | None:
         """이 파일이 마지막으로 커밋된 시각 (ISO).
 

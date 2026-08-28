@@ -179,6 +179,12 @@ class Outcome:
     hits: list[Hit] = field(default_factory=list)
     draft: Draft | None = None
     halted: Halt | None = None
+    generated_by: str = ""
+    """어느 모델이 만들었는가 (§6.6.1 필드 5, ADR-005).
+
+    **설정에서 온다 — 하네스에게 묻지 않는다.** 모델 식별자는 우리가 정한 값이고,
+    실행기가 무엇을 썼는지 되물으면 그 답이 실행기마다 달라진다.
+    """
 
     @property
     def produced(self) -> bool:
@@ -468,14 +474,16 @@ class AnswerPipeline:
         conn: sqlite3.Connection,
         harness: Harness | None = None,
         limit: int = 5,
+        generated_by: str = "",
     ) -> None:
         self._search = search
         self._conn = conn
         self._harness = harness
         self._limit = limit
+        self._generated_by = generated_by
 
     def run(self, question: str) -> Outcome:
-        outcome = Outcome()
+        outcome = Outcome(generated_by=self._generated_by)
 
         analysis = self._analyze(question, outcome)
         hits = self._retrieve(question, analysis, outcome)

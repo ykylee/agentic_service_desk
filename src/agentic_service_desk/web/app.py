@@ -424,24 +424,13 @@ def _publish(cfg, conn, parent_system, draft_id: str) -> str:  # noqa: ANN001
             parent_system(),
             draft_id,
             bot_accounts=accounts,
-            titles=_titles(cfg),
+            repo=KnowledgeRepository(cfg.knowledge_dir),
         )
     except Exception as exc:  # noqa: BLE001 — 게재 실패는 화면에 보여야 한다
         return f"게재하지 못했다: {exc}. 나갔는지 확인이 필요할 수 있다."
     if isinstance(result, publication.Refused):
         return f"게재하지 않았다 — {result.reason} ({result.detail})"
     return "게재했다."
-
-
-def _titles(cfg) -> dict[str, str]:  # noqa: ANN001
-    """지식 항목 id → 제목. 게재 본문의 근거 목록에 쓴다 (PO-2).
-
-    못 찾은 id 는 그냥 빠진다 — 조립 쪽이 그때 **id 를 그대로 적는다.**
-    """
-    repo = KnowledgeRepository(cfg.knowledge_dir)
-    if not repo.root.exists():
-        return {}
-    return {s.item.id: s.item.title for s in repo.scan()[0]}
 
 
 def _source_text(cfg, conn, drafts) -> dict[str, str]:  # noqa: ANN001
