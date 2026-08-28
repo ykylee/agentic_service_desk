@@ -27,8 +27,8 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중이며 로드맵과 WBS 분해까지 마쳤다.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중이며 로드맵과 WBS 분해까지 마쳤다.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 5 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — 40 leaf 중 5 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
