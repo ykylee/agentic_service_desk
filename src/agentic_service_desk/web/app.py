@@ -22,7 +22,9 @@ from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
+from agentic_service_desk.pipeline import draft_store, review as review_domain
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.schema import connect, initialize
@@ -62,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status = board.knowledge_status()
             counts = {
                 "Q1": len(board.tickets()),
+                "Q2": len(draft_store.pending(conn)),
                 "Q4": status.open_contradictions,
                 "Q8": len(board.knowledge_gaps()),
             }
@@ -219,6 +222,74 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             conn.close()
         return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
 
+    @app.get("/queues/Q2")
+    def q2(request: Request):  # noqa: ANN201
+        """검수 대기열 — **판정 화면이다** (§6.4.4, FR-45).
+
+        상태 기계가 없다. 보고 누르면 끝난다.
+        """
+        board, conn = dashboard()
+        try:
+            rows = draft_store.pending(conn)
+            sources = _source_text(cfg, conn, rows)
+            unmatched = {
+                d.id: review_domain.unmatched_terms(
+                    review_domain.ReviewInput(
+                        draft_body=d.body, grounding=d.grounding, source_text=sources
+                    )
+                )[:12]
+                for d in rows
+            }
+            dist = review_domain.distribution(conn, reviewed_by="human")
+            agent_dist = review_domain.distribution(conn, reviewed_by="agent")
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request,
+            "q2.html",
+            shell()
+            | {
+                "rows": rows,
+                "sources": sources,
+                "unmatched": unmatched,
+                "dist": dist,
+                "agent_dist": agent_dist,
+                "reasons": [(str(r), review_domain.DESCRIPTIONS[r]) for r in review_domain.Reject],
+            },
+        )
+
+    @app.post("/queues/Q2/{draft_id}/decide")
+    def q2_decide(  # noqa: ANN201
+        draft_id: str,
+        approved: str = Form(...),
+        reason: str = Form(""),
+        detail: str = Form(""),
+    ):
+        """승인하거나 반려한다. **반려에는 사유가 필요하다** (§5.5.6)."""
+        board, conn = dashboard()
+        try:
+            is_approved = approved == "1"
+            picked = None
+            if not is_approved:
+                try:
+                    picked = review_domain.Reject(reason)
+                except ValueError:
+                    # 사유 없는 반려는 기록으로 쓸 수 없다. 판정을 받지 않는다.
+                    return RedirectResponse("/queues/Q2", status_code=303)
+            draft = draft_store.get(conn, draft_id)
+            sources = _source_text(cfg, conn, [draft] if draft else [])
+            draft_store.decide(
+                conn,
+                draft_id,
+                approved=is_approved,
+                reason=picked,
+                detail=detail,
+                source_text=sources,
+            )
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q2", status_code=303)
+
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201
         board, conn = dashboard()
@@ -270,3 +341,23 @@ def _chosen_invalidation(  # noqa: ANN001
     if not period_days.strip().isdigit() or int(period_days) <= 0:
         raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
     return Invalidation(kind=parsed, period_days=int(period_days))
+
+
+def _source_text(cfg, conn, drafts) -> dict[str, str]:  # noqa: ANN001
+    """초안이 가리키는 지식 항목의 원문.
+
+    **없을 수 있다.** 초안을 만든 뒤 항목이 지워지거나 이름이 바뀌었을 수 있고,
+    그때 화면은 "원문을 찾을 수 없다"고 말해야 한다 — 조용히 빈칸으로 두면 검수자가
+    근거가 없는 줄 모르고 승인한다.
+    """
+    wanted = {g for d in drafts for g in d.grounding}
+    if not wanted:
+        return {}
+    repo = KnowledgeRepository(cfg.knowledge_dir)
+    if not repo.root.exists():
+        return {}
+    return {
+        s.item.id: f"{s.item.title}\n\n{s.item.body}"
+        for s in repo.scan()[0]
+        if s.item.id in wanted
+    }

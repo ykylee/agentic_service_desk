@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 20 완료 — 4.4(S2) 5개 중 4개. **절반을 넘었다.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0)·4.3(S1) 완주**, 40 leaf 중 20 완료 — 4.4(S2) 5개 중 4개. **절반을 넘었다.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주, 40 leaf 중 21 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주, 40 leaf 중 21 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-030 — WBS-4.4.5 대시보드 확장 (Q2 답변 검수)",
       "TASK-2026-08-28-main-029 — WBS-4.4.4 검수",
       "TASK-2026-08-28-main-028 — WBS-4.4.3 불확실성 표시",
       "TASK-2026-08-28-main-027 — WBS-4.4.2 파이프라인 1~3단계",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-024 — WBS-4.3.5 대시보드 확장 (Q1 티켓 대기열)",
       "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록",
       "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록",
-      "TASK-2026-08-28-main-021 — WBS-4.3.1 티켓 도메인",
-      "TASK-2026-08-28-main-020 — WBS-4.2.7 대시보드 최소"
+      "TASK-2026-08-28-main-021 — WBS-4.3.1 티켓 도메인"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 30,
+    "task_count": 31,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -83,7 +83,8 @@
       "TASK-2026-08-28-main-026 — WBS-4.4.1 검색",
       "TASK-2026-08-28-main-027 — WBS-4.4.2 파이프라인 1~3단계",
       "TASK-2026-08-28-main-028 — WBS-4.4.3 불확실성 표시",
-      "TASK-2026-08-28-main-029 — WBS-4.4.4 검수"
+      "TASK-2026-08-28-main-029 — WBS-4.4.4 검수",
+      "TASK-2026-08-28-main-030 — WBS-4.4.5 대시보드 확장 (Q2 답변 검수)"
     ]
   },
   "next_documents": [

@@ -323,9 +323,24 @@ class Distribution:
         return gap / self.rejected
 
 
-def distribution(conn: sqlite3.Connection) -> Distribution:
+def distribution(
+    conn: sqlite3.Connection, *, reviewed_by: str | None = None
+) -> Distribution:
+    """검수 분포. `reviewed_by` 로 **판정 주체를 가른다.**
+
+    섞으면 읽을 수 없다. §8.3 이 "검수 반려율은 신뢰 지표"라고 한 것은 **사람이
+    에이전트의 산출물을 얼마나 믿는가**를 뜻하므로 사람 판정만 세야 하고, 반대로
+    2국면 자동 검수의 학습 자료가 되는 것은(§5.5.3) **사람 판정 기록**이다.
+    에이전트 판정은 기계·의미 층이 무엇을 잡는지를 따로 보여 준다.
+    """
+    query = "SELECT outcome, reason FROM review"
+    params: tuple = ()
+    if reviewed_by:
+        query += " WHERE reviewed_by = ?"
+        params = (reviewed_by,)
+
     out = Distribution()
-    for row in conn.execute("SELECT outcome, reason FROM review"):
+    for row in conn.execute(query, params):
         if row["outcome"] == PASSED:
             out.passed += 1
             continue

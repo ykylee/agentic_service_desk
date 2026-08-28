@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Q2 답변 검수{% endblock %}
+{% block body %}
+<h1>Q2 — 답변 검수</h1>
+<p class="dim small">
+  <strong>보고 누르면 끝나는 판정</strong>이다 — 상태 전이도 진행 중 표시도 없다 (§6.4.4).
+  묻는 것은 "근거가 붙어 있는가"가 아니라 <strong>"이 문장이 그 근거로 뒷받침되는가"</strong>다.
+</p>
+
+{% if agent_dist.total %}
+<p class="dim small">
+  <strong>에이전트 검수</strong> — 통과 {{ agent_dist.passed }} · 반려 {{ agent_dist.rejected }}
+  {% if agent_dist.by_reason %}({{ agent_dist.by_reason|list|join(', ') }}){% endif %}
+</p>
+{% endif %}
+{% if dist.total %}
+<p class="dim small">
+  <strong>내 판정</strong> — 통과 {{ dist.passed }} · 반려 {{ dist.rejected }}
+  {% if dist.rejected %}
+  (<span class="{% if dist.grounding_gap_share > 0.5 %}warn{% endif %}">P1·P5 가
+  {{ '%.0f'|format(dist.grounding_gap_share * 100) }}%</span> —
+  높으면 <strong>근거가 부족하다는 뜻</strong>이고 지식 공백으로 이어진다)
+  {% endif %}
+  <br>이 반려율은 <strong>내가 에이전트를 얼마나 믿는가</strong>다 — 0 에 수렴하는데
+  오답이 나오면 검수가 형식적으로 흐르고 있다는 뜻이다 (§8.3).
+</p>
+{% endif %}
+
+{% if not rows %}
+<p class="ok">검수를 기다리는 초안이 없다.</p>
+{% endif %}
+
+{% for d in rows %}
+<h2>{{ d.question }}</h2>
+<p class="dim small">
+  <strong>{{ d.look_here_first }}</strong>
+  {% if d.agent_rejected %}
+  <br><span class="warn">에이전트: {{ d.agent_reason }} — {{ d.agent_detail }}</span>
+  {% endif %}
+</p>
+
+<table>
+  {% for s in d.statements %}
+  <tr>
+    <td style="width:6rem" class="small {% if s.confidence != '확인됨' %}warn{% endif %}">
+      {{ s.confidence }}
+    </td>
+    <td>{{ s.text }}<div class="dim small">근거 {{ s.grounding|join(', ') or '없음' }}</div></td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if d.unanswered %}
+<p class="dim small">모른다고 밝힌 부분 —
+  {% for u in d.unanswered %}{{ u }}{% if not loop.last %} · {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+<details>
+  <summary class="dim small">근거 원문 ({{ d.grounding|length }}건)</summary>
+  {% for gid in d.grounding %}
+  <div class="side" style="margin-top:.5rem">
+    <h4>{{ gid }}</h4>
+    <div class="small">{{ sources.get(gid, '(원문을 찾을 수 없다 — 항목이 사라졌다)') }}</div>
+  </div>
+  {% endfor %}
+</details>
+
+{% set stray = unmatched.get(d.id) %}
+{% if stray %}
+<p class="dim small">근거 원문에 없는 낱말 — <code>{{ stray|join('</code> <code>')|safe }}</code>
+  <br>바꿔 쓴 문장은 낱말이 다른 것이 정상이다. <strong>판정 근거가 아니라 볼 곳의 힌트다.</strong>
+</p>
+{% endif %}
+
+<form method="post" action="/queues/Q2/{{ d.id }}/decide" style="margin-top:.6rem">
+  <input type="hidden" name="approved" value="1">
+  <button type="submit">승인</button>
+</form>
+<form method="post" action="/queues/Q2/{{ d.id }}/decide">
+  <input type="hidden" name="approved" value="0">
+  <select name="reason">
+    {% for code, text in reasons %}<option value="{{ code }}">{{ code }} — {{ text }}</option>{% endfor %}
+  </select>
+  <input name="detail" placeholder="무엇이 문제인지" style="font:inherit;padding:.25rem">
+  <button type="submit">반려</button>
+</form>
+<p class="dim small">
+  반려에는 사유가 필요하다 — <strong>사유 없는 반려는 기록으로 쓸 수 없다</strong> (§5.5.6).
+</p>
+{% endfor %}
+{% endblock %}

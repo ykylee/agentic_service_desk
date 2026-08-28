@@ -101,6 +101,26 @@ CREATE TABLE IF NOT EXISTS answer_record (
     FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
 
+-- 답변 초안 — 검수를 기다리는 것 (Q2, §8.2).
+-- **`review` 와 나눠 둔다.** 이쪽은 판정받는 *물건*이고 저쪽은 판정 *사건*이다 —
+-- 한 초안이 에이전트 검수와 사람 검수를 차례로 받으면 사건은 둘, 물건은 하나다.
+-- 진술을 통째로 담는 이유는 근거 강도 표시(§5.6.5)가 화면에서 살아 있어야 하기
+-- 때문이다. 본문만 남기면 **어디를 먼저 볼지**가 사라진다.
+CREATE TABLE IF NOT EXISTS answer_draft (
+    id           TEXT PRIMARY KEY,
+    qna_item_id  TEXT,
+    question     TEXT NOT NULL,   -- 사람 검수자에게만 보인다. 에이전트는 못 본다 (FR-20)
+    statements   TEXT NOT NULL,   -- JSON — 진술과 근거 강도
+    grounding    TEXT NOT NULL,   -- JSON — 지식 항목 id
+    unanswered   TEXT NOT NULL,   -- JSON — 모른다고 밝힌 경계 (FR-19)
+    agent_outcome TEXT,           -- passed | rejected. 에이전트 검수 결과
+    agent_reason TEXT,            -- P1~P5
+    agent_detail TEXT,
+    state        TEXT NOT NULL,   -- pending | approved | rejected
+    created_at   TEXT NOT NULL,
+    decided_at   TEXT
+);
+
 -- 검수 기록 (FR-22, §5.5.6).
 -- **반려된 초안도 남긴다.** 버리면 왜 반려됐는지의 분포를 잃고, 그 분포가 세 가지로
 -- 쓰인다 — 지식 공백 탐지(P1·P5 가 몰리면 근거가 부족하다), 신뢰 계측(반려율은
