@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx
 
 from agentic_service_desk.llm.arbiter import YieldSignal
@@ -21,6 +23,18 @@ from agentic_service_desk.llm.policy import (
     assert_endpoint_allowed,
     is_local_endpoint,
 )
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+
+
+def _strip_thinking(content: str) -> str:
+    """혹시 남은 사고 블록을 걷어낸다.
+
+    `reasoning_split` 이 대개 처리하지만 **믿고 넘기지 않는다** — 지원하지 않는
+    런타임에서는 본문에 그대로 남고, 그러면 사고 과정이 게재물에 실린다.
+    """
+    return _THINK_BLOCK.sub("", content).strip()
+
 
 __all__ = [
     "ChatLlmGateway",
@@ -73,6 +87,14 @@ class ChatLlmGateway:
         return self._chat(prompt)
 
     def _chat(self, prompt: str) -> str:
+        """한 번 부르고 **본문만** 돌려준다.
+
+        `reasoning_split` 을 켜는 이유가 있다. 사고형 모델은 기본적으로 `<think>...</think>`
+        블록을 **본문 안에 섞어** 보낸다(2026-08-28 MiniMax-M3 로 확인). 그대로 두면
+        그 사고 과정이 지식 항목이나 게재 답변에 실려 나간다.
+
+        이 옵션을 지원하지 않는 런타임은 무시하므로 켜 두어도 해가 없다.
+        """
         with httpx.Client(timeout=self._timeout) as client:
             res = client.post(
                 f"{self._base_url}/chat/completions",
@@ -80,10 +102,12 @@ class ChatLlmGateway:
                 json={
                     "model": self._model,
                     "messages": [{"role": "user", "content": prompt}],
+                    "reasoning_split": True,
                 },
             )
             res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"]
+            message = res.json()["choices"][0]["message"]
+            return _strip_thinking(message.get("content") or "")
 
     # --- 임베딩 -----------------------------------------------------------
 

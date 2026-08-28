@@ -66,3 +66,31 @@ class TestYieldSignal:
 class TestPriority:
     def test_온라인이_배치보다_앞선다(self) -> None:
         assert Priority.ONLINE < Priority.BATCH
+
+
+class TestThinkingBlocks:
+    """사고형 모델은 `<think>` 블록을 본문에 섞어 보낸다 (2026-08-28 MiniMax-M3 확인).
+
+    그대로 두면 **사고 과정이 지식 항목이나 게재 답변에 실려 나간다.**
+    """
+
+    def test_사고_블록을_걷어낸다(self) -> None:
+        from agentic_service_desk.llm.local import _strip_thinking
+
+        raw = '<think>\n사용자가 OK 를 원한다.\n</think>\n\nOK'
+        assert _strip_thinking(raw) == "OK"
+
+    def test_여러_블록도_걷어낸다(self) -> None:
+        from agentic_service_desk.llm.local import _strip_thinking
+
+        assert _strip_thinking("<think>가</think>답<think>나</think>변") == "답변"
+
+    def test_블록이_없으면_그대로다(self) -> None:
+        from agentic_service_desk.llm.local import _strip_thinking
+
+        assert _strip_thinking("그냥 답변") == "그냥 답변"
+
+    def test_빈_본문도_안전하다(self) -> None:
+        from agentic_service_desk.llm.local import _strip_thinking
+
+        assert _strip_thinking("") == ""
