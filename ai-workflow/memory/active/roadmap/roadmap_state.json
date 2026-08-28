@@ -117,6 +117,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "M-001 WBS 완료 후 수행한 문서 품질 감사 — 특정 WBS 산출물이 아니라 컨셉 전체를 대상으로 한다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-001.md"
+    },
+    {
+      "task_id": "TASK-2026-08-28-main-003",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS-2.1 산출물 완료 후 수행한 품질 감사",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-003.md"
     }
   ],
   "issues": [
