@@ -12,41 +12,14 @@ import pytest
 
 from agentic_service_desk.llm.arbiter import YieldSignal
 from agentic_service_desk.llm.gateway import Priority
-from agentic_service_desk.llm.local import RemoteEndpointRejected, assert_local_endpoint
 
 
 class TestLocalOnly:
-    @pytest.mark.parametrize(
-        "url",
-        [
-            "http://localhost:11434",
-            "http://127.0.0.1:8080",
-            "http://192.168.1.50:8000",
-            "http://10.0.0.5:9000",
-            "http://gpu-box.local:11434",
-        ],
-    )
-    def test_로컬은_통과한다(self, url: str) -> None:
-        assert_local_endpoint(url)
+    """엔드포인트 허용 판정은 `tests/test_llm_policy.py` 로 옮겼다.
 
-    @pytest.mark.parametrize(
-        "url",
-        [
-            "https://api.openai.com/v1",
-            "https://api.anthropic.com",
-            "http://8.8.8.8:11434",
-            "https://example.com/llm",
-        ],
-    )
-    def test_외부는_거부한다(self, url: str) -> None:
-        # NFR-1 — 지식 항목은 소스코드 파생이므로 외부 전송이 곧 반출이다.
-        with pytest.raises(RemoteEndpointRejected):
-            assert_local_endpoint(url)
-
-    def test_판정이_애매하면_거부한다(self) -> None:
-        # 반출은 되돌릴 수 없으므로 모호할 때는 막는 쪽으로 기운다.
-        with pytest.raises(RemoteEndpointRejected):
-            assert_local_endpoint("http://some-internal-host:8000")
+    NFR-1 이 "로컬 엔드포인트"가 아니라 "실제 데이터 반출 금지"로 정확해지면서
+    판정이 노출 상태에 따라 갈리기 때문이다 (ADR-005 §개발 환경).
+    """
 
 
 class TestYieldSignal:

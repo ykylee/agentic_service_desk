@@ -59,7 +59,18 @@ class Settings(BaseSettings):
     )
     llm_model: str = Field(default="", description="생성·검수에 쓸 모델 식별자.")
     llm_embedding_model: str = Field(
-        default="", description="임베딩 모델. 이것도 로컬이어야 한다 (NFR-1)."
+        default="", description="임베딩 모델. 실제 데이터를 다룰 때는 로컬이어야 한다 (NFR-1)."
+    )
+    llm_api_key: str = Field(
+        default="", description="원격 제공자를 쓸 때의 키. 로컬 런타임에는 대개 불필요하다."
+    )
+    llm_allow_remote: bool = Field(
+        default=False,
+        description=(
+            "원격 LLM 을 허용할 것인가. **개발 환경 전용이다.** 이것만으로는 열리지 않고 "
+            "실제 데이터가 없어야 한다 — 어댑터가 mock 이고 소스 저장소가 비어 있어야 "
+            "한다 (ADR-005 §개발 환경). 셋 중 하나라도 어긋나면 거부한다."
+        ),
     )
 
     # --- 도입 단계 (D49 · FR-59) ------------------------------------------

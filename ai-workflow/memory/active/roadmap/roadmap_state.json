@@ -132,7 +132,8 @@
               "title": "LLM 게이트웨이",
               "derived_status": "done",
               "linked_task_ids": [
-                "TASK-2026-08-28-main-007"
+                "TASK-2026-08-28-main-007",
+                "TASK-2026-08-28-main-010"
               ],
               "total_leaves": 1,
               "done_leaves": 1,
