@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.025,
+      "progress": 0.075,
       "total_leaves": 40,
-      "done_leaves": 1,
+      "done_leaves": 3,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -103,7 +103,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 4,
-          "done_leaves": 1,
+          "done_leaves": 3,
           "children": [
             {
               "id": "WBS-4.1.1",
@@ -128,19 +128,23 @@
             {
               "id": "WBS-4.1.3",
               "title": "LLM 게이트웨이",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-007"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {
               "id": "WBS-4.1.4",
               "title": "저장소 골격",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-008"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

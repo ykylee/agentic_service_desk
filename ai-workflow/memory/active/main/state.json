@@ -34,6 +34,8 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
+      "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
       "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
       "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
       "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
@@ -41,15 +43,14 @@
       "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
       "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰",
       "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
-      "TASK-2026-08-27-main-002 — M-001 WBS-1.1 — PURPOSE.md 4-element 채움",
-      "TASK-2026-08-27-agentic-service-desk-001 — 표준 AI 워크플로우 초기 도입"
+      "TASK-2026-08-27-main-002 — M-001 WBS-1.1 — PURPOSE.md 4-element 채움"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 7,
+    "task_count": 9,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -59,7 +60,9 @@
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
       "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
       "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
-      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격"
+      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
+      "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
+      "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격"
     ]
   },
   "next_documents": [

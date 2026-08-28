@@ -1,0 +1,112 @@
+"""운영 DB 스키마 (ADR-002).
+
+**컨셉의 결정이 열(column)로 드러나게** 썼다. 어느 필드가 왜 있는지는 주석이 밝힌다.
+
+가장 중요한 것 둘.
+    - `qna_item` 과 `ticket` 은 **별개 테이블**이며 상태가 서로를 결정하지 않는다 (D15)
+    - `answer_grounding` 이 **근거 버전을 고정**한다 — 링크가 아니라 커밋 해시다 (D20)
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+SCHEMA_SQL = """
+-- QnA 항목 — 대외 관점. "이용자에게 이 질문이 어떻게 되었는가" (D15)
+CREATE TABLE IF NOT EXISTS qna_item (
+    id                TEXT PRIMARY KEY,
+    parent_question_id TEXT NOT NULL UNIQUE,  -- 모 시스템의 질문 id
+    asker_id          TEXT,                   -- 사내 식별자. 지식 항목에는 넘어가지 않는다 (PO-3)
+    state             TEXT NOT NULL,          -- 접수 | 게재됨 | 후속진행 | 사람대기 | 해결 | 미해결종료
+    resolution_grade  TEXT,                   -- explicit | implicit — ingest 자격을 가른다 (D8)
+    language          TEXT,                   -- 1단계에서 판정 (D53)
+    opened_at         TEXT NOT NULL,
+    closed_at         TEXT
+);
+
+-- 티켓 — 내부 관점. "우리에게 무슨 일이 남았는가" (D15)
+-- 모든 QnA 가 티켓을 발행한다 (D19). 자동 처리분은 발행 즉시 auto_closed 다.
+CREATE TABLE IF NOT EXISTS ticket (
+    id          TEXT PRIMARY KEY,
+    source      TEXT NOT NULL,   -- qna | content | contradiction | correction (§6.4.3)
+    qna_item_id TEXT,            -- QnA 유래일 때만. 없어도 된다 — 티켓 출처는 넷이다
+    state       TEXT NOT NULL,   -- auto_closed | open | in_progress | held | closed (D33)
+    opened_at   TEXT NOT NULL,   -- 경과 시간의 기준. SLA 는 두지 않는다 (D30)
+    closed_at   TEXT,
+    FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
+);
+
+-- 종결 기록 — 지식 항목의 초안이다 (D18). 승격을 번역이 아니라 승인으로 만든다.
+CREATE TABLE IF NOT EXISTS ticket_resolution (
+    ticket_id           TEXT PRIMARY KEY,
+    generalized_question TEXT NOT NULL,  -- 개인·상황 요소를 걷어낸 형태 (PO-3 를 여기서 집행한다)
+    answer              TEXT NOT NULL,
+    grounding           TEXT NOT NULL,   -- JSON — 근거 목록
+    invalidation        TEXT NOT NULL,   -- JSON — 없으면 승격하지 않는다 (FR-14). 강제 입력 지점 (D26)
+    cause               TEXT,
+    scope               TEXT,
+    recurrence          TEXT,
+    FOREIGN KEY (ticket_id) REFERENCES ticket (id)
+);
+
+-- 답변 이력 — 게재한 것과 그 근거 (D20)
+-- 답변 본문은 모 시스템에 있지만 **무엇을 근거로 만들어졌는지는 우리만 안다.**
+CREATE TABLE IF NOT EXISTS answer_record (
+    id                TEXT PRIMARY KEY,
+    qna_item_id       TEXT NOT NULL,
+    parent_answer_id  TEXT,            -- 모 시스템에서 받은 게재 id. 정정(XR-7)에 쓴다
+    body              TEXT NOT NULL,
+    author_kind       TEXT NOT NULL,   -- bot | human — 되먹임 차단의 판정 근거 (D7)
+    generated_by      TEXT,            -- 모델 식별자. 모델 교체 추적 (ADR-005)
+    review_outcome    TEXT,            -- passed | rejected
+    review_reason     TEXT,            -- P1~P8 — 사유별 분포가 신뢰 지표다 (§5.5.6)
+    published_at      TEXT,
+    corrected_at      TEXT,            -- 정정 시각 (PO-1)
+    FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
+);
+
+-- 근거 버전 고정 (D20) — 이 표가 stale 전파의 배선이다.
+-- 링크만 두면 지식이 갱신된 뒤 "당시 무엇을 근거로 답했는지"가 사라진다.
+CREATE TABLE IF NOT EXISTS answer_grounding (
+    answer_record_id  TEXT NOT NULL,
+    knowledge_item_id TEXT NOT NULL,   -- 경로가 아니라 불변 id (ADR-002)
+    pinned_commit     TEXT NOT NULL,   -- 답변 시점의 버전. 이것이 고정이다
+    PRIMARY KEY (answer_record_id, knowledge_item_id),
+    FOREIGN KEY (answer_record_id) REFERENCES answer_record (id)
+);
+
+-- 콘텐츠 발행 이력 (§7)
+CREATE TABLE IF NOT EXISTS content_publication (
+    id           TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL,   -- faq | guide | column | newsletter
+    nature       TEXT NOT NULL,   -- living | issued — 갱신인가 회차인가 (§7.3)
+    destination  TEXT NOT NULL,   -- doc_surface | publication_surface (D46)
+    path         TEXT,            -- 살아있는 문서의 자리
+    published_at TEXT NOT NULL
+);
+
+-- 배치 진행 지점 (ADR-005 · ADR-006)
+-- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
+CREATE TABLE IF NOT EXISTS ingest_checkpoint (
+    kind       TEXT PRIMARY KEY,  -- source | qna
+    cursor     TEXT NOT NULL,     -- 마지막 처리 커밋 해시 또는 QnA 시각
+    updated_at TEXT NOT NULL
+);
+"""
+
+
+def connect(db_path: Path) -> sqlite3.Connection:
+    """연결한다. **WAL 모드**로 연다 — 온라인과 배치가 동시에 접근한다 (ADR-002)."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def initialize(conn: sqlite3.Connection) -> None:
+    """스키마를 만든다. 여러 번 불러도 안전하다."""
+    conn.executescript(SCHEMA_SQL)
+    conn.commit()
