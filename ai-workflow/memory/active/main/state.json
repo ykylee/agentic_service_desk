@@ -27,8 +27,8 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S3 완주, S4 착수(4.6.1). 40 leaf 중 30 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S3 완주, S4 착수(4.6.1). 40 leaf 중 30 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S3 완주, S4 진행(4.6.1·4.6.2). 40 leaf 중 31 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S3 완주, S4 진행(4.6.1·4.6.2). 40 leaf 중 31 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
