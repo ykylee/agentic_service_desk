@@ -93,18 +93,449 @@
       "declared_status": "in_progress",
       "derived_status": "planned",
       "progress": 0.0,
-      "total_leaves": 1,
+      "total_leaves": 40,
       "done_leaves": 0,
       "deliverables_missing": [],
       "wbs": [
         {
           "id": "WBS-4.1",
-          "title": "구현 (설계 확정 후 leaf 로 분해한다)",
+          "title": "기반",
           "derived_status": "planned",
           "linked_task_ids": [],
-          "total_leaves": 1,
+          "total_leaves": 4,
           "done_leaves": 0,
-          "children": []
+          "children": [
+            {
+              "id": "WBS-4.1.1",
+              "title": "프로젝트 골격",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.1.2",
+              "title": "모 시스템 어댑터 골격과 읽기 표면",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.1.3",
+              "title": "LLM 게이트웨이",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.1.4",
+              "title": "저장소 골격",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.2",
+          "title": "S0 수집과 지식베이스 구축",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 7,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.2.1",
+              "title": "소스 수집",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.2",
+              "title": "QnA 수집",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.3",
+              "title": "산출물 필터",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.4",
+              "title": "Ingest 에이전트",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.5",
+              "title": "모순 표시와 사람 편집 보존",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.6",
+              "title": "Lint",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.2.7",
+              "title": "대시보드 최소",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.3",
+          "title": "S1 수동 등록과 티켓",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 5,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.3.1",
+              "title": "티켓 도메인",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.3.2",
+              "title": "종결 기록",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.3.3",
+              "title": "질문 직접 등록",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.3.4",
+              "title": "승격 경로 A",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.3.5",
+              "title": "대시보드 확장",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.4",
+          "title": "S2 답변 초안",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 5,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.4.1",
+              "title": "검색",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.4.2",
+              "title": "파이프라인 1~3단계",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.4.3",
+              "title": "불확실성 표시",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.4.4",
+              "title": "검수",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.4.5",
+              "title": "대시보드 확장",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.5",
+          "title": "S3 게재와 추적",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 8,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.5.1",
+              "title": "게재",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.2",
+              "title": "전건 티켓 발행",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.3",
+              "title": "답변 이력",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.4",
+              "title": "QnA 추적",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.5",
+              "title": "게재 판정",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.6",
+              "title": "승격 경로 B",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.7",
+              "title": "stale 전파와 정정",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.5.8",
+              "title": "지표와 대시보드 확장",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.6",
+          "title": "S4 시스템 사용 가이드",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 4,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.6.1",
+              "title": "콘텐츠 타입 레지스트리",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.6.2",
+              "title": "가이드 제작",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.6.3",
+              "title": "문서 면 게재",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.6.4",
+              "title": "콘텐츠 검수",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.7",
+          "title": "S5 FAQ · 칼럼 · 뉴스레터",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 3,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.7.1",
+              "title": "FAQ",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.7.2",
+              "title": "칼럼",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.7.3",
+              "title": "뉴스레터",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-4.8",
+          "title": "운영 부가 (4.5 이후 병행)",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 4,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-4.8.1",
+              "title": "국면 판정과 전환",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.8.2",
+              "title": "알림 웹훅",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.8.3",
+              "title": "보존 만료",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-4.8.4",
+              "title": "표본 재검증",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
         }
       ]
     }
@@ -124,6 +555,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS-2.1 산출물 완료 후 수행한 품질 감사",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-003.md"
+    },
+    {
+      "task_id": "TASK-2026-08-28-main-005",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS 자체를 분해하는 작업이므로 특정 leaf 에 속하지 않는다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-005.md"
     }
   ],
   "issues": []
