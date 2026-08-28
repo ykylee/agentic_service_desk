@@ -20,6 +20,7 @@ from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.operations.schema import connect, initialize
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -83,6 +84,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return RedirectResponse("/queues/Q4", status_code=303)
+
+    @app.get("/entry")
+    def entry_form(request: Request):  # noqa: ANN201
+        """질문 등록 화면 — **두 칸뿐이다** (ADR-007 결정 4).
+
+        등록 부담이 크면 유인이 상쇄된다(§1.4.4). 붙여넣고 닫는 것이 전부여야 한다.
+        """
+        _, conn = dashboard()
+        try:
+            ctx = shell() | {"manual_count": manual_entry.count(conn)}
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
+
+    @app.post("/entry")
+    def entry_submit(  # noqa: ANN201
+        request: Request, question: str = Form(...), answer: str = Form(...)
+    ):
+        """등록한다. **여기서 LLM 을 부르지 않는다** — 초안은 배치가 채운다.
+
+        수십 초 걸리는 호출로 응답을 붙들면 부담이 되돌아와 §1.4.4 가 무너진다.
+        """
+        _, conn = dashboard()
+        try:
+            registered = manual_entry.register(conn, question=question, answer=answer)
+            ctx = shell() | {
+                "registered": registered,
+                "manual_count": manual_entry.count(conn),
+            }
+        except manual_entry.EmptyEntry as exc:
+            ctx = shell() | {"error": str(exc), "manual_count": manual_entry.count(conn)}
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
 
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201

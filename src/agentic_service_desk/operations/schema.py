@@ -20,13 +20,31 @@ SCHEMA_SQL = """
 -- QnA 항목 — 대외 관점. "이용자에게 이 질문이 어떻게 되었는가" (D15)
 CREATE TABLE IF NOT EXISTS qna_item (
     id                TEXT PRIMARY KEY,
-    parent_question_id TEXT NOT NULL UNIQUE,  -- 모 시스템의 질문 id
+    -- 모 시스템의 질문 id. **비어 있을 수 있다** — 담당자가 메신저 문의를 직접
+    -- 등록한 건은 모 시스템을 거치지 않았다 (§1.4.3). UNIQUE 는 NULL 을 여럿
+    -- 허용하므로 수동 등록끼리 부딪히지 않는다.
+    parent_question_id TEXT UNIQUE,
+    origin            TEXT NOT NULL DEFAULT 'parent',  -- parent | manual
+                                              -- **수동 등록 건수가 W4(질문이 기록되지
+                                              -- 않는다)의 유일한 간접 지표다** (§1.4.6)
     asker_id          TEXT,                   -- 사내 식별자. 지식 항목에는 넘어가지 않는다 (PO-3)
     state             TEXT NOT NULL,          -- 접수 | 게재됨 | 후속진행 | 사람대기 | 해결 | 미해결종료
     resolution_grade  TEXT,                   -- explicit | implicit — ingest 자격을 가른다 (D8)
     language          TEXT,                   -- 1단계에서 판정 (D53)
     opened_at         TEXT NOT NULL,
     closed_at         TEXT
+);
+
+-- 수동 등록 원문 (FR-10, §1.4.3).
+-- 메신저로 오간 질문과 담당자의 답변을 **그대로** 담는다. 종결 기록의 일반화된 질문은
+-- 이것을 가공한 결과이므로, 원문을 지우면 초안을 다시 만들 수 없다.
+CREATE TABLE IF NOT EXISTS manual_entry (
+    qna_item_id   TEXT PRIMARY KEY,
+    question      TEXT NOT NULL,   -- 붙여넣은 질문 원문
+    answer        TEXT NOT NULL,   -- 담당자가 실제로 한 답변
+    registered_by TEXT,
+    registered_at TEXT NOT NULL,
+    FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
 
 -- 티켓 — 내부 관점. "우리에게 무슨 일이 남았는가" (D15)

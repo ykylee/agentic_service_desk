@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0) 완주**, 40 leaf 중 13 완료 — 4.3(S1) 진행 중.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0) 완주**, 40 leaf 중 13 완료 — 4.3(S1) 진행 중.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0) 완주**, 40 leaf 중 14 완료 — 4.3(S1) 5개 중 3개.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — **WBS-4.2(S0) 완주**, 40 leaf 중 14 완료 — 4.3(S1) 5개 중 3개.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록",
       "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록",
       "TASK-2026-08-28-main-021 — WBS-4.3.1 티켓 도메인",
       "TASK-2026-08-28-main-020 — WBS-4.2.7 대시보드 최소",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-017 — WBS-4.2.4 Ingest 에이전트",
       "TASK-2026-08-28-main-016 — WBS-4.2.3 산출물 필터",
       "TASK-2026-08-28-main-015 — WBS-4.2.2 QnA 수집",
-      "TASK-2026-08-28-main-014 — pi 헤드리스 연결",
-      "TASK-2026-08-28-main-013 — WBS-4.2.1 소스 수집"
+      "TASK-2026-08-28-main-014 — pi 헤드리스 연결"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 23,
+    "task_count": 24,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -76,7 +76,8 @@
       "TASK-2026-08-28-main-019 — WBS-4.2.6 Lint",
       "TASK-2026-08-28-main-020 — WBS-4.2.7 대시보드 최소",
       "TASK-2026-08-28-main-021 — WBS-4.3.1 티켓 도메인",
-      "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록"
+      "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록",
+      "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록"
     ]
   },
   "next_documents": [

@@ -28,6 +28,7 @@ from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
 from agentic_service_desk.knowledge.lint import Lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import ticket as ticket_domain
+from agentic_service_desk.operations.drafter import Drafter
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
 from agentic_service_desk.operations.schema import connect, initialize
 
@@ -73,6 +74,7 @@ class BatchRunner:
         self._sync_source()
         self._sync_qna()
         self._release_held_tickets()
+        self._draft_resolutions()
         self._ingest()
         self._lint()
 
@@ -168,6 +170,39 @@ class BatchRunner:
         if self._filter is None:
             self._filter = build_output_filter(self._cfg.bot_accounts)
         return self._filter
+
+    def _draft_resolutions(self) -> None:
+        """수동 등록 건의 종결 기록 초안을 채운다 (WBS-4.3.3, FR-11).
+
+        **등록은 온라인에서 즉시 끝나고 초안은 여기서 만들어진다.** 등록 응답을
+        LLM 호출만큼 붙들면 부담이 되돌아와 §1.4.4 의 유인이 상쇄된다.
+
+        무효화 조건은 여기서 채우지 않는다 — 사람 몫이다 (§5.6.4).
+        """
+        if not self._cfg.llm_base_url or not self._cfg.llm_model:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = Drafter(
+                PiHarness(self._cfg.llm_model, self._cfg.llm_api_key)
+            ).run(conn)
+        except (HarnessError, RuntimeError) as exc:
+            print(f"[worker] 종결 기록 초안 실패: {exc}")
+            return
+        finally:
+            conn.close()
+
+        if report.drafted:
+            print(
+                f"[worker] 종결 기록 초안 {len(report.drafted)}건 — "
+                f"**무효화 조건은 비워 뒀다.** 사람이 채워야 닫힌다 (§5.6.4)"
+            )
+        for failure in report.failures:
+            print(f"[worker] 초안 실패 — {failure}")
 
     def _ingest(self) -> None:
         """원천을 읽어 지식을 짓는다 (WBS-4.2.4, FR-3).

@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.325,
+      "progress": 0.35,
       "total_leaves": 40,
-      "done_leaves": 13,
+      "done_leaves": 14,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -248,7 +248,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 5,
-          "done_leaves": 2,
+          "done_leaves": 3,
           "children": [
             {
               "id": "WBS-4.3.1",
@@ -275,10 +275,12 @@
             {
               "id": "WBS-4.3.3",
               "title": "질문 직접 등록",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-023"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

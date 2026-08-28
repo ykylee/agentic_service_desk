@@ -43,6 +43,7 @@
 <nav>
   <a href="/"><strong>Agentic Service Desk</strong></a>
   {% for q in queues %}<a href="/queues/{{ q.id }}">{{ q.id }} {{ q.title }}</a>{% endfor %}
+  <a href="/entry">＋ 질문 등록</a>
   <span class="dim small">단계 {{ stage }}</span>
 </nav>
 {% block body %}{% endblock %}
