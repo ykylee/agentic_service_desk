@@ -17,9 +17,9 @@
 
 - **M-001** [concept] 컨셉 정리 — status: done
   - path: [`./M-001-concept.md`](./M-001-concept.md)
-- **M-002** [requirements] 요구사항 정리 — status: in_progress
+- **M-002** [requirements] 요구사항 정리 — status: done
   - path: [`./M-002-requirements.md`](./M-002-requirements.md)
-- **M-003** [design] 설계 — status: planned
+- **M-003** [design] 설계 — status: in_progress
   - path: [`./M-003-design.md`](./M-003-design.md)
 - **M-004** [implementation] 구현 — status: planned
   - path: [`./M-004-implementation.md`](./M-004-implementation.md)

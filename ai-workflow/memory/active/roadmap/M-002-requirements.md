@@ -2,7 +2,7 @@
 id: M-002
 title: 요구사항 정리
 sdlc_phase: requirements
-status: in_progress
+status: done
 order: 2
 parallel_allowed: []
 deliverables:
