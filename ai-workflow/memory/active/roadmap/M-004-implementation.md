@@ -2,7 +2,7 @@
 id: M-004
 title: 구현
 sdlc_phase: implementation
-status: planned
+status: in_progress
 order: 4
 parallel_allowed: []
 deliverables: []

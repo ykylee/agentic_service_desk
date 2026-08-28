@@ -27,16 +27,16 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001(컨셉)·M-002(요구사항) 완료. M-003(설계)로 넘어왔다.** 다음 산출물은 `docs/architecture`.",
-    "current_axis": "**M-001(컨셉)·M-002(요구사항) 완료. M-003(설계)로 넘어왔다.** 다음 산출물은 `docs/architecture`.",
-    "current_focus": "TASK-2026-08-28-main-002",
-    "in_progress_items": [
-      "TASK-2026-08-28-main-002"
-    ],
+    "current_baseline": "**M-001~M-003 완료. M-004(구현)으로 넘어왔다.** 도입 단계 **S0**(수집·지식베이스 구축)부터 켠다 —",
+    "current_axis": "**M-001~M-003 완료. M-004(구현)으로 넘어왔다.** 도입 단계 **S0**(수집·지식베이스 구축)부터 켠다 —",
+    "current_focus": null,
+    "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
       "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
+      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
       "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰",
       "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
       "TASK-2026-08-27-main-002 — M-001 WBS-1.1 — PURPOSE.md 4-element 채움",
@@ -47,15 +47,15 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 4,
-    "in_progress_items": [
-      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성"
-    ],
+    "task_count": 5,
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
       "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰",
-      "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사"
+      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
+      "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
+      "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성"
     ]
   },
   "next_documents": [

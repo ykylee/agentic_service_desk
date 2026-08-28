@@ -2,7 +2,7 @@
 id: M-003
 title: 설계
 sdlc_phase: design
-status: in_progress
+status: done
 order: 3
 parallel_allowed: []
 deliverables:

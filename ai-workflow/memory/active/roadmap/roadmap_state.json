@@ -43,21 +43,21 @@
       "title": "요구사항 정리",
       "sdlc_phase": "requirements",
       "declared_status": "done",
-      "derived_status": "in_progress",
-      "progress": 0.0,
+      "derived_status": "done",
+      "progress": 1.0,
       "total_leaves": 1,
-      "done_leaves": 0,
+      "done_leaves": 1,
       "deliverables_missing": [],
       "wbs": [
         {
           "id": "WBS-2.1",
           "title": "요구사항 문서 작성",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [
             "TASK-2026-08-28-main-002"
           ],
           "total_leaves": 1,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": []
         }
       ]
@@ -66,22 +66,22 @@
       "id": "M-003",
       "title": "설계",
       "sdlc_phase": "design",
-      "declared_status": "in_progress",
-      "derived_status": "planned",
-      "progress": 0.0,
+      "declared_status": "done",
+      "derived_status": "done",
+      "progress": 1.0,
       "total_leaves": 1,
-      "done_leaves": 0,
-      "deliverables_missing": [
-        "docs/architecture"
-      ],
+      "done_leaves": 1,
+      "deliverables_missing": [],
       "wbs": [
         {
           "id": "WBS-3.1",
           "title": "설계 문서 / ADR 작성",
-          "derived_status": "planned",
-          "linked_task_ids": [],
+          "derived_status": "done",
+          "linked_task_ids": [
+            "TASK-2026-08-28-main-004"
+          ],
           "total_leaves": 1,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": []
         }
       ]
@@ -90,7 +90,7 @@
       "id": "M-004",
       "title": "구현",
       "sdlc_phase": "implementation",
-      "declared_status": "planned",
+      "declared_status": "in_progress",
       "derived_status": "planned",
       "progress": 0.0,
       "total_leaves": 1,
@@ -109,7 +109,7 @@
       ]
     }
   ],
-  "current_milestone_id": "M-003",
+  "current_milestone_id": "M-004",
   "exempt_tasks": [
     {
       "task_id": "TASK-2026-08-28-main-001",
@@ -126,16 +126,5 @@
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-003.md"
     }
   ],
-  "issues": [
-    {
-      "code": "declared_derived_mismatch",
-      "detail": "M-002: 선언 done ≠ 파생 in_progress (done 경계)",
-      "where": "M-002-requirements.md"
-    },
-    {
-      "code": "done_milestone_open_task",
-      "detail": "M-002: done 선언 아래 열린 task ['TASK-2026-08-28-main-002']",
-      "where": "M-002-requirements.md"
-    }
-  ]
+  "issues": []
 }
