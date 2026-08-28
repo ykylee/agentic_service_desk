@@ -27,6 +27,7 @@ from agentic_service_desk.ingest.run import IngestRun
 from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
 from agentic_service_desk.knowledge.lint import Lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
+from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
 from agentic_service_desk.operations.schema import connect, initialize
 
@@ -71,6 +72,7 @@ class BatchRunner:
         """한 주기. 단계에 따라 할 일이 붙는다."""
         self._sync_source()
         self._sync_qna()
+        self._release_held_tickets()
         self._ingest()
         self._lint()
 
@@ -136,6 +138,30 @@ class BatchRunner:
             f"답변 {report.answers}건, 후속 {report.followups}건, "
             f"명시적 해결 상향 {report.upgraded}건 (다시 훑음 {report.refreshed_questions}건)"
         )
+
+    def _release_held_tickets(self) -> None:
+        """응답이 온 보류 티켓을 다시 연다 (§6.7.1).
+
+        **수집 직후에 돈다.** 보류를 푸는 신호가 후속 답글이므로, 방금 들어온 후속을
+        보고 판단해야 다음 주기까지 기다리지 않는다.
+
+        사람이 다시 열게 하지 않는 이유는 보류의 값이 거기 있기 때문이다 — 응답을
+        알아채는 일까지 사람 몫이면 결국 열어 보게 되고, 그것이 보류로 피하려던
+        **반복되는 재판단**이다 (§6.7.2).
+        """
+        if not self._cfg.operations_db.exists():
+            # 아직 아무것도 돌지 않았다. 여기서 DB 를 만들면 **설정이 비어 있는
+            # 워커가 파일을 남기고**, 그것이 "연동이 없다"와 "아직 아무 일도 없다"를
+            # 구분하기 어렵게 만든다.
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            reopened = ticket_domain.release_held_with_response(conn)
+        finally:
+            conn.close()
+        if reopened:
+            print(f"[worker] 응답이 와 보류를 푼 티켓 {len(reopened)}건 — Q1 로 돌아간다")
 
     def _output_filter(self) -> OutputFilter:
         """되먹임 차단 필터. **한 번 만들어 재사용한다** (NFR-4)."""

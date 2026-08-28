@@ -41,9 +41,10 @@ from agentic_service_desk.ingest.source import SourceMirror
 from agentic_service_desk.knowledge import contradiction
 from agentic_service_desk.knowledge.item import InvalidationKind, KnowledgeItem
 from agentic_service_desk.knowledge.repository import KnowledgeRepository, StoredItem
+from agentic_service_desk.operations import ticket as ticket_domain
 
-CORRECTION = "correction"
-"""`ticket.source` 값. Q5(정정 후보) 대기열이 이것으로 걸린다."""
+CORRECTION = ticket_domain.Source.CORRECTION
+"""티켓 출처. Q5(정정 후보) 대기열이 이것으로 걸린다 (§6.4.3)."""
 
 OPEN = "open"
 RESOLVED = "resolved"
@@ -327,12 +328,7 @@ class Lint:
             ).fetchone()
             if exists:
                 continue
-            ticket_id = f"t-{uuid.uuid4().hex[:12]}"
-            self._conn.execute(
-                "INSERT INTO ticket (id, source, qna_item_id, state, opened_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (ticket_id, CORRECTION, None, "open", now),
-            )
+            ticket_id = ticket_domain.issue(self._conn, source=CORRECTION).id
             self._conn.execute(
                 "INSERT INTO lint_finding "
                 "(key, kind, subject, detail, ticket_id, first_seen, state) "
@@ -367,14 +363,20 @@ def list_open(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 def resolve(conn: sqlite3.Connection, key: str) -> None:
     """사람이 처리했다. 티켓도 함께 닫는다."""
     now = _now().isoformat()
-    cur = conn.execute(
-        "UPDATE lint_finding SET state = ?, resolved_at = ? WHERE key = ? AND state = ?",
-        (RESOLVED, now, key, OPEN),
+    row = conn.execute(
+        "SELECT ticket_id, kind FROM lint_finding WHERE key = ? AND state = ?", (key, OPEN)
+    ).fetchone()
+    if row is None:
+        return
+    conn.execute(
+        "UPDATE lint_finding SET state = ?, resolved_at = ? WHERE key = ?", (RESOLVED, now, key)
     )
-    if cur.rowcount:
-        conn.execute(
-            "UPDATE ticket SET state = 'closed', closed_at = ? "
-            "WHERE id = (SELECT ticket_id FROM lint_finding WHERE key = ?)",
-            (now, key),
-        )
     conn.commit()
+    conn.execute(
+        "INSERT INTO ticket_resolution "
+        "(ticket_id, generalized_question, answer, grounding, invalidation) "
+        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(ticket_id) DO NOTHING",
+        (row["ticket_id"], "Lint 소견을 어떻게 처리하는가", f"처리함: {row['kind']}", "[]", "{}"),
+    )
+    conn.commit()
+    ticket_domain.transition(conn, row["ticket_id"], ticket_domain.State.CLOSED)

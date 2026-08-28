@@ -25,9 +25,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.knowledge.item import Provenance
+from agentic_service_desk.operations import ticket as ticket_domain
 
-SOURCE = "contradiction"
-"""`ticket.source` 값. Q4 대기열이 이것으로 걸린다."""
+SOURCE = ticket_domain.Source.CONTRADICTION
+"""티켓 출처. Q4 대기열이 이것으로 걸린다 (§6.4.3)."""
 
 OPEN = "open"
 RESOLVED = "resolved"
@@ -72,13 +73,9 @@ def record(
 
     now = _now()
     contradiction_id = f"c-{uuid.uuid4().hex[:12]}"
-    ticket_id = f"t-{uuid.uuid4().hex[:12]}"
+    # `qna_item_id` 가 비는 것이 정상이다 — 이 티켓은 QnA 에서 오지 않았다 (§6.4.1).
+    ticket_id = ticket_domain.issue(conn, source=SOURCE).id
 
-    conn.execute(
-        "INSERT INTO ticket (id, source, qna_item_id, state, opened_at) VALUES (?, ?, ?, ?, ?)",
-        # `qna_item_id` 가 비는 것이 정상이다 — 이 티켓은 QnA 에서 오지 않았다 (§6.4.1).
-        (ticket_id, SOURCE, None, "open", now),
-    )
     conn.execute(
         "INSERT INTO contradiction "
         "(id, knowledge_item_id, ticket_id, proposed_title, proposed_body, provenance, "
@@ -132,18 +129,19 @@ def resolve(conn: sqlite3.Connection, contradiction_id: str, *, resolution: str)
     반대면 ingest 프롬프트가 틀리고 있다는 뜻이기 때문이다. 분포가 곧 지표다.
     """
     now = _now()
-    cur = conn.execute(
-        "UPDATE contradiction SET state = ?, resolution = ?, resolved_at = ? "
-        "WHERE id = ? AND state = ?",
-        (RESOLVED, resolution, now, contradiction_id, OPEN),
+    row = conn.execute(
+        "SELECT ticket_id FROM contradiction WHERE id = ? AND state = ?",
+        (contradiction_id, OPEN),
+    ).fetchone()
+    if row is None:
+        return
+    conn.execute(
+        "UPDATE contradiction SET state = ?, resolution = ?, resolved_at = ? WHERE id = ?",
+        (RESOLVED, resolution, now, contradiction_id),
     )
-    if cur.rowcount:
-        conn.execute(
-            "UPDATE ticket SET state = 'closed', closed_at = ? "
-            "WHERE id = (SELECT ticket_id FROM contradiction WHERE id = ?)",
-            (now, contradiction_id),
-        )
     conn.commit()
+    # 판정 자체가 종결 기록이다 — 무엇을 골랐는지가 `resolution` 에 남는다.
+    _close_ticket(conn, row["ticket_id"], f"모순 판정: {resolution}")
 
 
 def _to_dict(p: Provenance) -> dict:
@@ -161,3 +159,20 @@ def _from_row(row: sqlite3.Row) -> Contradiction:
         detected_at=row["detected_at"],
         state=row["state"],
     )
+
+
+def _close_ticket(conn: sqlite3.Connection, ticket_id: str, note: str) -> None:
+    """모순 티켓을 닫는다.
+
+    티켓 종결은 종결 기록을 요구하는데(§6.4.5), 모순 티켓의 기록은 **판정 그 자체**다 —
+    어느 쪽이 옳았는지가 곧 결론이고 그것은 `contradiction.resolution` 에 남는다.
+    형식을 맞춰 한 줄 남기고 닫는다.
+    """
+    conn.execute(
+        "INSERT INTO ticket_resolution "
+        "(ticket_id, generalized_question, answer, grounding, invalidation) "
+        "VALUES (?, ?, ?, ?, ?) ON CONFLICT(ticket_id) DO NOTHING",
+        (ticket_id, "지식 항목의 모순을 어느 쪽으로 판정하는가", note, "[]", "{}"),
+    )
+    conn.commit()
+    ticket_domain.transition(conn, ticket_id, ticket_domain.State.CLOSED)

@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS ticket (
     qna_item_id TEXT,            -- QnA 유래일 때만. 없어도 된다 — 티켓 출처는 넷이다
     state       TEXT NOT NULL,   -- auto_closed | open | in_progress | held | closed (D33)
     opened_at   TEXT NOT NULL,   -- 경과 시간의 기준. SLA 는 두지 않는다 (D30)
+    state_at    TEXT NOT NULL,   -- 지금 상태가 된 시각. **보류 해제 판정이 이것에 걸린다**
+                                 -- (§6.7.1) — 보류로 바꾸기 *전에* 온 후속은 기다리던
+                                 -- 응답이 아니다. opened_at 으로 재면 그것까지 센다
     closed_at   TEXT,
     FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
