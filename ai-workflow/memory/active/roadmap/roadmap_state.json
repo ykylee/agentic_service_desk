@@ -7,11 +7,11 @@
       "id": "M-001",
       "title": "컨셉 정리",
       "sdlc_phase": "concept",
-      "declared_status": "in_progress",
-      "derived_status": "in_progress",
-      "progress": 0.5,
+      "declared_status": "done",
+      "derived_status": "done",
+      "progress": 1.0,
       "total_leaves": 2,
-      "done_leaves": 1,
+      "done_leaves": 2,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -28,12 +28,12 @@
         {
           "id": "WBS-1.2",
           "title": "컨셉 노트 — 핵심 개념·용어·경계",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [
             "TASK-2026-08-27-main-001"
           ],
           "total_leaves": 1,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": []
         }
       ]
@@ -42,7 +42,7 @@
       "id": "M-002",
       "title": "요구사항 정리",
       "sdlc_phase": "requirements",
-      "declared_status": "planned",
+      "declared_status": "in_progress",
       "derived_status": "planned",
       "progress": 0.0,
       "total_leaves": 1,
@@ -109,7 +109,7 @@
       ]
     }
   ],
-  "current_milestone_id": "M-001",
+  "current_milestone_id": "M-002",
   "exempt_tasks": [],
   "issues": []
 }

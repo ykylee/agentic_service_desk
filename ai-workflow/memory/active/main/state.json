@@ -27,15 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.26**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
-    "current_axis": "M-001 컨셉 정리 진행 중. 컨셉은 **v0.26**, `ai-workflow/wiki/concepts/` 아래 **8개 문서**로",
-    "current_focus": "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
-    "in_progress_items": [
-      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성"
-    ],
+    "current_baseline": "**M-001(컨셉) 완료. M-002(요구사항)로 넘어왔다.** 다음 산출물은 `docs/REQUIREMENTS.md`.",
+    "current_axis": "**M-001(컨셉) 완료. M-002(요구사항)로 넘어왔다.** 다음 산출물은 `docs/REQUIREMENTS.md`.",
+    "current_focus": null,
+    "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
       "TASK-2026-08-27-main-002 — M-001 WBS-1.1 — PURPOSE.md 4-element 채움",
       "TASK-2026-08-27-agentic-service-desk-001 — 표준 AI 워크플로우 초기 도입"
     ],
@@ -45,11 +44,11 @@
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
     "task_count": 1,
-    "in_progress_items": [
-      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성"
-    ],
+    "in_progress_items": [],
     "blocked_items": [],
-    "done_items": []
+    "done_items": [
+      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성"
+    ]
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",

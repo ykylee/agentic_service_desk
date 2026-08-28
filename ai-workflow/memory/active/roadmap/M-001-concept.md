@@ -2,7 +2,7 @@
 id: M-001
 title: 컨셉 정리
 sdlc_phase: concept
-status: in_progress
+status: done
 order: 1
 parallel_allowed: []
 deliverables:
