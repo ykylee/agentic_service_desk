@@ -5,7 +5,23 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """환경의 `ASD_*` 를 걷어낸다.
+
+    `Settings(_env_file=None)` 은 `.env` 만 막고 **실제 환경변수는 그대로 읽는다.**
+    그래서 `ASD_KNOWLEDGE_DIR` 을 내보낸 셸에서 돌리면 기본값을 쓰는 시험이 남의
+    디렉터리를 보고 엉뚱하게 실패한다 — 실제로 한 번 밟았고, 원인을 찾는 데
+    시간이 걸렸다. 시험은 환경이 아니라 자기가 준 값으로만 돌아야 한다.
+    """
+    for name in [k for k in os.environ if k.startswith("ASD_")]:
+        monkeypatch.delenv(name, raising=False)
 
 
 @dataclass

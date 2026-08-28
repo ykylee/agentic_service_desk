@@ -167,6 +167,42 @@ class TestVocabulary:
         assert hits
         assert "vocabulary" in hits[0].matched_by
 
+    def test_한_낱말만_맞으면_걸리지_않는다(self, tmp_path) -> None:
+        """라이브에서 잡은 것 — 질문의 틀이 개념을 가리키는 척한다.
+
+        "VPN 접속이 안 되는데 어떻게 하나요"가 "결재 한도 결정 규칙"에 걸렸고,
+        걸린 이유가 **"어떻게" 하나**였다. 한 낱말이 맞은 것은 개념이 같다는
+        증거가 아니다.
+        """
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        r = manual_entry.register(
+            conn, question="승인 한도는 어떻게 정해지나요?", answer="등급입니다."
+        )
+        _item(repo, "approval limit", provenance=[Provenance(qna=r.qna_item_id)])
+
+        assert Search(repo=repo, conn=conn).find("VPN 이 안 되는데 어떻게 하나요") == []
+
+    def test_여러_낱말이_맞으면_걸린다(self, tmp_path) -> None:
+        # 진짜 어휘 격차 질의는 여러 낱말이 함께 맞는다.
+        repo, conn = self._with_qna(tmp_path)
+        assert Search(repo=repo, conn=conn).find("결재 반려 사유")
+
+    def test_여러_항목을_함께_가리키는_말은_버린다(self, tmp_path) -> None:
+        # 불용어 목록을 쓰지 않는다 — 언어마다 따로 만들어야 한다 (ADR-003 제약 1).
+        # 대신 몇 개 항목을 가리키는가로 판정한다. QnA 가 쌓일수록 정확해진다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        for q, title in [
+            ("결재 반려 사유는 어떻게 확인하나요?", "approval rejection"),
+            ("휴가 신청은 어떻게 취소하나요?", "leave cancellation"),
+            ("권한 요청은 어떻게 하나요?", "permission request"),
+        ]:
+            r = manual_entry.register(conn, question=q, answer="답입니다.")
+            _item(repo, title, provenance=[Provenance(qna=r.qna_item_id)])
+
+        index = VocabularyIndex.build(conn, repo.scan()[0])
+        assert not any("어떻게" in terms for terms in index._by_item.values())
+        assert any("결재" in terms for terms in index._by_item.values())
+
     def test_QnA_링크가_없으면_사전도_비어_있다(self, tmp_path) -> None:
         # 1국면에는 비어 있고 그것이 정상이다 (D14).
         repo, conn = _repo(tmp_path), _conn(tmp_path)

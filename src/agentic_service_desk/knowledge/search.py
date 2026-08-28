@@ -49,6 +49,18 @@ TITLE_WEIGHT = 3.0
 VOCAB_WEIGHT = 2.0
 """표현 사전으로 맞은 것의 가중치. **QnA 원천의 고유 기여다** (§2.5.4)."""
 
+MIN_VOCAB_MATCHES = 2
+"""표현 사전이 걸리려면 이만큼은 맞아야 한다.
+
+**한 낱말이 맞은 것은 개념이 같다는 증거가 아니다.** 질문에는 개념을 부르는 말만
+있는 것이 아니라 질문의 틀("어떻게", "하나요")도 있어서, 하나만으로 걸리게 두면
+아무 질문이나 아무 항목에 붙는다 — 라이브에서 "VPN 접속이 안 되는데 어떻게
+하나요"가 "결재 한도 결정 규칙"에 걸렸고 이유가 "어떻게" 하나였다.
+
+실제로 어휘 격차를 넘는 질의는 여러 낱말이 함께 맞는다 — "결재 반려 사유"는
+셋이 맞는다. 둘을 요구하면 틀만 맞는 경우가 걸러지고 진짜 대응은 살아남는다.
+"""
+
 EMBEDDING_WEIGHT = 4.0
 """임베딩 유사도의 가중치. 표현이 달라도 같은 개념을 잡는다."""
 
@@ -105,7 +117,7 @@ class VocabularyIndex:
         self._by_item = by_item
 
     def __len__(self) -> int:
-        return len(self._by_item)
+        return sum(1 for terms in self._by_item.values() if terms)
 
     def terms_for(self, item_id: str) -> set[str]:
         return self._by_item.get(item_id, set())
@@ -121,7 +133,35 @@ class VocabularyIndex:
                     terms |= set(tokenize(questions[p.qna]))
             if terms:
                 by_item[stored.item.id] = terms
-        return cls(by_item)
+        return cls(_drop_indistinct(by_item))
+
+
+def _drop_indistinct(by_item: dict[str, set[str]]) -> dict[str, set[str]]:
+    """여러 항목을 함께 가리키는 말을 버린다.
+
+    질문에는 개념을 부르는 말만 있는 것이 아니라 **질문의 틀**도 있다 — "어떻게",
+    "무엇", "하나요". 그런 말은 어느 개념에나 붙어서, 남겨 두면 아무 질문이나 아무
+    항목에 걸린다.
+
+    불용어 목록을 쓰지 않는다 — 언어마다 따로 만들어야 해서 ADR-003 제약 1 이
+    깨진다. 대신 **몇 개 항목을 가리키는가**로 판정한다: 절반 넘는 항목을 가리키는
+    말은 그 개념의 이름이 아니다. 언어를 몰라도 셀 수 있고 **QnA 가 쌓일수록
+    정확해진다.**
+
+    다만 항목이 몇 개뿐인 1국면에는 이 셈이 힘을 못 쓴다 — 틀 낱말이 아직 한 항목만
+    가리키기 때문이다. 그 구간은 `MIN_VOCAB_MATCHES` 가 받친다.
+    """
+    if len(by_item) < 2:
+        return by_item  # 셀 것이 없다. 한 항목뿐이면 모든 말이 그것만 가리킨다
+    frequency: dict[str, int] = {}
+    for terms in by_item.values():
+        for term in terms:
+            frequency[term] = frequency.get(term, 0) + 1
+    limit = len(by_item) / 2
+    return {
+        item_id: {t for t in terms if frequency[t] <= limit}
+        for item_id, terms in by_item.items()
+    }
 
 
 def _question_text_by_qna(conn: sqlite3.Connection) -> dict[str, str]:
@@ -215,7 +255,7 @@ class Search:
             if not terms:
                 continue
             matched = sum(1 for t in set(tokens) if _matches(t, terms))
-            if matched:
+            if matched >= MIN_VOCAB_MATCHES:
                 self._add(hits, stored, VOCAB_WEIGHT * matched, "vocabulary")
 
     # --- 임베딩 -----------------------------------------------------------

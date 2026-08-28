@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.425,
+      "progress": 0.45,
       "total_leaves": 40,
-      "done_leaves": 17,
+      "done_leaves": 18,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -313,7 +313,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 5,
-          "done_leaves": 1,
+          "done_leaves": 2,
           "children": [
             {
               "id": "WBS-4.4.1",
@@ -329,10 +329,12 @@
             {
               "id": "WBS-4.4.2",
               "title": "파이프라인 1~3단계",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-027"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {
