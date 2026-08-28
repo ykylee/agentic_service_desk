@@ -20,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.content import registry as content_registry
+from agentic_service_desk.content import store as content_store
 from agentic_service_desk.web import metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
@@ -92,6 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             counts = {
                 "Q1": len(board.tickets()),
                 "Q2": len(draft_store.pending(conn)),
+                # 화면(`/queues/Q3`)과 티켓 배선은 WBS-4.6.4 다. 그래도 **건수는
+                # 지금 센다** — 초안이 쌓이는데 0 을 내면 화면이 거짓을 말한다.
+                "Q3": len(content_store.pending(conn)),
                 "Q4": status.open_contradictions,
                 "Q5": len(correction.pending(conn)),
                 "Q6": len(tracking.awaiting_confirmation(conn)),
@@ -142,7 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "screens": [
                     _knowledge_screen(board.knowledge_status()),
                     metrics.qna_status(conn),
-                    metrics.content_status(content_types),
+                    metrics.content_status(conn, content_types),
                     metrics.agent_status(conn),
                     metrics.phase_status(conn, stage=cfg.stage, phase=cfg.phase),
                 ],

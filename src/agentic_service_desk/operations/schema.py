@@ -338,6 +338,43 @@ CREATE TABLE IF NOT EXISTS knowledge_embedding (
     built_at  TEXT NOT NULL
 );
 
+-- 콘텐츠 초안 — 검수를 기다린다 (Q3, FR-39, WBS-4.6.2).
+-- **콘텐츠는 국면과 무관하게 전수 사람 승인**이므로 답변과 달리 자동 게재 관문이
+-- 아예 없다. 여기 오면 사람이 본다.
+--
+-- 타입 선언을 이 표에 두지 않는다 — 선언은 파일이고(FR-42, §7.5) `type_id` 는
+-- 그 선언을 가리키는 이름일 뿐이다. DB 에 복사해 두면 **두 벌이 어긋난다.**
+CREATE TABLE IF NOT EXISTS content_draft (
+    id           TEXT PRIMARY KEY,
+    type_id      TEXT NOT NULL,   -- 레지스트리의 타입 id (faq | guide | column | ...)
+    title        TEXT NOT NULL,
+    body         TEXT NOT NULL,
+    grounding    TEXT NOT NULL,   -- JSON — 근거로 쓴 지식 항목 id
+    based_on     TEXT,            -- 직전 판본 `content_draft.id`. **살아있는 문서의 갱신**
+                                  -- 이라야 diff 검수가 성립한다 (§5.5.5) — 없으면 첫 제작
+    state        TEXT NOT NULL,   -- pending | approved | rejected
+    generated_by TEXT,            -- 생성 시점의 모델 (ADR-005)
+    created_at   TEXT NOT NULL,
+    decided_at   TEXT
+);
+
+-- 콘텐츠 제작 주기의 진행 표시 (WBS-4.6.2).
+-- **"내용이 바뀌었는가"에 걸지 않는다.** 걸면 바뀔 것이 없는 타입이 매 주기 LLM 에
+-- 다시 실리는데, ingest 에서 이미 밟은 실패다 — 돈 것은 바뀌지 않았어도 돈 것이다.
+CREATE TABLE IF NOT EXISTS content_run (
+    type_id           TEXT PRIMARY KEY,
+    last_run_at       TEXT NOT NULL,  -- 마지막으로 **본** 시각. 화면이 이것을 말한다
+    -- **트리거는 이것을 본다.** 본 시각으로 재면 기다리기로 한 주기가 시계를 앞으로
+    -- 밀어, 근거가 낡아 한 번 미룬 타입이 **꼬박 한 주기를 더 기다린다.**
+    -- 모델을 실제로 돌렸을 때만 앞으로 간다.
+    last_generated_at TEXT,
+    last_commit       TEXT,          -- 그때 본 소스 커서. 코드 변경 임계가 이것을 본다.
+                                     -- 생성했을 때만 옮긴다 — 먼저 옮기면 그 변경이
+                                     -- 아무것도 만들지 않은 채 소비된다
+    outcome           TEXT NOT NULL, -- produced | unchanged | held | no_grounding | pending_review
+    detail            TEXT
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (

@@ -24,6 +24,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from agentic_service_desk.content import registry
+from agentic_service_desk.content import store as content_store
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
 
@@ -252,7 +253,7 @@ def agent_status(conn: sqlite3.Connection) -> Status:
     )
 
 
-def content_status(reg: registry.Registry) -> Status:
+def content_status(conn: sqlite3.Connection, reg: registry.Registry) -> Status:
     """콘텐츠 현황 (§8.3).
 
     **등록된 것과 만들어진 것은 다르다.** 타입 레지스트리가 섰다고 콘텐츠가
@@ -275,11 +276,18 @@ def content_status(reg: registry.Registry) -> Status:
         )
         for t in reg.all()
     ]
+    rows.append(("검수 대기 초안", f"{len(content_store.pending(conn))}건 — Q3"))
     rows.append(
         (
-            "제작·게재",
-            "**아직 없다** — 레지스트리는 섰지만 제작은 WBS-4.6.2 부터다 (FR-36). "
-            "**등록된 것과 만들어진 것은 다르므로** 0 을 내지 않는다",
+            "마지막 제작",
+            " · ".join(_last_runs(conn, reg)) or "**아직 한 번도 돌지 않았다**",
+        )
+    )
+    rows.append(
+        (
+            "게재",
+            "**아직 없다** — 문서 면 게재는 WBS-4.6.3 이다 (XR-6). **만든 것과 "
+            "나간 것은 다르므로** 0 을 내지 않는다",
         )
     )
     return Status(
@@ -289,6 +297,21 @@ def content_status(reg: registry.Registry) -> Status:
         note="검수자는 타입이 고르지 않는다 — 콘텐츠는 **국면과 무관하게 전수 사람 "
         "승인**이다 (FR-39). 타입이 고르는 것은 범위와 추가 반려 사유뿐이다.",
     )
+
+
+def _last_runs(conn: sqlite3.Connection, reg: registry.Registry) -> list[str]:
+    """타입별 마지막 주기. **아무것도 안 만든 주기도 말한다.**
+
+    조용하면 돌지 않은 것과 구분되지 않는다 — "만들 것이 없었다"와 "배치가 죽었다"가
+    화면에서 같아 보이면 후자를 아무도 알아채지 못한다.
+    """
+    out = []
+    for t in reg.all():
+        run = content_store.last_run(conn, t.id)
+        if run is None:
+            continue
+        out.append(f"{t.title} {run.last_run_at[:10]} {run.outcome}")
+    return out
 
 
 def phase_status(conn: sqlite3.Connection, *, stage: str, phase: int) -> Status:

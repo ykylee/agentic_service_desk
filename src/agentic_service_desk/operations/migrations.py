@@ -95,6 +95,36 @@ MIGRATIONS: tuple[Migration, ...] = (
         name="answer_draft.corrects — 정정 대상 (WBS-4.5.7, PO-1)",
         statements=("ALTER TABLE answer_draft ADD COLUMN corrects TEXT",),
     ),
+    Migration(
+        version=6,
+        name="content_draft · content_run — 콘텐츠 제작 (WBS-4.6.2, FR-36·39)",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS content_draft (
+                id           TEXT PRIMARY KEY,
+                type_id      TEXT NOT NULL,
+                title        TEXT NOT NULL,
+                body         TEXT NOT NULL,
+                grounding    TEXT NOT NULL,
+                based_on     TEXT,
+                state        TEXT NOT NULL,
+                generated_by TEXT,
+                created_at   TEXT NOT NULL,
+                decided_at   TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS content_run (
+                type_id           TEXT PRIMARY KEY,
+                last_run_at       TEXT NOT NULL,
+                last_generated_at TEXT,
+                last_commit       TEXT,
+                outcome           TEXT NOT NULL,
+                detail            TEXT
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

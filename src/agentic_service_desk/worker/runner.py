@@ -18,6 +18,8 @@ from types import FrameType
 from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.config import Settings
+from agentic_service_desk.content import production as content_production
+from agentic_service_desk.content import registry as content_registry
 from agentic_service_desk.ingest.agent import IngestAgent
 from agentic_service_desk.ingest.harness_runner import HarnessError, PiHarness
 from agentic_service_desk.ingest.output_filter import (
@@ -93,6 +95,7 @@ class BatchRunner:
         self._ingest()
         self._lint()
         self._correct()
+        self._produce_content()
         self._reindex()
 
     def _sync_source(self) -> None:
@@ -530,6 +533,55 @@ class BatchRunner:
                 count += 1
         return count
 
+    def _produce_content(self) -> None:
+        """콘텐츠를 만든다 (WBS-4.6.2, FR-36·43).
+
+        **ingest·Lint 다음에 돈다.** 낡음 표시를 붙이는 것이 Lint 이고, 이 단계가
+        낡은 근거를 빼는 판단을 그 표시로 한다 — 순서가 뒤집히면 어제의 낡음으로
+        오늘의 문서를 쓴다.
+
+        **단계가 켜져야 돈다** (FR-59, D49). S4 미만에서 콘텐츠를 만들면 앞 단계
+        대기열이 밀려 있는데 새 대기열을 여는 것이고, 그것이 §1.5.4 가 금지한 것이다.
+        """
+        if self._cfg.stage not in content_production.CONTENT_STAGES:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+
+        try:
+            types = content_registry.load(self._cfg.content_types_path)
+        except content_registry.InvalidDeclaration as exc:
+            print(f"[worker] 콘텐츠 타입 선언이 잘못됐다 — {exc}")
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            producer = content_production.ContentProducer(
+                conn=conn,
+                repo=repo,
+                harness=self._harness(),
+                generated_by=self._cfg.llm_model,
+            )
+            commit = get_cursor(conn, SOURCE)
+            for ctype in types.all():
+                try:
+                    result = producer.run(ctype, source_commit=commit)
+                except content_production.UnsupportedInput as exc:
+                    # **조용히 건너뛰지 않는다.** 침묵은 "만들 것이 없다"와
+                    # 구분되지 않아, 선언은 있는데 아무것도 안 나오는 타입이 생긴다.
+                    print(f"[worker] 콘텐츠 건너뜀 — {exc}")
+                    continue
+                except KnowledgeRepoError as exc:
+                    print(f"[worker] 콘텐츠 제작 실패 ({ctype.id}): {exc}")
+                    continue
+                _report_content(ctype, result)
+        finally:
+            conn.close()
+
     def _reindex(self) -> None:
         """임베딩 인덱스를 다시 만든다 (WBS-4.4.1, ADR-004).
 
@@ -585,6 +637,22 @@ def _has_pending_correction(conn, record_id: str) -> bool:  # noqa: ANN001
         ).fetchone()
         is not None
     )
+
+
+def _report_content(ctype, result) -> None:  # noqa: ANN001
+    """무슨 일이 있었는지 말한다. **아무것도 안 만든 주기도 말한다** — 조용하면
+    돌지 않은 것과 구분되지 않는다."""
+    from agentic_service_desk.content.store import Outcome
+
+    if result.outcome is Outcome.NOT_DUE:
+        return
+    if result.outcome is Outcome.PRODUCED:
+        print(
+            f"[worker] {ctype.title} 초안을 Q3 에 올렸다 — {result.detail}. "
+            "**콘텐츠는 국면과 무관하게 전수 사람 승인이다** (FR-39)"
+        )
+        return
+    print(f"[worker] {ctype.title} — {result.outcome}: {result.detail}")
 
 
 def _lint_notes(report) -> list[str]:  # noqa: ANN001

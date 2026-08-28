@@ -172,14 +172,17 @@ class TestUnmeasurable:
         assert "아직 정해지지 않았다" in rows["국면별 임계"]
         conn.close()
 
-    def test_등록된_것과_만들어진_것을_구분한다(self) -> None:
-        # 레지스트리가 섰다고 콘텐츠가 생긴 것은 아니다 — 제작·게재 수에 0 을 내면
-        # "만들었는데 하나도 없다"로 읽힌다.
+    def test_만든_것과_나간_것을_구분한다(self, tmp_path) -> None:
+        # 게재는 4.6.3 이다 — 만든 것이 있어도 나간 것은 없다. 0 을 내면
+        # "만들었는데 하나도 안 나갔다"로 읽힌다.
         from agentic_service_desk.content import registry
 
-        rows = dict(metrics.content_status(registry.load()).rows)
+        conn = _conn(tmp_path)
+        rows = dict(metrics.content_status(conn, registry.load()).rows)
         assert "시스템 사용 가이드" in rows  # 선언된 것은 말한다
-        assert "아직 없다" in rows["제작·게재"]  # 만들어진 것은 아직 없다
+        assert "아직 없다" in rows["게재"]
+        assert "아직 한 번도 돌지 않았다" in rows["마지막 제작"]
+        conn.close()
 
 
 class TestAgentStatus:
