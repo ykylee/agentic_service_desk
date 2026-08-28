@@ -9,6 +9,9 @@ dependencies = [
     "jinja2",
     "pydantic-settings",
     "httpx",
+    # 지식 항목의 OKF frontmatter (FR-55). uvicorn[standard] 에 딸려 오지만
+    # 우리가 직접 쓰므로 명시한다 — 전이 의존은 언제 사라져도 이상하지 않다.
+    "pyyaml",
 ]
 
 [project.scripts]

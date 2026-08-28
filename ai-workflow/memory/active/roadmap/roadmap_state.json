@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.175,
+      "progress": 0.2,
       "total_leaves": 40,
-      "done_leaves": 7,
+      "done_leaves": 8,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -161,7 +161,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 7,
-          "done_leaves": 3,
+          "done_leaves": 4,
           "children": [
             {
               "id": "WBS-4.2.1",
@@ -199,10 +199,12 @@
             {
               "id": "WBS-4.2.4",
               "title": "Ingest 에이전트",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-017"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

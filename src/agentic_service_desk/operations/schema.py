@@ -147,6 +147,16 @@ CREATE TABLE IF NOT EXISTS raw_resolution (
     FOREIGN KEY (question_id) REFERENCES raw_question (id)
 );
 
+-- 이미 ingest 한 답변 (FR-5 증분).
+-- **커서가 아니라 목록인 이유가 있다.** 답변은 만들어진 지 한참 뒤에 ingest 자격을
+-- 얻을 수 있다 — 이용자가 나중에 해결 표시를 누르면 그렇게 된다(§5.3.2). 시각
+-- 커서를 쓰면 그 답변은 커서보다 오래됐다는 이유로 **영영 건너뛰어진다.**
+CREATE TABLE IF NOT EXISTS ingested_answer (
+    answer_id        TEXT PRIMARY KEY,
+    knowledge_commit TEXT,   -- 지식 저장소의 커밋. 어느 ingest 가 이것을 읽었는가
+    ingested_at      TEXT NOT NULL
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (
