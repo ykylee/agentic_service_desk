@@ -90,16 +90,32 @@ CREATE TABLE IF NOT EXISTS ticket_resolution (
 CREATE TABLE IF NOT EXISTS answer_record (
     id                TEXT PRIMARY KEY,
     qna_item_id       TEXT NOT NULL,
+    draft_id          TEXT,            -- 어느 초안이 나갔는가. 한 초안은 한 번만 나간다
     parent_answer_id  TEXT,            -- 모 시스템에서 받은 게재 id. 정정(XR-7)에 쓴다
-    body              TEXT NOT NULL,
+    body              TEXT NOT NULL,   -- **조립된 게재 본문** — 귀속과 근거가 붙은 그대로 (PO-2)
     author_kind       TEXT NOT NULL,   -- bot | human — 되먹임 차단의 판정 근거 (D7)
+    author_account    TEXT,            -- 어느 계정으로 나갔는가. 이것이 `bot` 의 실체다
     generated_by      TEXT,            -- 모델 식별자. 모델 교체 추적 (ADR-005)
     review_outcome    TEXT,            -- passed | rejected
     review_reason     TEXT,            -- P1~P8 — 사유별 분포가 신뢰 지표다 (§5.5.6)
+    -- 게재 진행 상태. **기록을 먼저 남기고 내보내기 때문에** 필요하다 (§9.6 단일 출구).
+    -- in_flight : 내보내려 했고 결과를 모른다. **사람이 봐야 한다**
+    -- published : 나갔고 모 시스템 id 를 받았다
+    -- abandoned : 나가지 않은 것으로 사람이 확인했다. 그 초안은 다시 시도할 수 있다
+    state             TEXT NOT NULL DEFAULT 'in_flight',
+    attempted_at      TEXT,            -- 내보내려 한 시각. 게재 시각보다 **먼저** 적힌다
     published_at      TEXT,
     corrected_at      TEXT,            -- 정정 시각 (PO-1)
     FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
+
+-- **한 초안은 한 번만 나간다 — 코드가 아니라 스키마가 지킨다.**
+-- 게재는 되돌리기 어려운 대외 행위라(§5.2) 중복 게재를 코드 분기에 맡기지 않는다.
+-- `abandoned` 를 제외하는 이유는, 나가지 않은 것으로 확인된 건은 **다시 시도할 수
+-- 있어야** 하기 때문이다 — 제외하지 않으면 한 번의 통신 실패가 그 답변을 영영 막는다.
+CREATE UNIQUE INDEX IF NOT EXISTS answer_record_one_per_draft
+    ON answer_record (draft_id)
+    WHERE draft_id IS NOT NULL AND state <> 'abandoned';
 
 -- 답변 초안 — 검수를 기다리는 것 (Q2, §8.2).
 -- **`review` 와 나눠 둔다.** 이쪽은 판정받는 *물건*이고 저쪽은 판정 *사건*이다 —

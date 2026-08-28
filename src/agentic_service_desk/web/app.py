@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
@@ -24,7 +25,9 @@ from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
+from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.pipeline import draft_store, review as review_domain
+from agentic_service_desk.pipeline import publication
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.schema import connect, initialize
@@ -47,6 +50,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         conn = connect(cfg.operations_db)
         initialize(conn)
         return Dashboard(repo=KnowledgeRepository(cfg.knowledge_dir), conn=conn), conn
+
+    parent_cache: dict[str, object] = {}
+
+    def parent_system():  # noqa: ANN202
+        """모 시스템 어댑터. **앱 수명 동안 하나만 만든다.**
+
+        요청마다 만들면 HTTP 클라이언트가 매번 새로 열리고, 무엇보다 `mock` 은
+        인메모리라 **게재한 답변이 그 요청과 함께 사라진다** — 개발 중에 게재가
+        되는지 확인할 방법이 없어진다.
+
+        지연 생성인 것은 `http` 어댑터가 주소 없이 만들어지길 거부하기 때문이다
+        (`NotConfigured`). 연동 전 단계(S0)에서도 대시보드는 떠야 한다.
+        """
+        if "it" not in parent_cache:
+            parent_cache["it"] = build_parent_system(cfg)
+        return parent_cache["it"]
 
     def shell() -> dict:
         """모든 화면이 함께 쓰는 것 — 켜진 단계와 그 단계의 대기열."""
@@ -223,13 +242,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
 
     @app.get("/queues/Q2")
-    def q2(request: Request):  # noqa: ANN201
+    def q2(request: Request, outcome: str = ""):  # noqa: ANN201
         """검수 대기열 — **판정 화면이다** (§6.4.4, FR-45).
 
         상태 기계가 없다. 보고 누르면 끝난다.
         """
         board, conn = dashboard()
         try:
+            unsettled = publication.unsettled(conn)
             rows = draft_store.pending(conn)
             sources = _source_text(cfg, conn, rows)
             unmatched = {
@@ -249,6 +269,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "q2.html",
             shell()
             | {
+                "outcome": outcome,
+                "unsettled": unsettled,
                 "rows": rows,
                 "sources": sources,
                 "unmatched": unmatched,
@@ -265,8 +287,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         reason: str = Form(""),
         detail: str = Form(""),
     ):
-        """승인하거나 반려한다. **반려에는 사유가 필요하다** (§5.5.6)."""
+        """승인하거나 반려한다. **반려에는 사유가 필요하다** (§5.5.6).
+
+        승인은 곧 **게재**다 (FR-24). 여기서 바로 내보내는 이유는, 게재를 배치로
+        미루면 승인과 게재 사이에 사람이 볼 수 없는 구간이 생기고 **누른 사람이 결과를
+        모르는 채로 화면을 떠나기** 때문이다 — 게재는 되돌리기 어려운 행위이므로
+        (§5.2) 실패했을 때 그 자리에 있어야 할 사람이 누른 그 사람이다.
+        """
         board, conn = dashboard()
+        outcome = ""
         try:
             is_approved = approved == "1"
             picked = None
@@ -286,9 +315,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail=detail,
                 source_text=sources,
             )
+            if is_approved:
+                outcome = _publish(cfg, conn, parent_system, draft_id)
         finally:
             conn.close()
-        return RedirectResponse("/queues/Q2", status_code=303)
+        suffix = f"?outcome={quote(outcome)}" if outcome else ""
+        return RedirectResponse(f"/queues/Q2{suffix}", status_code=303)
 
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201
@@ -341,6 +373,43 @@ def _chosen_invalidation(  # noqa: ANN001
     if not period_days.strip().isdigit() or int(period_days) <= 0:
         raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
     return Invalidation(kind=parsed, period_days=int(period_days))
+
+
+def _publish(cfg, conn, parent_system, draft_id: str) -> str:  # noqa: ANN001
+    """게재하고 결과를 한 줄로 돌려준다.
+
+    **예외를 화면 밖으로 내보내지 않는다.** 여기서 500 이 나면 운영자는 승인이
+    반영됐는지조차 모른 채 남겨지는데, 그때 남은 `in_flight` 기록은 **사람이
+    확인해야만 닫히는 것**이라 그 사실이 화면에 닿아야 한다 (§5.2).
+
+    어댑터를 만드는 것까지 이 안에서 하는 이유도 같다 — 연동이 설정되지 않았을 때
+    (`NotConfigured`) 그것은 게재하지 못한 **이유**이지 화면이 깨질 일이 아니다.
+    """
+    accounts = frozenset(a.strip() for a in cfg.bot_accounts.split(",") if a.strip())
+    try:
+        result = publication.publish(
+            conn,
+            parent_system(),
+            draft_id,
+            bot_accounts=accounts,
+            titles=_titles(cfg),
+        )
+    except Exception as exc:  # noqa: BLE001 — 게재 실패는 화면에 보여야 한다
+        return f"게재하지 못했다: {exc}. 나갔는지 확인이 필요할 수 있다."
+    if isinstance(result, publication.Refused):
+        return f"게재하지 않았다 — {result.reason} ({result.detail})"
+    return "게재했다."
+
+
+def _titles(cfg) -> dict[str, str]:  # noqa: ANN001
+    """지식 항목 id → 제목. 게재 본문의 근거 목록에 쓴다 (PO-2).
+
+    못 찾은 id 는 그냥 빠진다 — 조립 쪽이 그때 **id 를 그대로 적는다.**
+    """
+    repo = KnowledgeRepository(cfg.knowledge_dir)
+    if not repo.root.exists():
+        return {}
+    return {s.item.id: s.item.title for s in repo.scan()[0]}
 
 
 def _source_text(cfg, conn, drafts) -> dict[str, str]:  # noqa: ANN001

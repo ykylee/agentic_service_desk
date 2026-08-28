@@ -7,6 +7,24 @@
   묻는 것은 "근거가 붙어 있는가"가 아니라 <strong>"이 문장이 그 근거로 뒷받침되는가"</strong>다.
 </p>
 
+{% if outcome %}
+<p class="{% if outcome == '게재했다.' %}ok{% else %}warn{% endif %}">{{ outcome }}</p>
+{% endif %}
+
+{% if unsettled %}
+<h2 class="warn">끝을 보지 못한 게재 {{ unsettled|length }}건</h2>
+<p class="dim small">
+  내보내려 했는데 <strong>나갔는지 모른다.</strong> 통신이 끊긴 것과 응답만 못 받은 것을
+  기계가 구별할 수 없어 추측하지 않는다 — 모 시스템에서 눈으로 확인해야 닫힌다.
+  추측해서 다시 보내면 <strong>같은 답변이 둘 달리고, 그것은 지울 수 없다</strong> (§5.2).
+</p>
+<ul class="dim small">
+  {% for u in unsettled %}
+  <li><code>{{ u.record_id }}</code> — 질문 {{ u.parent_question_id or '?' }} · {{ u.attempted_at }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
 {% if agent_dist.total %}
 <p class="dim small">
   <strong>에이전트 검수</strong> — 통과 {{ agent_dist.passed }} · 반려 {{ agent_dist.rejected }}

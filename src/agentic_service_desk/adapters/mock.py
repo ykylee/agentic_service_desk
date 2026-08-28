@@ -42,6 +42,7 @@ class MockParentSystem:
         self._followups: dict[str, list[Followup]] = {}
         self._resolutions: dict[str, Resolution] = {}
         self._documents: dict[str, str] = {}
+        self._grounding: dict[str, list[str]] = {}
         self._publications: list[tuple[str, str]] = []
         self._ids = itertools.count(1)
         if seed:
@@ -122,11 +123,22 @@ class MockParentSystem:
 
     # --- 쓰기 (XR-5·7·6) — 허용된 것은 셋뿐이다 (CO-2) ---------------------
 
+    @property
+    def bot_account(self) -> str:
+        """게재에 쓰는 계정. mock 은 자기 시드와 같은 계정을 쓴다 — 그래야 게재한
+        답변이 다음 주기에 **실제로 봇 답변으로 읽힌다**(§5.3의 되먹임 분기가 mock
+        위에서 그대로 재현된다)."""
+        return BOT_ACCOUNT
+
     def publish_answer(self, question_id: str, body: str, grounding: list[str]) -> str:
         if question_id not in self._questions:
             raise KeyError(f"없는 질문이다: {question_id}")
         self._add_answer(question_id, body, BOT_ACCOUNT)
-        return self._answers[question_id][-1].id
+        answer_id = self._answers[question_id][-1].id
+        # 근거를 버리지 않고 붙들어 둔다. **mock 은 실행 가능한 명세다**(ADR-008) —
+        # 받은 것을 흘리면 "모 시스템이 근거를 받는다"가 시험되지 않은 가정으로 남는다.
+        self._grounding[answer_id] = list(grounding)
+        return answer_id
 
     def revise_answer(self, answer_id: str, body: str, reason: str) -> None:
         """정정. **조용히 고치지 않는다** — 사유를 본문에 남긴다(PO-1)."""
@@ -155,6 +167,11 @@ class MockParentSystem:
         return f"P-{len(self._publications)}"
 
     # --- 시험 편의 -------------------------------------------------------
+
+    @property
+    def grounding(self) -> dict[str, list[str]]:
+        """게재와 함께 받은 근거. 모 시스템이 링크로 렌더링할 재료다 (FR-24)."""
+        return {k: list(v) for k, v in self._grounding.items()}
 
     @property
     def documents(self) -> dict[str, str]:

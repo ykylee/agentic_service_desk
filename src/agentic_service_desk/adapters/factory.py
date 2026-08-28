@@ -28,4 +28,6 @@ def build_parent_system(settings: Settings) -> ParentSystem:
 
     from agentic_service_desk.adapters.http import HttpParentSystem
 
-    return HttpParentSystem(settings.parent_api_base_url)
+    return HttpParentSystem(
+        settings.parent_api_base_url, publish_account=settings.publish_account
+    )
