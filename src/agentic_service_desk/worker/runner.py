@@ -190,7 +190,7 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
     if result.held_for_human:
         notes.append(
             f"사람이 고친 항목 {len(result.held_for_human)}건은 덮어쓰지 않았다 "
-            f"— 모순 대기열은 WBS-4.2.5 다"
+            f"— 모순 {result.contradictions_opened}건을 Q4 로 올렸다 (FR-6)"
         )
     if result.dropped_config_paths:
         notes.append(f"설정 파일 {len(result.dropped_config_paths)}개를 원천에서 뺐다 (FR-9)")

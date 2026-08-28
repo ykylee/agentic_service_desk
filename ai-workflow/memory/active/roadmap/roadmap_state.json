@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.2,
+      "progress": 0.225,
       "total_leaves": 40,
-      "done_leaves": 8,
+      "done_leaves": 9,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -161,7 +161,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 7,
-          "done_leaves": 4,
+          "done_leaves": 5,
           "children": [
             {
               "id": "WBS-4.2.1",
@@ -210,10 +210,12 @@
             {
               "id": "WBS-4.2.5",
               "title": "모순 표시와 사람 편집 보존",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-018"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

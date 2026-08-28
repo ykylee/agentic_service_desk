@@ -2,9 +2,11 @@
 
 **컨셉의 결정이 열(column)로 드러나게** 썼다. 어느 필드가 왜 있는지는 주석이 밝힌다.
 
-가장 중요한 것 셋.
+가장 중요한 것 넷.
     - `qna_item` 과 `ticket` 은 **별개 테이블**이며 상태가 서로를 결정하지 않는다 (D15)
     - `answer_grounding` 이 **근거 버전을 고정**한다 — 링크가 아니라 커밋 해시다 (D20)
+    - `contradiction` 이 **에이전트의 진 쪽 주장을 보관**한다 (FR-6) — 덮어쓰지 않는 것과
+      없던 일로 하는 것은 다르다
     - `raw_*` 는 **Raw Layer** 다 (FR-52). 수집된 원문이며 질의 대상이 아니라 ingest 입력이다.
       운영 테이블과 한 파일에 있지만 성격이 다르다 — 이쪽만 보존 기간이 걸린다 (PO-4)
 """
@@ -145,6 +147,26 @@ CREATE TABLE IF NOT EXISTS raw_resolution (
     resolved_at  TEXT,
     collected_at TEXT NOT NULL,
     FOREIGN KEY (question_id) REFERENCES raw_question (id)
+);
+
+-- 모순 — 에이전트의 판단이 사람이 고친 항목과 어긋났다 (FR-6, D38).
+-- **에이전트의 판단을 버리지 않는다.** 덮어쓰지 않는 것과 없던 일로 하는 것은 다르다 —
+-- 버리면 사람이 무엇과 어긋났는지 볼 수 없어 판정 자체가 불가능해진다.
+-- 사람 쪽은 지식 파일에 그대로 있고, 에이전트 쪽이 여기 남는다. 그것이 "양쪽을 남긴다"다.
+--
+-- 지식 파일이 아니라 여기에 두는 이유: 파일에 넣으면 **다음 ingest 가 그 대립 주장을
+-- 본문으로 읽는다.** 원천이 아닌 것이 원천처럼 되돌아오는 경로를 만들지 않는다.
+CREATE TABLE IF NOT EXISTS contradiction (
+    id                TEXT PRIMARY KEY,
+    knowledge_item_id TEXT NOT NULL,   -- 경로가 아니라 불변 id (ADR-002)
+    ticket_id         TEXT,            -- Q4 대기열의 자리 (source=contradiction)
+    proposed_title    TEXT NOT NULL,   -- 에이전트가 주장한 쪽
+    proposed_body     TEXT NOT NULL,
+    provenance        TEXT NOT NULL,   -- JSON — 그 주장의 근거
+    detected_at       TEXT NOT NULL,
+    state             TEXT NOT NULL,   -- open | resolved
+    resolution        TEXT,            -- kept_human | took_agent | merged
+    resolved_at       TEXT
 );
 
 -- 이미 ingest 한 답변 (FR-5 증분).

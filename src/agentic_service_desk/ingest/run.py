@@ -32,6 +32,7 @@ from agentic_service_desk.ingest.agent import (
 )
 from agentic_service_desk.ingest.output_filter import OutputFilter
 from agentic_service_desk.ingest.source import SourceMirror
+from agentic_service_desk.knowledge import contradiction
 from agentic_service_desk.knowledge.repository import KnowledgeRepository, StoredItem
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor, set_cursor
 
@@ -60,10 +61,14 @@ class IngestResult:
     """지식 저장소의 커밋 해시. 바뀐 것이 없으면 `None`."""
 
     held_for_human: list[str] = field(default_factory=list)
-    """사람이 고친 항목이라 덮어쓰지 않고 둔 것 (D38).
+    """사람이 고친 항목이라 덮어쓰지 않고 **모순으로 올린 것** (FR-6, D38).
 
-    지금은 두고 넘어가기만 한다. 이것을 **모순 대기열(Q4)로 올리는 것은 WBS-4.2.5** 다.
+    덮어쓰지 않는 것과 없던 일로 하는 것은 다르다 — 에이전트의 판단은
+    `contradiction` 에 남아 Q4 대기열로 간다.
     """
+
+    contradictions_opened: int = 0
+    """이번에 새로 연 모순. 같은 항목에 이미 열려 있으면 세지 않는다."""
 
     dropped_config_paths: list[str] = field(default_factory=list)
     broken_items: list[str] = field(default_factory=list)
@@ -236,10 +241,24 @@ class IngestRun:
         index: list[tuple[str, str]],
         result: IngestResult,
     ) -> None:
-        """제안 하나를 반영한다. **사람이 고친 항목은 건드리지 않는다** (D38)."""
+        """제안 하나를 반영한다. **사람이 고친 항목은 건드리지 않는다** (D38).
+
+        덮어쓰는 대신 **양쪽을 남긴다** (FR-6) — 사람 쪽은 파일에 그대로 두고,
+        에이전트 쪽은 모순 기록에 넣어 Q4 로 올린다. 판정은 사람이 다시 한다.
+        """
         base = by_id.get(proposal.item_id) if proposal.item_id else None
         if base and base.item.edited_by_human:
             result.held_for_human.append(base.item.id)
+            before = contradiction.open_for(self._conn, base.item.id)
+            contradiction.record(
+                self._conn,
+                knowledge_item_id=base.item.id,
+                proposed_title=proposal.title,
+                proposed_body=proposal.body,
+                provenance=provenance,
+            )
+            if before is None:
+                result.contradictions_opened += 1
             return
 
         item = to_knowledge_item(
