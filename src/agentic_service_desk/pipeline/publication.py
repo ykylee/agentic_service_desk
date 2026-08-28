@@ -67,13 +67,14 @@ from datetime import UTC, datetime
 
 from agentic_service_desk.adapters.parent_system import ParentSystem
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
 
 AUTHOR_BOT = "bot"
 """`answer_record.author_kind`. 되먹임 차단의 판정 근거다 (D7)."""
 
-STATE_PUBLISHED_QNA = "게재됨"
-"""`qna_item.state` — 답변이 올라간 뒤의 대외 상태 (§6.2)."""
+STATE_PUBLISHED_QNA = qna_state.PUBLISHED
+"""`qna_item.state` — 답변이 올라간 뒤의 대외 상태. **끝이 아니다** (§6.1)."""
 
 IN_FLIGHT = "in_flight"
 PUBLISHED = "published"

@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.operations import qna_state
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.drafter import DraftReport, parse_draft
@@ -59,15 +60,13 @@ ORIGIN_PARENT = "parent"
 그러려면 둘이 구분돼 있어야 한다.
 """
 
-STATE_RECEIVED = "접수"
-"""유입 직후. 아직 아무것도 판정되지 않았다."""
-
-STATE_AWAITING_HUMAN = "사람대기"
+STATE_RECEIVED = qna_state.RECEIVED
+STATE_AWAITING_HUMAN = qna_state.AWAITING_HUMAN
 """사람의 판정이나 손질을 기다린다 — Q2 검수 대기이거나 Q1 티켓이다.
 
-수동 등록의 같은 상태(`manual_entry.STATE_HUMAN_ANSWERED`)와 글자는 같지만 사연이
-다르다. 저쪽은 *답은 이미 나갔고* 무효화 조건만 남은 것이고, 이쪽은 *답이 아직
-나가지 않은* 것이다. 이용자에게는 둘 다 "우리 쪽에 일이 남았다"로 같다.
+수동 등록의 같은 상태와 사연이 다르다: 저쪽은 *답은 이미 나갔고* 무효화 조건만 남은
+것이고, 이쪽은 *답이 아직 나가지 않은* 것이다. 이용자에게는 둘 다 "우리 쪽에 일이
+남았다"로 같아서 상태를 나누지 않았다.
 """
 
 
@@ -179,7 +178,77 @@ def _admit_one(
     reviewer: Reviewer | None,
 ) -> Admission:
     qna_item_id = admit(conn, row)
-    outcome = pipeline.run(row["body"]) if pipeline is not None else None
+    already = _already_answered(conn, row["id"])
+    if already:
+        # **우리가 할 일이 없다.** 우리가 처리하기 전에 사람이 이미 답한 건이다 —
+        # 여기서 답을 하나 더 올리면 이용자의 질문에 답이 둘 달린다. 티켓은 그래도
+        # 발행한다(전건, FR-27): 처리 결과가 "할 일이 없었다"인 것도 처리다.
+        pipeline = None
+        reviewer = None
+    processed = process(
+        conn,
+        qna_item_id=qna_item_id,
+        question=row["body"],
+        pipeline=pipeline,
+        reviewer=reviewer,
+        no_work=already,
+    )
+    return Admission(
+        qna_item_id=qna_item_id,
+        parent_question_id=row["id"],
+        ticket_id=processed.ticket_id,
+        ticket_state=processed.ticket_state,
+        draft_id=processed.draft_id,
+        halted=processed.halted,
+    )
+
+
+def _already_answered(conn: sqlite3.Connection, parent_question_id: str) -> bool:
+    """유입 시점에 이미 답변이 달려 있는가.
+
+    우리 봇 답변일 수는 없다 — 그랬다면 `qna_item` 이 이미 있어 유입 대상에서
+    빠졌을 것이다. 그러므로 **사람이 먼저 답한 것**이다.
+    """
+    return (
+        conn.execute(
+            "SELECT 1 FROM raw_answer WHERE question_id = ? LIMIT 1",
+            (parent_question_id,),
+        ).fetchone()
+        is not None
+    )
+
+
+@dataclass(frozen=True)
+class Processed:
+    """파이프라인을 한 번 태운 결과. **한 번의 처리 = 한 개의 티켓**이다."""
+
+    ticket_id: str
+    ticket_state: ticket_domain.State
+    draft_id: str | None
+    halted: Halt | None
+
+
+def process(
+    conn: sqlite3.Connection,
+    *,
+    qna_item_id: str,
+    question: str,
+    pipeline: AnswerPipeline | None,
+    reviewer: Reviewer | None,
+    no_work: bool = False,
+) -> Processed:
+    """질문 하나를 파이프라인에 태우고 **그 처리의 티켓을 발행한다.**
+
+    유입(첫 처리)과 후속 재실행(§6.2)이 같은 함수를 쓴다. 갈라 두면 한쪽에만 규칙이
+    붙는 일이 생기는데, 여기서 정하는 것이 **티켓 상태와 검수 통과 여부**라 갈리면
+    통계가 경로마다 달라진다.
+
+    `no_work` 는 **할 일이 없어서 초안이 없는 경우**다 — 이미 답이 달려 있는 건.
+    초안을 만들지 못한 것(멈춤)과 구분해야 한다: 전자는 끝난 처리라 `auto_closed`
+    이고 후자는 사람이 봐야 해서 `open` 이다. 섞으면 **이미 답이 있는 질문이 Q1 에
+    떠서 "직접 답하고 적어라"고 말하게 된다.**
+    """
+    outcome = pipeline.run(question) if pipeline is not None else None
 
     if outcome is not None and outcome.analysis is not None:
         conn.execute(
@@ -189,11 +258,11 @@ def _admit_one(
 
     draft_id = None
     if outcome is not None and outcome.draft is not None:
-        draft_id = _queue(conn, row["body"], outcome, qna_item_id, reviewer)
+        draft_id = _queue(conn, question, outcome, qna_item_id, reviewer)
 
     state = (
         ticket_domain.State.AUTO_CLOSED
-        if draft_id is not None
+        if draft_id is not None or no_work
         else ticket_domain.State.OPEN
     )
     ticket = ticket_domain.issue(
@@ -204,9 +273,7 @@ def _admit_one(
         (STATE_AWAITING_HUMAN, qna_item_id),
     )
     conn.commit()
-    return Admission(
-        qna_item_id=qna_item_id,
-        parent_question_id=row["id"],
+    return Processed(
         ticket_id=ticket.id,
         ticket_state=state,
         draft_id=draft_id,

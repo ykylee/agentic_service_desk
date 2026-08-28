@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.operations import resolution as resolution_domain
+from agentic_service_desk.operations import qna_state
 from agentic_service_desk.operations import ticket as ticket_domain
 
 MANUAL = "manual"
@@ -51,7 +52,7 @@ MANUAL = "manual"
 
 PARENT = "parent"
 
-STATE_HUMAN_ANSWERED = "사람대기"
+STATE_HUMAN_ANSWERED = qna_state.AWAITING_HUMAN
 """등록 직후의 QnA 상태.
 
 이미 답은 나갔지만(담당자가 메신저로 답했다) **우리 쪽에 남은 일이 있다** —

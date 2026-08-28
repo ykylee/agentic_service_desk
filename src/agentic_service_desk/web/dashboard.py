@@ -24,6 +24,7 @@ from pathlib import Path
 from agentic_service_desk.knowledge import contradiction, lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import qna_state
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 
@@ -376,12 +377,14 @@ class Dashboard:
     def knowledge_gaps(self) -> list[dict]:
         """미해결로 종료된 QnA 가 가리키는 영역 (§6.2).
 
-        **아직 비어 있다.** 미해결 종료 판정은 추적 상태를 다루는 WBS-4.5.4 의 몫이고,
-        그 판정 없이는 이 대기열에 넣을 것이 생기지 않는다. 화면에는 그 사실을
-        적어 둔다 — 빈 목록과 "아직 만들지 않았다"는 다르다.
+        **질문 원문을 함께 준다.** id 만 늘어놓으면 무엇이 공백인지 알 수 없어
+        ingest 우선순위로 되먹일 수가 없다 — 이 대기열의 목적이 그것이다.
         """
         rows = self._conn.execute(
-            "SELECT id, parent_question_id FROM qna_item WHERE state = '미해결종료'"
+            "SELECT i.id, i.parent_question_id, q.body AS question FROM qna_item i "
+            "LEFT JOIN raw_question q ON q.id = i.parent_question_id "
+            "WHERE i.state = ? ORDER BY i.closed_at",
+            (qna_state.UNRESOLVED_CLOSED,),
         ).fetchall()
         return [dict(r) for r in rows]
 

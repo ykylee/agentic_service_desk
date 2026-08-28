@@ -51,6 +51,16 @@ class Settings(BaseSettings):
         default=60,
         description="QnA 폴링 주기 (NFR-7). 주기가 답변 지연에 그대로 더해진다.",
     )
+    quiet_hours: int = Field(
+        default=336,
+        description=(
+            "이 시간만큼 아무 일도 없으면 QnA 추적을 닫는다 (O18, §6.1). 마지막으로 말한 "
+            "쪽이 등급을 정한다 — 답이 나간 뒤의 침묵은 **암묵적 해결**, 물음 뒤의 침묵은 "
+            "**미해결 종료**(지식 공백)다. 닫지 않으면 항목이 영원히 열려 있어 모든 비율의 "
+            "분모가 계속 자란다. **기본값 14일은 넉넉한 쪽**이다 — 짧게 잡으면 아직 읽지도 "
+            "않은 답변이 암묵적 해결로 닫힌다. 실데이터로 다시 정해야 하는 임계값이다."
+        ),
+    )
     bot_accounts: str = Field(
         default="",
         description=(

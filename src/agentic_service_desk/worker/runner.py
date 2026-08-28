@@ -36,6 +36,7 @@ from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import intake as intake_domain
 from agentic_service_desk.operations import ticket as ticket_domain
+from agentic_service_desk.operations import tracking as tracking_domain
 from agentic_service_desk.operations.drafter import Drafter
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
 from agentic_service_desk.operations.schema import connect, initialize
@@ -82,6 +83,7 @@ class BatchRunner:
         self._sync_source()
         self._sync_qna()
         self._intake()
+        self._track()
         self._release_held_tickets()
         self._draft_resolutions()
         self._ingest()
@@ -214,6 +216,47 @@ class BatchRunner:
         if not self._cfg.llm_base_url or not self._cfg.llm_model:
             return None
         return PiHarness(self._cfg.llm_model, self._cfg.llm_api_key)
+
+    def _track(self) -> None:
+        """게재 뒤를 따라간다 (WBS-4.5.4, FR-29~32).
+
+        **순서에 이유가 있다.** ① 모 시스템이 알려준 명시적 해결을 먼저 반영한다 —
+        그러지 않으면 방금 해결 표시가 눌린 건을 아래에서 다시 판정한다.
+        ② 후속을 재실행하고 ③ 조용해진 건을 닫는다. 재실행이 먼저인 것은, 닫기부터
+        하면 **후속이 달린 오래된 건이 미해결로 닫혀** 답할 기회를 잃기 때문이다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            adopted = tracking_domain.adopt_explicit(conn)
+            reran = tracking_domain.rerun(
+                conn,
+                pipeline=self._answer_pipeline(conn),
+                reviewer=self._reviewer(),
+            )
+            settled = tracking_domain.settle_quiet(
+                conn, quiet_hours=self._cfg.quiet_hours
+            )
+        finally:
+            conn.close()
+
+        if adopted:
+            print(
+                f"[worker] 명시적 해결 {len(adopted)}건 반영 — "
+                f"그 봇 답변에 **ingest 자격이 생겼다** (§5.3)"
+            )
+        if reran.changed:
+            print(f"[worker] 후속 재실행 {len(reran.reruns)}건")
+            for failure in reran.failures:
+                print(f"[worker] 재실행 실패 — {failure}")
+        if settled.changed:
+            print(
+                f"[worker] 조용해서 닫은 건 {len(settled.settled)}건 — "
+                f"암묵적 해결 {settled.implicit} · 미해결 종료 {settled.gaps}"
+                f" (Q8 지식 공백)"
+            )
 
     def _release_held_tickets(self) -> None:
         """응답이 온 보류 티켓을 다시 연다 (§6.7.1).

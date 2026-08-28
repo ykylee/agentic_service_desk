@@ -9,13 +9,14 @@
 
 {% if rows %}
 <table>
-  <tr><th>QnA 항목</th><th>모 시스템 질문</th></tr>
-  {% for r in rows %}<tr><td><code>{{ r.id }}</code></td><td><code>{{ r.parent_question_id }}</code></td></tr>{% endfor %}
+  <tr><th>QnA 항목</th><th>모 시스템 질문</th><th>물었던 것</th></tr>
+  {% for r in rows %}<tr>
+    <td><code>{{ r.id }}</code></td>
+    <td><code>{{ r.parent_question_id }}</code></td>
+    <td>{{ r.question or '' }}</td>
+  </tr>{% endfor %}
 </table>
 {% else %}
-<p class="dim">
-  아직 비어 있다. <strong>미해결 종료 판정이 아직 없기 때문</strong>이며(WBS-4.5.4),
-  그 판정 없이는 이 대기열에 들어올 것이 생기지 않는다 — 처리할 것이 없는 것과는 다르다.
-</p>
+<p class="dim">미해결로 종료된 QnA 가 없다.</p>
 {% endif %}
 {% endblock %}

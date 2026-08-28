@@ -134,20 +134,36 @@ class OutputFilter:
 
         질문 본문을 함께 준다. 답변만으로는 무엇에 대한 답인지 알 수 없어 개념을
         뽑을 수 없기 때문이다 (WBS-4.2.4).
+
+        **명시적 해결의 출처는 둘이다** (§5.3.1-1). *이용자의 해결 표시*는 모 시스템이
+        알려주므로 `raw_resolution` 에 있고, *운영자의 확인 종결*은 이 시스템에서
+        나오므로 `qna_item.resolution_grade` 에 있다. 한쪽만 보면 **Q6 에서 확인한
+        건이 끝내 ingest 되지 않아** 상향의 의미가 사라진다 (FR-32).
         """
         placeholders = ",".join("?" * len(self._bot_accounts))
         rows = conn.execute(
             f"""
             SELECT a.id, a.question_id, q.body AS question_body, a.body,
-                   a.author_account, a.created_at, r.grade
+                   a.author_account, a.created_at,
+                   CASE WHEN r.grade = ? OR i.resolution_grade = ? THEN ?
+                        ELSE COALESCE(r.grade, i.resolution_grade) END AS grade
             FROM raw_answer a
             JOIN raw_question q ON q.id = a.question_id
             LEFT JOIN raw_resolution r ON r.question_id = a.question_id
+            LEFT JOIN qna_item i ON i.parent_question_id = a.question_id
             WHERE a.author_account NOT IN ({placeholders})
                OR r.grade = ?
+               OR i.resolution_grade = ?
             ORDER BY a.created_at, a.id
             """,  # noqa: S608 — 자리표시자 개수만 문자열로 만든다. 값은 바인딩된다
-            (*sorted(self._bot_accounts), ResolutionGrade.EXPLICIT.value),
+            (
+                ResolutionGrade.EXPLICIT.value,
+                ResolutionGrade.EXPLICIT.value,
+                ResolutionGrade.EXPLICIT.value,
+                *sorted(self._bot_accounts),
+                ResolutionGrade.EXPLICIT.value,
+                ResolutionGrade.EXPLICIT.value,
+            ),
         ).fetchall()
         return [
             IngestibleAnswer(

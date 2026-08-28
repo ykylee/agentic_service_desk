@@ -31,6 +31,7 @@ from agentic_service_desk.pipeline import draft_store, review as review_domain
 from agentic_service_desk.pipeline import publication
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
+from agentic_service_desk.operations import tracking
 from agentic_service_desk.operations.schema import connect, initialize
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Q1": len(board.tickets()),
                 "Q2": len(draft_store.pending(conn)),
                 "Q4": status.open_contradictions,
+                "Q6": len(tracking.awaiting_confirmation(conn)),
                 "Q8": len(board.knowledge_gaps()),
             }
             next_up = board.next_up(cfg.stage)
@@ -353,6 +355,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
+
+    @app.get("/queues/Q6")
+    def q6(request: Request):  # noqa: ANN201
+        """암묵적 해결 확인 — **판정 화면이다** (§6.4.4).
+
+        보고 누르면 끝난다. 상태 기계도 상세도 없다.
+        """
+        board, conn = dashboard()
+        try:
+            rows = tracking.awaiting_confirmation(conn)
+            grades = tracking.grades(conn)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request, "q6.html", shell() | {"rows": rows, "grades": grades}
+        )
+
+    @app.post("/queues/Q6/{qna_item_id}/confirm")
+    def q6_confirm(qna_item_id: str):  # noqa: ANN201
+        """운영자가 확인해 명시적으로 올린다 (FR-32).
+
+        **이것이 §5.3.1-1 이 꼽은 명시적 해결 신호 둘 중 하나다** — 다른 하나인
+        이용자의 해결 표시와 달리 이 신호는 모 시스템이 아니라 여기서 나온다.
+        """
+        board, conn = dashboard()
+        try:
+            tracking.upgrade(conn, qna_item_id)
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q6", status_code=303)
 
     @app.get("/queues/Q8")
     def q8(request: Request):  # noqa: ANN201

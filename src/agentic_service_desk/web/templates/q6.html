@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Q6 암묵적 해결 확인{% endblock %}
+{% block body %}
+<h1>Q6 — 암묵적 해결 확인</h1>
+<p class="dim small">
+  사람 확인 없이 닫힌 QnA 다. <strong>여기서 하나를 확인하면 그 봇 답변에 ingest
+  자격이 생겨 지식베이스가 자란다</strong> (§5.3.2) — 방치해도 사고가 나지 않아
+  영원히 밀리는 대기열이므로(§8.2), 무엇을 얻는지 적어 둔다.
+  <br><strong>강등은 없다.</strong> 한 번 확인한 사실은 시간이 지나도 확인된 사실이다.
+</p>
+
+{% if grades.total %}
+<p class="dim small">
+  명시적 해결 {{ grades.explicit }} ({{ '%.0f'|format(grades.explicit_rate * 100) }}%) ·
+  암묵적 {{ grades.implicit }} ({{ '%.0f'|format(grades.implicit_rate * 100) }}%) ·
+  미해결 종료 {{ grades.unresolved }} · 추적 중 {{ grades.open_items }}
+  <br>암묵 비율은 <strong>단독으로 읽지 않는다</strong> — "잘 됐는데 표시를 안 한 것"과
+  "포기하고 떠난 것"을 함께 담는다. 둘이 같이 오르면 유입이 는 것이고,
+  <strong>암묵만 오르면 품질이 의심된다</strong> (§6.3).
+</p>
+{% endif %}
+
+{% if not rows %}
+<p class="ok">확인을 기다리는 건이 없다.</p>
+{% endif %}
+
+{% for r in rows %}
+<h2>{{ r.question }}</h2>
+<p class="dim small">
+  <code>{{ r.id }}</code> · 모 시스템 질문 <code>{{ r.parent_question_id }}</code>
+  {% if r.closed_at %}· 닫힌 시각 {{ r.closed_at[:16] }}{% endif %}
+</p>
+{% if r.answer %}<div>{{ r.answer }}</div>{% endif %}
+<form method="post" action="/queues/Q6/{{ r.id }}/confirm">
+  <p><button type="submit">확인했다 — 명시적 해결로 올린다</button></p>
+</form>
+<hr>
+{% endfor %}
+{% endblock %}

@@ -212,12 +212,17 @@ class TestQ4:
 
 
 class TestQ8:
-    def test_빈_것과_아직_만들지_않은_것을_구분해_말한다(self, tmp_path) -> None:
-        # 빈 목록과 "아직 판정 자체가 없다"는 다르다.
+    def test_비어_있으면_비었다고_말한다(self, tmp_path) -> None:
+        """WBS-4.5.4 로 미해결 종료 판정이 생겼으므로 **빈 목록은 이제 빈 목록이다.**
+
+        그전까지는 "아직 판정 자체가 없다"고 적어 두었다 — 처리할 것이 없는 것과
+        기능이 없는 것은 다르기 때문이다. 판정이 생긴 지금 그 문구를 남겨 두면
+        **있는 기능을 없다고 말하게 된다.**
+        """
         _repo(tmp_path)
         _conn(tmp_path).close()
         html = TestClient(create_app(_settings(tmp_path))).get("/queues/Q8").text
-        assert "미해결 종료 판정이 아직 없기 때문" in html
+        assert "미해결로 종료된 QnA 가 없다" in html
 
     def test_미해결_종료된_QnA_가_올라온다(self, tmp_path) -> None:
         _repo(tmp_path)
