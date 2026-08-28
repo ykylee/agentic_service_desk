@@ -23,6 +23,7 @@ from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.content import registry as content_registry
 from agentic_service_desk.content import production as content_production
+from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import review as content_review
 from agentic_service_desk.content import store as content_store
 from agentic_service_desk.web import metrics
@@ -34,6 +35,7 @@ from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.adapters.factory import build_parent_system
+from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.pipeline import draft_store, review as review_domain
 from agentic_service_desk.pipeline import correction, publication
 from agentic_service_desk.operations import resolution as resolution_domain
@@ -160,7 +162,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "status.html", shell() | ctx)
 
     @app.get("/queues/Q3")
-    def q3(request: Request):  # noqa: ANN201
+    def q3(request: Request, outcome: str = ""):  # noqa: ANN201
         """콘텐츠 검수 대기열 (FR-39·45).
 
         **작업 대기열이다** — 판정 화면과 달리 항목마다 상세가 있다. diff 를 읽어야
@@ -172,9 +174,50 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 _content_row(conn, content_types, d)
                 for d in content_store.pending(conn)
             ]
+            waiting = [
+                _content_row(conn, content_types, d)
+                for d in content_store.approved(conn)
+                if content_types.get(d.type_id).review.final_check
+                and content_publication.of_draft(conn, d.id) is None
+            ]
+            unsettled = content_publication.unsettled(conn, content_types)
         finally:
             conn.close()
-        return TEMPLATES.TemplateResponse(request, "q3.html", shell() | {"rows": rows})
+        return TEMPLATES.TemplateResponse(
+            request,
+            "q3.html",
+            shell()
+            | {
+                "rows": rows,
+                "waiting": waiting,
+                "unsettled": unsettled,
+                "outcome": outcome,
+            },
+        )
+
+    @app.post("/queues/Q3/{ticket_id}/publish")
+    def q3_publish(ticket_id: str):  # noqa: ANN201
+        """발행 직전 최종 확인 (§5.5.5, §7.3).
+
+        **발행물에만 있다.** 되돌릴 수 없으므로 승인 위에 확인이 하나 더 있고,
+        누르는 행위가 곧 그 확인이다 — 배치가 대신 누르지 않는다.
+        """
+        _, conn = dashboard()
+        outcome = ""
+        try:
+            draft = content_store.by_ticket(conn, ticket_id)
+            if draft is not None:
+                outcome = _publish_content(
+                    conn,
+                    parent_system,
+                    content_types.get(draft.type_id),
+                    draft,
+                    cfg=cfg,
+                    final_check_by="human",
+                )
+        finally:
+            conn.close()
+        return RedirectResponse(f"/queues/Q3?outcome={quote(outcome)}", status_code=303)
 
     @app.get("/queues/Q3/{ticket_id}")
     def q3_detail(request: Request, ticket_id: str):  # noqa: ANN201
@@ -212,6 +255,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ):
         """사람이 판정한다. **여기 자동 승인 경로는 없다** (FR-39)."""
         _, conn = dashboard()
+        outcome = ""
         try:
             draft = content_store.by_ticket(conn, ticket_id)
             if draft is None:
@@ -227,17 +271,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     return RedirectResponse(
                         f"/queues/Q3/{ticket_id}", status_code=303
                     )
+            ctype = content_types.get(draft.type_id)
             content_review.decide(
                 conn,
-                content_types.get(draft.type_id),
+                ctype,
                 draft,
                 approved=is_approved,
                 reason=picked,
                 detail=detail,
             )
+            # **승인과 게재는 다른 행위다.** 게재는 모 시스템에 닿아야 하므로
+            # 실패할 수 있고, 실패해도 승인은 남아 다음 배치가 다시 시도한다 —
+            # 살아있는 문서는 멱등해서 그 재시도가 안전하다 (D46).
+            # 발행물은 여기서 나가지 않는다: 발행 직전 최종 확인이 남았다 (§5.5.5).
+            if is_approved and not ctype.review.final_check:
+                # **판정 뒤의 초안을 다시 읽는다.** 손에 든 것은 `pending` 이던
+                # 시점의 값이라, 그대로 넘기면 게재 관문이 "승인되지 않았다"며
+                # 막는다 — 방금 승인한 사람에게는 이유를 알 수 없는 거절이다.
+                outcome = _publish_content(
+                    conn, parent_system, ctype, content_store.get(conn, draft.id), cfg=cfg
+                )
         finally:
             conn.close()
-        return RedirectResponse("/queues/Q3", status_code=303)
+        return RedirectResponse(f"/queues/Q3?outcome={quote(outcome)}", status_code=303)
 
     @app.get("/queues/Q1")
     def q1(request: Request):  # noqa: ANN201
@@ -881,3 +937,46 @@ def _hours_since(when: str) -> float:
     if at.tzinfo is None:
         at = at.replace(tzinfo=UTC)
     return (datetime.now(UTC) - at).total_seconds() / 3600
+
+
+def _publish_content(conn, parent_of, ctype, draft, *, cfg, final_check_by=None) -> str:  # noqa: ANN001
+    """게재하고 **무슨 일이 있었는지 한 문장으로** 돌려준다.
+
+    실패를 삼키지 않는다 — 승인은 남았는데 나가지 않았다는 사실이 화면에 보이지
+    않으면, 운영자는 나갔다고 믿고 다음 일로 넘어간다. 살아있는 문서는 멱등하므로
+    다음 배치가 다시 시도한다 (D46).
+
+    **어댑터를 늦게 만든다.** 연동 전 단계에서도 승인은 되어야 하고, 모 시스템이
+    설정되지 않았다는 이유로 **판정이 통째로 실패하면 대기열이 막힌다** — 승인은
+    우리 안의 일이고 게재는 바깥으로 나가는 일이라 실패의 성격이 다르다.
+    """
+    try:
+        record = content_publication.publish(
+            conn,
+            parent_of(),
+            ctype,
+            draft,
+            # **근거 버전을 여기서도 박는다.** 화면에서 승인하는 것이 보통의
+            # 경로인데 배치에서만 박으면 그 칸은 **실제로는 늘 비어 있다** —
+            # 기록된 듯 보이지만 아무것도 재현할 수 없다.
+            repo=KnowledgeRepository(cfg.knowledge_dir),
+            final_check_by=final_check_by,
+        )
+    except (
+        content_publication.FinalCheckMissing,
+        content_publication.AlreadyPublished,
+        content_publication.NotApproved,
+    ) as exc:
+        # **다시 시도한다고 말하지 않는다.** 셋 다 배치가 고칠 수 있는 것이 아니라
+        # 지금 상태가 그렇다는 뜻이고, "다음 배치가 한다"고 적으면 오지 않을 것을
+        # 기다리게 한다.
+        return str(exc)
+    except (NotConfigured, RuntimeError) as exc:
+        return (
+            f"게재하지 못했다 — {exc}. **승인은 남아 있고 다음 배치가 다시 시도한다** "
+            "(문서 면은 멱등하다)"
+            if ctype.living
+            else f"게재하지 못했다 — {exc}. 발행 면이라 **사람이 확인해야 한다**"
+        )
+    where = "문서 면" if ctype.living else "발행 면"
+    return f"{where}에 게재했다 — {record.parent_ref}"

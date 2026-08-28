@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.8,
+      "progress": 0.825,
       "total_leaves": 40,
-      "done_leaves": 32,
+      "done_leaves": 33,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -473,10 +473,10 @@
         {
           "id": "WBS-4.6",
           "title": "S4 시스템 사용 가이드",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 4,
-          "done_leaves": 3,
+          "done_leaves": 4,
           "children": [
             {
               "id": "WBS-4.6.1",
@@ -503,10 +503,12 @@
             {
               "id": "WBS-4.6.3",
               "title": "문서 면 게재",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-044"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

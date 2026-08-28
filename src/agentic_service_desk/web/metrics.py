@@ -24,6 +24,7 @@ import sqlite3
 from dataclasses import dataclass, field
 
 from agentic_service_desk.content import registry
+from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import store as content_store
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
@@ -292,13 +293,7 @@ def content_status(conn: sqlite3.Connection, reg: registry.Registry) -> Status:
             " · ".join(_last_runs(conn, reg)) or "**아직 한 번도 돌지 않았다**",
         )
     )
-    rows.append(
-        (
-            "게재",
-            "**아직 없다** — 문서 면 게재는 WBS-4.6.3 이다 (XR-6). **만든 것과 "
-            "나간 것은 다르므로** 0 을 내지 않는다",
-        )
-    )
+    rows.append(("게재", " · ".join(_published(conn, reg)) or "**아직 나간 것이 없다**"))
     return Status(
         title="콘텐츠 현황",
         question="어떤 콘텐츠가 돌고 있고 최신인가",
@@ -320,6 +315,22 @@ def _last_runs(conn: sqlite3.Connection, reg: registry.Registry) -> list[str]:
         if run is None:
             continue
         out.append(f"{t.title} {run.last_run_at[:10]} {run.outcome}")
+    return out
+
+
+def _published(conn: sqlite3.Connection, reg: registry.Registry) -> list[str]:
+    """타입별로 지금 나가 있는 판본.
+
+    **승인된 것과 나간 것은 다르다.** 게재는 모 시스템에 닿아야 하므로 실패할 수
+    있고, 그 차이가 화면에 보이지 않으면 운영자는 나갔다고 믿는다.
+    """
+    out = []
+    for t in reg.all():
+        record = content_publication.current(conn, t.id)
+        if record is None:
+            continue
+        where = "문서 면" if t.living else "발행 면"
+        out.append(f"{t.title} → {where} {record.parent_ref}")
     return out
 
 

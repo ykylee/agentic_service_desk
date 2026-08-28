@@ -180,7 +180,7 @@ class TestUnmeasurable:
         conn = _conn(tmp_path)
         rows = dict(metrics.content_status(conn, registry.load()).rows)
         assert "시스템 사용 가이드" in rows  # 선언된 것은 말한다
-        assert "아직 없다" in rows["게재"]
+        assert "아직 나간 것이 없다" in rows["게재"]
         assert "아직 한 번도 돌지 않았다" in rows["마지막 제작"]
         conn.close()
 

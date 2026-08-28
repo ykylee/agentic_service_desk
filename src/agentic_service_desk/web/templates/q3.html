@@ -7,6 +7,44 @@
   관문이 여기에는 <strong>아예 없다</strong> — 빈도가 낮고 노출이 넓고 회수가 어렵다 (§5.5.5).
 </p>
 
+{% if outcome %}
+<p class="{% if '게재했다' in outcome %}ok{% else %}warn{% endif %}">{{ outcome }}</p>
+{% endif %}
+
+{% if unsettled %}
+<h2 class="warn">끝을 보지 못한 발행 {{ unsettled|length }}건</h2>
+<p class="dim small">
+  내보내려 했는데 <strong>나갔는지 모른다.</strong> 발행 면은 멱등하지 않아 추측해서
+  다시 보내면 <strong>회차가 둘 생기고, 그것은 지울 수 없다</strong> (§7.3).
+  모 시스템에서 눈으로 확인해야 닫힌다 — 문서 면은 멱등해서 여기 오지 않는다.
+</p>
+<ul class="dim small">
+  {% for u in unsettled %}<li><code>{{ u.id }}</code> — {{ u.type_id }} · {{ u.attempted_at }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if waiting %}
+<h2>발행 직전 최종 확인 {{ waiting|length }}건</h2>
+<p class="dim small">
+  승인은 끝났고 <strong>발행물이라 확인이 하나 더 있다</strong> (§5.5.5) —
+  되돌릴 수 없기 때문이며, <strong>배치가 대신 누르지 않는다</strong>.
+</p>
+<table>
+  {% for r in waiting %}
+  <tr>
+    <td class="small">{{ r.type_title }}</td>
+    <td>{{ r.draft.title }}</td>
+    <td class="small">{{ r.age_label }}</td>
+    <td>
+      <form method="post" action="/queues/Q3/{{ r.draft.ticket_id }}/publish">
+        <button type="submit">최종 확인 후 발행</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
 {% if not rows %}
 <p class="ok">검수를 기다리는 콘텐츠가 없다.</p>
 {% endif %}

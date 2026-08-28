@@ -19,6 +19,8 @@ from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.config import Settings
 from agentic_service_desk.content import production as content_production
+from agentic_service_desk.content import publication as content_publication
+from agentic_service_desk.content import store as content_store
 from agentic_service_desk.content import registry as content_registry
 from agentic_service_desk.ingest.agent import IngestAgent
 from agentic_service_desk.ingest.harness_runner import HarnessError, PiHarness
@@ -96,6 +98,7 @@ class BatchRunner:
         self._lint()
         self._correct()
         self._produce_content()
+        self._publish_content()
         self._reindex()
 
     def _sync_source(self) -> None:
@@ -579,6 +582,47 @@ class BatchRunner:
                     print(f"[worker] 콘텐츠 제작 실패 ({ctype.id}): {exc}")
                     continue
                 _report_content(ctype, result)
+        finally:
+            conn.close()
+
+    def _publish_content(self) -> None:
+        """승인됐는데 아직 나가지 않은 콘텐츠를 내보낸다 (WBS-4.6.3, XR-6).
+
+        **승인과 게재는 다른 행위다.** 승인 시점에 모 시스템이 닿지 않았을 수 있고,
+        그때 승인은 남되 게재는 남지 않는다 — 여기가 그 차이를 메운다.
+
+        **문서 면만 스스로 다시 시도한다** (D46). upsert 는 멱등해서 결과를 몰라도
+        다시 보내면 되지만, 발행 면은 다시 보내면 **회차가 둘 생기고 우리는 그것을
+        지울 수 없다.** 발행물은 최종 확인도 남아 있어(§5.5.5) 배치가 대신 누르지
+        않는다 — 둘 다 사람의 자리다.
+        """
+        if self._cfg.stage not in content_production.CONTENT_STAGES:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+        try:
+            types = content_registry.load(self._cfg.content_types_path)
+            parent = build_parent_system(self._cfg)
+        except (content_registry.InvalidDeclaration, NotConfigured) as exc:
+            print(f"[worker] 콘텐츠 게재를 건너뛴다 — {exc}")
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        try:
+            for draft in content_publication.retriable(conn, types):
+                ctype = types.get(draft.type_id)
+                try:
+                    record = content_publication.publish(
+                        conn, parent, ctype, draft, repo=repo
+                    )
+                except (content_publication.NotApproved, RuntimeError) as exc:
+                    print(f"[worker] 콘텐츠 게재 실패 ({ctype.id}): {exc}")
+                    continue
+                print(
+                    f"[worker] {ctype.title} 을 문서 면에 올렸다 — {record.parent_ref}"
+                )
         finally:
             conn.close()
 

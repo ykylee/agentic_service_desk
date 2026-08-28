@@ -217,15 +217,35 @@ CREATE TABLE IF NOT EXISTS holding_notice (
     FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
 
--- 콘텐츠 발행 이력 (§7)
+-- 콘텐츠 게재 기록 (XR-6, WBS-4.6.3).
+-- **답변과 같은 순서다** — 기록을 먼저 남기고 내보낸다 (§9.6). 뒤집으면 나갔는데
+-- 기록이 없는 상태가 생기고, 그것은 조용하다.
+--
+-- **두 자리의 성질이 다르다** (D46). 문서 면은 upsert 라 **멱등**하므로 결과를
+-- 모르면 그냥 다시 보내면 되고, 발행 면은 create 라 멱등하지 않아 다시 보내면
+-- **회차가 둘 생긴다** — 그것은 우리가 지울 수 없다. 그래서 `in_flight` 를 닫는
+-- 방법이 자리마다 다르다.
 CREATE TABLE IF NOT EXISTS content_publication (
-    id           TEXT PRIMARY KEY,
-    content_type TEXT NOT NULL,   -- faq | guide | column | newsletter
-    nature       TEXT NOT NULL,   -- living | issued — 갱신인가 회차인가 (§7.3)
-    destination  TEXT NOT NULL,   -- doc_surface | publication_surface (D46)
-    path         TEXT,            -- 살아있는 문서의 자리
-    published_at TEXT NOT NULL
+    id            TEXT PRIMARY KEY,
+    draft_id      TEXT NOT NULL,
+    type_id       TEXT NOT NULL,
+    place         TEXT NOT NULL,   -- document | publication (§7.7)
+    path          TEXT,            -- 문서 면만. 회차는 경로를 갖지 않는다
+    parent_ref    TEXT,            -- 모 시스템이 준 것 — 문서 경로 또는 회차 id
+    body          TEXT NOT NULL,   -- **조립된 게재 본문** — 귀속과 근거가 붙은 그대로
+    grounding     TEXT NOT NULL,   -- JSON — 무엇에 기대어 썼는가
+    pinned_commit TEXT,            -- 게재 시점의 **지식베이스** 커밋 (D20 과 같은 뜻)
+    state         TEXT NOT NULL,   -- in_flight | published | abandoned
+    attempted_at  TEXT NOT NULL,   -- 내보내려 한 시각. 게재 시각보다 **먼저** 적힌다
+    published_at  TEXT,
+    FOREIGN KEY (draft_id) REFERENCES content_draft (id)
 );
+
+-- **한 초안은 한 번만 나간다.** 살아있는 문서는 같은 경로를 거듭 upsert 하지만
+-- 그때마다 초안이 다르다 — 같은 초안이 두 번 나가는 것은 재시도가 아니라 사고다.
+CREATE UNIQUE INDEX IF NOT EXISTS content_publication_one_per_draft
+    ON content_publication (draft_id)
+    WHERE state <> 'abandoned';
 
 -- ─── Raw Layer — QnA 원문 (FR-52) ────────────────────────────────────────
 -- **수집된 그대로**를 담는다. 판정하지 않고, 해석하지 않고, 걸러내지 않는다.

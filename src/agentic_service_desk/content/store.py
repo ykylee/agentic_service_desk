@@ -144,6 +144,17 @@ def pending(conn: sqlite3.Connection, type_id: str | None = None) -> list[Conten
     return [_from_row(r) for r in conn.execute(sql + " ORDER BY created_at", params)]
 
 
+def approved(conn: sqlite3.Connection) -> list[ContentDraft]:
+    """승인된 초안 전부. **오래된 것이 먼저다** — 게재도 순서가 있다."""
+    return [
+        _from_row(r)
+        for r in conn.execute(
+            "SELECT * FROM content_draft WHERE state = ? ORDER BY created_at",
+            (APPROVED,),
+        )
+    ]
+
+
 def current(conn: sqlite3.Connection, type_id: str) -> ContentDraft | None:
     """지금 유효한 판본 — **승인된 것 중 가장 최근**.
 

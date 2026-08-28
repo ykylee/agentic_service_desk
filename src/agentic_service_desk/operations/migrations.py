@@ -133,6 +133,39 @@ MIGRATIONS: tuple[Migration, ...] = (
             "ALTER TABLE content_draft ADD COLUMN ticket_id TEXT",
         ),
     ),
+    Migration(
+        version=8,
+        name="content_publication — 콘텐츠 게재 (WBS-4.6.3, XR-6)",
+        statements=(
+            # **자리표를 실제 표로 바꾼다.** 골격 단계(WBS-4.1.4)에 열 여섯짜리
+            # `content_publication` 이 있었지만 **한 번도 쓰인 적이 없다** — 게재가
+            # 없었으므로 행이 하나도 들어가지 않았고, 그래서 지워도 잃을 것이 없다.
+            # 열을 하나씩 맞춰 가는 것보다 통째로 다시 만드는 편이 읽기 쉽다.
+            "DROP TABLE IF EXISTS content_publication",
+            """
+            CREATE TABLE IF NOT EXISTS content_publication (
+                id            TEXT PRIMARY KEY,
+                draft_id      TEXT NOT NULL,
+                type_id       TEXT NOT NULL,
+                place         TEXT NOT NULL,
+                path          TEXT,
+                parent_ref    TEXT,
+                body          TEXT NOT NULL,
+                grounding     TEXT NOT NULL,
+                pinned_commit TEXT,
+                state         TEXT NOT NULL,
+                attempted_at  TEXT NOT NULL,
+                published_at  TEXT,
+                FOREIGN KEY (draft_id) REFERENCES content_draft (id)
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS content_publication_one_per_draft
+                ON content_publication (draft_id)
+                WHERE state <> 'abandoned'
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 
