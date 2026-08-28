@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}티켓 {{ d.item.ticket.id }}{% endblock %}
+{% block body %}
+<h1>{{ d.item.queue.id }} — 티켓 <code>{{ d.item.ticket.id }}</code></h1>
+<p class="dim small">
+  상태 <strong>{{ d.item.ticket.state }}</strong> · 열린 지 {{ d.item.age_label }} ·
+  출처 {{ d.item.ticket.source }}
+</p>
+<p><strong>지금 할 일:</strong> {{ d.next_step }}</p>
+
+{% if d.entry %}
+<h2>등록된 원문</h2>
+<div class="sides">
+  <div class="side"><h4>질문</h4><div>{{ d.entry.question }}</div></div>
+  <div class="side"><h4>담당자가 한 답변</h4><div>{{ d.entry.answer }}</div></div>
+</div>
+{% endif %}
+
+{% if d.resolution %}
+<h2>종결 기록 초안</h2>
+<table>
+  <tr><th style="width:9rem">일반화된 질문</th><td>{{ d.resolution.generalized_question }}</td></tr>
+  <tr><th>답</th><td>{{ d.resolution.answer }}</td></tr>
+  <tr><th>근거</th><td>
+    {% for g in d.resolution.grounding %}<code>{{ g.kind }}</code> {{ g.ref }}<br>{% endfor %}
+    {% if not d.resolution.code_traceable %}
+    <span class="warn small">코드에 닿지 않는다 — <strong>무효화 조건이 유일한 stale 장치다</strong> (§6.5.3)</span>
+    {% endif %}
+  </td></tr>
+  {% if d.resolution.cause %}<tr><th>원인</th><td>{{ d.resolution.cause }}</td></tr>{% endif %}
+  {% if d.resolution.scope %}<tr><th>적용 범위</th><td>{{ d.resolution.scope }}</td></tr>{% endif %}
+  {% if d.resolution.recurrence %}<tr><th>재발 가능성</th><td>{{ d.resolution.recurrence }}</td></tr>{% endif %}
+</table>
+
+{% if d.resolution.confirmed %}
+<p class="ok">
+  무효화 조건: <code>{{ d.resolution.invalidation.kind }}</code>
+  {{ d.resolution.invalidation.refs|join(', ') or (d.resolution.invalidation.period_days ~ '일') }}
+</p>
+{% else %}
+<h2>무효화 조건 — 무엇이 바뀌면 이 답이 틀려지는가</h2>
+<p class="dim small">
+  <strong>에이전트가 채우지 않은 유일한 칸이다</strong> (§5.6.4). 이것을 쓰려면 위 초안을
+  읽을 수밖에 없고, 그래서 검증이 부산물로 실질이 된다. 비어 있으면 이 지식은
+  <strong>영영 낡지 않는다</strong>.
+</p>
+<form method="post" action="/queues/Q1/{{ d.item.ticket.id }}/confirm">
+  {% for c in d.resolution.invalidation_candidates %}
+  <p><label>
+    <input type="radio" name="choice" value="{{ loop.index0 }}" required>
+    <code>{{ c.kind }}</code>
+    {{ c.refs|join(', ') if c.refs else (c.period_days ~ '일마다 재확인') }}
+    <span class="dim small">— 에이전트 제안</span>
+  </label></p>
+  {% endfor %}
+  <p><label><input type="radio" name="choice" value="custom" required> 직접 쓴다</label></p>
+  <p class="small" style="margin-left:1.5rem">
+    <select name="kind">
+      <option value="linked">연결형 — 코드·설정에 묶는다 (원칙)</option>
+      <option value="periodic">주기형 — 묶을 대상이 없을 때</option>
+    </select>
+    <input name="refs" placeholder="연결형: 경로들, 쉼표로" style="font:inherit;padding:.25rem">
+    <input name="period_days" type="number" placeholder="주기형: 일수" style="width:8rem;font:inherit;padding:.25rem">
+  </p>
+  <p><button type="submit">채우고 티켓 종결</button></p>
+</form>
+{% endif %}
+{% if error %}<p class="warn">{{ error }}</p>{% endif %}
+{% endif %}
+
+<h2>상태</h2>
+<p>
+  {% for value, label in transitions %}
+  <form method="post" action="/queues/Q1/{{ d.item.ticket.id }}/state">
+    <input type="hidden" name="to" value="{{ value }}">
+    <button type="submit">{{ label }}</button>
+  </form>
+  {% endfor %}
+  {% if not transitions %}<span class="dim">종점이다.</span>{% endif %}
+</p>
+<p class="dim small">
+  보류는 <strong>대기열에서 빠지고</strong>, 질문자의 후속이 오면 사람 없이 다시 열린다 (§6.7.1).
+</p>
+{% endblock %}

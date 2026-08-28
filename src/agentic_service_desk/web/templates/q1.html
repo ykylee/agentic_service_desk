@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Q1 티켓{% endblock %}
+{% block body %}
+<h1>Q1 — 티켓</h1>
+<p class="dim small">
+  사람 손이 필요한 작업이다. <strong>오래된 것이 위로 온다</strong> —
+  기한을 걸지 않으므로 경과 시간이 축이다 (§6.7.3).
+</p>
+
+{% if not rows %}
+<p class="ok">열린 티켓이 없다.</p>
+{% else %}
+<table>
+  <tr><th>티켓</th><th style="width:6rem">상태</th><th style="width:6rem">경과</th><th style="width:8rem">지금 할 일</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/queues/Q1/{{ r.ticket.id }}">{{ r.ticket.id }}</a></td>
+    <td class="dim small">{{ r.ticket.state }}</td>
+    <td class="small">{{ r.age_label }}</td>
+    <td class="dim small">{{ r.ticket.qna_item_id and '무효화 조건' or '확인' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

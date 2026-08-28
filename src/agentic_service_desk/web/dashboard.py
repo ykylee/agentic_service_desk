@@ -23,6 +23,13 @@ from pathlib import Path
 
 from agentic_service_desk.knowledge import contradiction, lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import resolution as resolution_domain
+from agentic_service_desk.operations import ticket as ticket_domain
+
+
+#: 방치 비용의 크기 (§8.2). **정렬의 첫 축이다.**
+HIGH, MEDIUM, LOW = 3, 2, 1
 
 
 @dataclass(frozen=True)
@@ -36,25 +43,39 @@ class Queue:
     """**방치 비용이 우선순위다** — 여덟을 나란히 늘어놓으면 무엇부터 볼지 모른다."""
 
     kind: str
-    """`작업` | `판정` — 화면이 다르다 (§6.4.4)."""
+    """`작업` | `판정` — 화면이 다르다 (§6.4.4, FR-45).
+
+    작업은 조사·수정이 필요해 상세와 상태 전이가 있고, 판정은 보고 누르면 끝난다.
+    """
+
+    weight: int = MEDIUM
+    """방치 비용의 수치. **경과 시간과 곱해 순위를 만든다** (D32, FR-46)."""
+
+    source: str | None = None
+    """이 대기열을 채우는 티켓 출처 (§6.4.3). 판정 대기열에는 없다."""
 
 
 QUEUES: dict[str, Queue] = {
-    "Q1": Queue("Q1", "티켓", "사람 손이 필요한 작업", "높음 — 사람이 기다린다", "작업"),
-    "Q2": Queue("Q2", "검수 대기 (답변)", "게재 전 답변 초안", "높음 — 답변이 나가지 못한다", "판정"),
-    "Q3": Queue("Q3", "검수 대기 (콘텐츠)", "발행 전 콘텐츠", "중간 — 발행이 밀린다", "작업"),
-    "Q4": Queue(
-        "Q4",
-        "모순",
-        "사람이 고친 지식과 에이전트의 판단이 어긋난 것",
-        "높음 — 모순된 지식이 계속 답변에 쓰인다",
-        "작업",
-    ),
-    "Q5": Queue("Q5", "정정 후보", "근거가 낡은 게재 답변·살아있는 문서", "높음 — 틀린 내용이 계속 노출된다", "작업"),
-    "Q6": Queue("Q6", "암묵적 해결 확인", "사람 확인 없이 닫힌 QnA", "낮음 — 다만 지식이 자라지 않는다", "판정"),
-    "Q7": Queue("Q7", "승격 후보", "자동 승격 조건을 못 채운 명시적 해결분", "낮음 — 다만 지식이 자라지 않는다", "판정"),
-    "Q8": Queue("Q8", "지식 공백", "미해결로 종료된 QnA 가 가리키는 영역", "낮음 — 같은 질문이 계속 실패한다", "판정"),
+    "Q1": Queue("Q1", "티켓", "사람 손이 필요한 작업", "높음 — 사람이 기다린다",
+                "작업", HIGH, "qna"),
+    "Q2": Queue("Q2", "검수 대기 (답변)", "게재 전 답변 초안",
+                "높음 — 답변이 나가지 못한다", "판정", HIGH),
+    "Q3": Queue("Q3", "검수 대기 (콘텐츠)", "발행 전 콘텐츠",
+                "중간 — 발행이 밀린다", "작업", MEDIUM, "content"),
+    "Q4": Queue("Q4", "모순", "사람이 고친 지식과 에이전트의 판단이 어긋난 것",
+                "높음 — 모순된 지식이 계속 답변에 쓰인다", "작업", HIGH, "contradiction"),
+    "Q5": Queue("Q5", "정정 후보", "근거가 낡은 게재 답변·살아있는 문서",
+                "높음 — 틀린 내용이 계속 노출된다", "작업", HIGH, "correction"),
+    "Q6": Queue("Q6", "암묵적 해결 확인", "사람 확인 없이 닫힌 QnA",
+                "낮음 — 다만 지식이 자라지 않는다", "판정", LOW),
+    "Q7": Queue("Q7", "승격 후보", "자동 승격 조건을 못 채운 명시적 해결분",
+                "낮음 — 다만 지식이 자라지 않는다", "판정", LOW),
+    "Q8": Queue("Q8", "지식 공백", "미해결로 종료된 QnA 가 가리키는 영역",
+                "낮음 — 같은 질문이 계속 실패한다", "판정", LOW),
 }
+
+QUEUE_BY_SOURCE: dict[str, str] = {q.source: q.id for q in QUEUES.values() if q.source}
+"""티켓 출처에서 대기열로. **작업 대기열 넷이 모두 티켓을 낳는다** (§6.4.4)."""
 
 #: 단계별로 뜨는 대기열 (FR-59, D49).
 STAGE_QUEUES: dict[str, list[str]] = {
@@ -88,6 +109,55 @@ class ContradictionRow:
     detected_at: str
     missing_item: bool = False
     """지식 항목이 사라졌는가. 그러면 판정할 대상이 없다."""
+
+
+@dataclass(frozen=True)
+class WorkItem:
+    """대기열에 뜬 작업 하나."""
+
+    ticket: ticket_domain.Ticket
+    queue: Queue
+    age_hours: float
+
+    @property
+    def score(self) -> float:
+        """**방치 비용 × 경과 시간** (D32).
+
+        곱셈인 것이 요점이다 — 덧셈이면 낮은 비용의 대기열은 아무리 오래돼도
+        높은 비용을 넘지 못해 §8.2 가 걱정한 "영원히 밀리는" 문제가 남는다.
+        """
+        return self.queue.weight * self.age_hours
+
+    @property
+    def age_label(self) -> str:
+        if self.age_hours < 1:
+            return "방금"
+        if self.age_hours < 48:
+            return f"{int(self.age_hours)}시간"
+        return f"{int(self.age_hours / 24)}일"
+
+
+@dataclass(frozen=True)
+class TicketDetail:
+    """작업 화면 하나에 필요한 전부."""
+
+    item: WorkItem
+    entry: manual_entry.Entry | None
+    resolution: resolution_domain.Resolution | None
+
+    @property
+    def next_step(self) -> str:
+        """**지금 무엇을 해야 하는가.** 화면이 답을 대신 말해 준다."""
+        state = self.item.ticket.state
+        if state in (ticket_domain.State.CLOSED, ticket_domain.State.AUTO_CLOSED):
+            return "끝났다. 종결 기록이 남았으니 승격 후보로 간다 (§6.8 A 경로)."
+        if state is ticket_domain.State.HELD:
+            return "질문자의 응답을 기다린다 — 후속이 오면 사람 없이 다시 열린다."
+        if self.resolution is None:
+            return "종결 기록 초안을 기다리는 중이다 — 다음 배치 주기에 만들어진다."
+        if not self.resolution.confirmed:
+            return "무효화 조건을 채운다. 그것이 곧 승인이며, 채워야 티켓이 닫힌다."
+        return "닫을 수 있다."
 
 
 @dataclass
@@ -206,6 +276,58 @@ class Dashboard:
 
     def resolve_contradiction(self, contradiction_id: str, resolution: str) -> None:
         contradiction.resolve(self._conn, contradiction_id, resolution=resolution)
+
+    # --- Q1 --------------------------------------------------------------
+
+    def tickets(self) -> list[WorkItem]:
+        """Q1 대기열. **오래된 것이 위로 온다** — 기한이 없으니 경과 시간이 축이다."""
+        return [
+            self._work_item(t)
+            for t in ticket_domain.queue(self._conn)
+            if QUEUE_BY_SOURCE.get(str(t.source)) == "Q1"
+        ]
+
+    def next_up(self, stage: str, limit: int = 5) -> list[WorkItem]:
+        """**시스템이 다음에 볼 것을 제시한다** (FR-46, D32, §8.6.3).
+
+        여덟을 나란히 두면 1인 겸업은 매번 전부 훑어야 한다. 순위는 **방치 비용 ×
+        경과 시간** 두 축이다 — 위험한 대기열이 우선하되 **낮은 비용의 항목도
+        오래되면 올라온다.** Q6·Q7·Q8 이 "영원히 밀리는" 문제에 대한 실질적 대응이
+        곱셈이라는 형태 자체에 있다.
+
+        켜지지 않은 단계의 대기열은 여기서도 빠진다 (FR-59).
+        """
+        visible = {q.id for q in queues_for_stage(stage)}
+        items = [
+            self._work_item(t)
+            for t in ticket_domain.queue(self._conn)
+            if QUEUE_BY_SOURCE.get(str(t.source)) in visible
+        ]
+        items.sort(key=lambda i: i.score, reverse=True)
+        return items[:limit]
+
+    def ticket_detail(self, ticket_id: str) -> TicketDetail | None:
+        """작업 화면이 필요한 것 — 원문·초안·상태 (FR-45).
+
+        판정 화면과 달리 **상세가 있어야 한다.** 조사와 수정이 필요한 일이라
+        목록과 버튼만으로는 처리되지 않는다 (§6.4.4).
+        """
+        try:
+            t = ticket_domain.get(self._conn, ticket_id)
+        except ticket_domain.TicketNotFound:
+            return None
+        entry = (
+            manual_entry.get_entry(self._conn, t.qna_item_id) if t.qna_item_id else None
+        )
+        return TicketDetail(
+            item=self._work_item(t),
+            entry=entry,
+            resolution=resolution_domain.get(self._conn, ticket_id),
+        )
+
+    def _work_item(self, t: ticket_domain.Ticket) -> WorkItem:
+        queue_id = QUEUE_BY_SOURCE.get(str(t.source), "Q1")
+        return WorkItem(ticket=t, queue=QUEUES[queue_id], age_hours=t.age())
 
     # --- Q8 --------------------------------------------------------------
 

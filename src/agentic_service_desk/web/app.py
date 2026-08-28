@@ -20,7 +20,10 @@ from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import resolution as resolution_domain
+from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.schema import connect, initialize
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -57,14 +60,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             status = board.knowledge_status()
             counts = {
+                "Q1": len(board.tickets()),
                 "Q4": status.open_contradictions,
                 "Q8": len(board.knowledge_gaps()),
             }
+            next_up = board.next_up(cfg.stage)
         finally:
             conn.close()
         ctx = shell()
         # 아직 자료가 없는 대기열은 0 으로 둔다 — 화면에 뜨는 것과 셀 수 있는 것은 다르다.
-        ctx |= {"s": status, "counts": {q.id: counts.get(q.id, 0) for q in ctx["queues"]}}
+        ctx |= {
+            "s": status,
+            "counts": {q.id: counts.get(q.id, 0) for q in ctx["queues"]},
+            "next_up": next_up,
+        }
         return TEMPLATES.TemplateResponse(request, "index.html", ctx)
 
     @app.get("/queues/Q4")
@@ -85,6 +94,74 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             conn.close()
         return RedirectResponse("/queues/Q4", status_code=303)
 
+    @app.get("/queues/Q1")
+    def q1(request: Request):  # noqa: ANN201
+        board, conn = dashboard()
+        try:
+            rows = board.tickets()
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "q1.html", shell() | {"rows": rows})
+
+    @app.get("/queues/Q1/{ticket_id}")
+    def q1_detail(request: Request, ticket_id: str):  # noqa: ANN201
+        board, conn = dashboard()
+        try:
+            detail = board.ticket_detail(ticket_id)
+        finally:
+            conn.close()
+        if detail is None:
+            return RedirectResponse("/queues/Q1", status_code=303)
+        return TEMPLATES.TemplateResponse(
+            request, "ticket.html", shell() | {"d": detail, "transitions": _transitions(detail)}
+        )
+
+    @app.post("/queues/Q1/{ticket_id}/state")
+    def q1_state(ticket_id: str, to: str = Form(...)):  # noqa: ANN201
+        _, conn = dashboard()
+        try:
+            ticket_domain.transition(conn, ticket_id, to)
+        except (ticket_domain.InvalidTransition, ticket_domain.ResolutionRequired):
+            pass  # 화면이 다시 그려지며 왜 안 되는지 보인다
+        finally:
+            conn.close()
+        return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
+
+    @app.post("/queues/Q1/{ticket_id}/confirm")
+    def q1_confirm(  # noqa: ANN201
+        request: Request,
+        ticket_id: str,
+        choice: str = Form(...),
+        kind: str = Form("linked"),
+        refs: str = Form(""),
+        period_days: str = Form(""),
+    ):
+        """무효화 조건을 채우고 티켓을 닫는다.
+
+        **채우는 행위가 곧 승인이다** (§6.5.4). 그래서 성공하면 바로 종결까지 간다 —
+        따로 "닫기" 버튼을 두면 채워 놓고 닫지 않은 티켓이 쌓인다.
+        """
+        board, conn = dashboard()
+        try:
+            detail = board.ticket_detail(ticket_id)
+            if detail is None or detail.resolution is None:
+                return RedirectResponse("/queues/Q1", status_code=303)
+            try:
+                invalidation = _chosen_invalidation(
+                    detail.resolution, choice, kind, refs, period_days
+                )
+            except ValueError as exc:
+                return TEMPLATES.TemplateResponse(
+                    request,
+                    "ticket.html",
+                    shell() | {"d": detail, "transitions": _transitions(detail), "error": str(exc)},
+                )
+            resolution_domain.confirm(conn, ticket_id, invalidation=invalidation)
+            ticket_domain.transition(conn, ticket_id, ticket_domain.State.CLOSED)
+        finally:
+            conn.close()
+        return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
+
     @app.get("/entry")
     def entry_form(request: Request):  # noqa: ANN201
         """질문 등록 화면 — **두 칸뿐이다** (ADR-007 결정 4).
@@ -96,6 +173,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ctx = shell() | {"manual_count": manual_entry.count(conn)}
         finally:
             conn.close()
+        if not _q1_visible(cfg.stage):
+            # **등록이 만드는 것은 티켓이다.** 티켓을 볼 수 없는 단계에서 등록을 받으면
+            # 보이지 않는 대기열이 쌓인다 (FR-59 를 세운 이유와 같다).
+            ctx |= {"error": f"단계 {cfg.stage} 에서는 Q1 이 보이지 않아 등록을 받지 않는다."}
+            return TEMPLATES.TemplateResponse(request, "entry.html", ctx | {"locked": True})
         return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
 
     @app.post("/entry")
@@ -107,6 +189,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         수십 초 걸리는 호출로 응답을 붙들면 부담이 되돌아와 §1.4.4 가 무너진다.
         """
         _, conn = dashboard()
+        if not _q1_visible(cfg.stage):
+            # 화면만 막으면 POST 로 지나갈 수 있다. 규칙은 받는 쪽에도 있어야 한다.
+            try:
+                ctx = shell() | {
+                    "locked": True,
+                    "error": f"단계 {cfg.stage} 에서는 Q1 이 보이지 않아 등록을 받지 않는다.",
+                    "manual_count": manual_entry.count(conn),
+                }
+            finally:
+                conn.close()
+            return TEMPLATES.TemplateResponse(request, "entry.html", ctx)
         try:
             registered = manual_entry.register(conn, question=question, answer=answer)
             ctx = shell() | {
@@ -129,3 +222,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "q8.html", shell() | {"rows": rows})
 
     return app
+
+
+def _q1_visible(stage: str) -> bool:
+    return any(q.id == "Q1" for q in queues_for_stage(stage))
+
+
+def _transitions(detail) -> list[tuple[str, str]]:  # noqa: ANN001
+    """지금 갈 수 있는 곳. **종결은 여기 없다** — 무효화 조건을 채우는 행위가 곧 종결이다."""
+    labels = {
+        ticket_domain.State.OPEN: "열림으로 되돌린다",
+        ticket_domain.State.IN_PROGRESS: "손대기 시작한다",
+        ticket_domain.State.HELD: "보류 — 질문자 응답을 기다린다",
+    }
+    allowed = ticket_domain.TRANSITIONS[detail.item.ticket.state]
+    return [(str(s), labels[s]) for s in labels if s in allowed]
+
+
+def _chosen_invalidation(  # noqa: ANN001
+    resolution, choice: str, kind: str, refs: str, period_days: str
+) -> Invalidation:
+    """사람이 고른 무효화 조건.
+
+    후보를 고르든 직접 쓰든 **선택은 사람의 행위**다 (§5.6.4). 기본값이 없으므로
+    아무것도 고르지 않으면 여기서 막힌다.
+    """
+    if choice != "custom":
+        try:
+            return resolution.invalidation_candidates[int(choice)]
+        except (ValueError, IndexError):
+            raise ValueError("고른 후보를 찾을 수 없다") from None
+
+    parsed = InvalidationKind(kind)
+    if parsed is InvalidationKind.LINKED:
+        items = tuple(r.strip() for r in refs.split(",") if r.strip())
+        if not items:
+            raise ValueError("연결형에는 묶을 대상이 필요하다 — 경로를 쉼표로 적는다")
+        return Invalidation(kind=parsed, refs=items)
+
+    if not period_days.strip().isdigit() or int(period_days) <= 0:
+        raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
+    return Invalidation(kind=parsed, period_days=int(period_days))

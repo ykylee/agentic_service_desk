@@ -48,7 +48,16 @@ def _register(conn, question="김OO 사번 12345 인데 승인 한도가 왜 300
 
 
 def _settings(tmp_path, **over):  # noqa: ANN001, ANN202
-    base = dict(operations_db=tmp_path / "ops.sqlite3", knowledge_dir=tmp_path / "knowledge")
+    """등록 화면은 **Q1 이 보이는 단계에서만** 열린다 — 기본을 S1 로 둔다.
+
+    등록이 만드는 것은 티켓인데, 티켓을 볼 수 없는 단계에서 등록을 받으면 보이지
+    않는 대기열이 쌓인다 (FR-59 를 세운 이유와 같다).
+    """
+    base = dict(
+        operations_db=tmp_path / "ops.sqlite3",
+        knowledge_dir=tmp_path / "knowledge",
+        stage="S1",
+    )
     base.update(over)
     return Settings(_env_file=None, **base)  # type: ignore[arg-type]
 
@@ -252,6 +261,14 @@ class TestForm:
         client = TestClient(create_app(_settings(tmp_path)))
         html = client.post("/entry", data={"question": "  ", "answer": "답"}).text
         assert "질문 원문이 비었다" in html
+        assert manual_entry.count(_conn(tmp_path)) == 0
+
+    def test_Q1_이_안_보이는_단계에서는_등록을_받지_않는다(self, tmp_path) -> None:
+        # 화면만 막으면 POST 로 지나갈 수 있다. 규칙은 받는 쪽에도 있어야 한다.
+        client = TestClient(create_app(_settings(tmp_path, stage="S0")))
+        assert 'name="question"' not in client.get("/entry").text
+
+        client.post("/entry", data={"question": "질문", "answer": "답"})
         assert manual_entry.count(_conn(tmp_path)) == 0
 
     def test_등록_건수를_보여준다(self, tmp_path) -> None:

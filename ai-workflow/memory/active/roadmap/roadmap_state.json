@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.35,
+      "progress": 0.375,
       "total_leaves": 40,
-      "done_leaves": 14,
+      "done_leaves": 15,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -248,7 +248,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 5,
-          "done_leaves": 3,
+          "done_leaves": 4,
           "children": [
             {
               "id": "WBS-4.3.1",
@@ -295,10 +295,12 @@
             {
               "id": "WBS-4.3.5",
               "title": "대시보드 확장",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-024"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

@@ -15,6 +15,7 @@
 {% endif %}
 {% if error %}<p class="warn">{{ error }}</p>{% endif %}
 
+{% if not locked %}
 <form method="post" action="/entry">
   <p>
     <label class="dim small" for="question">질문 원문</label><br>
@@ -28,6 +29,7 @@
   </p>
   <p><button type="submit">등록</button></p>
 </form>
+{% endif %}
 
 <p class="dim small">
   <strong>왜 기록하는가.</strong> 유인은 시스템이 아니라 당신의 이익이다 —
