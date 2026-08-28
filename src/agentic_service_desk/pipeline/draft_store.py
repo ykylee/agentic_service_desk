@@ -55,12 +55,16 @@ class PendingDraft:
     agent_outcome: str | None
     agent_reason: str | None
     agent_detail: str
-    generated_by: str
+    gate_signals: tuple[str, ...] = ()
+    """게재 판정이 잡은 위험 신호 (§5.5.4). **왜 사람에게 왔는가**다 — 에이전트 검수
+    반려와는 다른 종류의 이유이므로 따로 든다."""
+
+    generated_by: str = ""
     """생성 시점의 모델 (§6.6.1 필드 5). 게재 시점이 아니다 — 초안이 큐에 머무는
     동안 설정이 바뀌면 모델 교체 추적이 어긋난다."""
 
-    state: str
-    created_at: str
+    state: str = PENDING
+    created_at: str = ""
 
     @property
     def body(self) -> str:
@@ -84,6 +88,8 @@ class PendingDraft:
         """
         if self.agent_rejected:
             return f"에이전트가 {self.agent_reason} 로 반려했다 — 그 지점을 먼저 본다."
+        if self.gate_signals:
+            return "게재 판정이 잡은 것: " + " · ".join(self.gate_signals)
         if self.weak_points:
             return f"근거가 약한 진술 {len(self.weak_points)}개를 먼저 본다."
         return "에이전트 검수를 통과했고 약한 지점도 없다 — 근거 대조만 확인한다."
@@ -192,6 +198,48 @@ def decide(
     )
 
 
+def note_signals(
+    conn: sqlite3.Connection, draft_id: str, signals: tuple[str, ...]
+) -> None:
+    """게재 판정이 무엇을 잡았는지 초안에 적는다 (§5.5.4).
+
+    **에이전트 검수 반려와 따로 든다.** 둘은 다른 종류의 이유다 — 저쪽은 "이 문장이
+    근거로 뒷받침되지 않는다"이고 이쪽은 "이 건은 사람이 봐야 한다"이며, 섞으면
+    화면이 어느 쪽을 먼저 보라고 말해야 할지 알 수 없다.
+    """
+    conn.execute(
+        "UPDATE answer_draft SET gate_signals = ? WHERE id = ?",
+        (json.dumps(list(signals), ensure_ascii=False), draft_id),
+    )
+    conn.commit()
+
+
+def auto_approve(conn: sqlite3.Connection, draft_id: str, *, detail: str) -> None:
+    """게재 판정이 자동으로 통과시켰다 (FR-25).
+
+    **사람이 판정한 것으로 적지 않는다.** `decide()` 는 검수 기록에 `human` 을 남기는데,
+    자동 게재를 거기 섞으면 §5.5.6 의 반려율이 **사람이 에이전트를 얼마나 믿는가**를
+    더는 뜻하지 않게 된다 — 사람이 보지도 않은 건이 분모에 들어가기 때문이다.
+    그래서 판정 주체를 셋으로 둔다: `agent`(1차 검수) · `human`(Q2) · `gate`(자동 게재).
+    """
+    draft = get(conn, draft_id)
+    if draft is None or draft.state != PENDING:
+        return
+    conn.execute(
+        "UPDATE answer_draft SET state = ?, decided_at = ? WHERE id = ?",
+        (APPROVED, datetime.now(UTC).isoformat(), draft_id),
+    )
+    conn.commit()
+    record(
+        conn,
+        review=ReviewInput(
+            draft_body=draft.body, grounding=draft.grounding, source_text={}
+        ),
+        verdict=Verdict(passed=True, detail=detail, checked_by="gate"),
+        qna_item_id=draft.qna_item_id,
+    )
+
+
 def _from_row(row: sqlite3.Row) -> PendingDraft:
     return PendingDraft(
         id=row["id"],
@@ -210,6 +258,7 @@ def _from_row(row: sqlite3.Row) -> PendingDraft:
         agent_outcome=row["agent_outcome"],
         agent_reason=row["agent_reason"],
         agent_detail=row["agent_detail"] or "",
+        gate_signals=tuple(json.loads(row["gate_signals"] or "[]")),
         generated_by=row["generated_by"] or "",
         state=row["state"],
         created_at=row["created_at"],

@@ -55,6 +55,9 @@
   {% if d.agent_rejected %}
   <br><span class="warn">에이전트: {{ d.agent_reason }} — {{ d.agent_detail }}</span>
   {% endif %}
+  {% if d.gate_signals %}
+  <br><span class="warn">게재 판정: {{ d.gate_signals|join(' · ') }}</span>
+  {% endif %}
 </p>
 
 <table>

@@ -134,6 +134,9 @@ CREATE TABLE IF NOT EXISTS answer_draft (
     agent_outcome TEXT,           -- passed | rejected. 에이전트 검수 결과
     agent_reason TEXT,            -- P1~P5
     agent_detail TEXT,
+    gate_signals TEXT,            -- 게재 판정이 잡은 위험 신호 JSON (§5.5.4, FR-25).
+                                  -- **왜 사람에게 왔는지**를 화면이 말해 주려면 필요하다 —
+                                  -- 없으면 검수자가 매번 처음부터 훑는다 (§8.6.3)
     generated_by TEXT,            -- 어느 모델이 만들었는가 (§6.6.1 필드 5, ADR-005).
                                   -- **게재 시점이 아니라 생성 시점의 모델**이다 —
                                   -- 초안이 큐에 머무는 동안 설정이 바뀔 수 있고,
@@ -182,6 +185,21 @@ CREATE TABLE IF NOT EXISTS answer_grounding (
                                        -- 쌓이면 검수가 새고 있다는 뜻이다
     PRIMARY KEY (answer_record_id, knowledge_item_id),
     FOREIGN KEY (answer_record_id) REFERENCES answer_record (id)
+);
+
+-- "확인 중" 게재 (FR-26, §8.6.3).
+-- 검수를 기다리는 동안 **자리를 먼저 잡아 둔다** — 침묵보다 낫고, SLA 없이 경과
+-- 시간을 드러내겠다는 방침과 일치한다. 승인되면 그 자리를 XR-7 로 채운다.
+--
+-- `answer_record` 와 나눠 두는 이유는 **답변 이력이 아니기 때문**이다. "확인 중"은
+-- 답이 아니라 상태 표시이고, 여기 섞으면 자동 게재율·근거 기록 같은 지표가 상태
+-- 표시까지 세게 된다.
+CREATE TABLE IF NOT EXISTS holding_notice (
+    qna_item_id      TEXT PRIMARY KEY,
+    parent_answer_id TEXT NOT NULL,   -- 나중에 채울 자리 (XR-7)
+    posted_at        TEXT NOT NULL,
+    filled_at        TEXT,            -- 채워진 시각. 대기 시간이 여기서 나온다
+    FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
 );
 
 -- 콘텐츠 발행 이력 (§7)

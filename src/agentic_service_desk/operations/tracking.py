@@ -166,6 +166,7 @@ def rerun(
     *,
     pipeline: AnswerPipeline | None = None,
     reviewer: Reviewer | None = None,
+    gate: intake.Gate | None = None,
 ) -> RerunReport:
     """후속이 달린 건을 다시 돌린다.
 
@@ -187,6 +188,7 @@ def rerun(
                 question=build_rerun_input(conn, row["parent_question_id"]),
                 pipeline=pipeline,
                 reviewer=reviewer,
+                gate=gate,
             )
         except Exception as exc:  # noqa: BLE001 — 한 건이 주기를 세우지 않는다
             report.failures.append(f"{row['parent_question_id']}: {exc}")

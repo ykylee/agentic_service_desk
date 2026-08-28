@@ -61,11 +61,33 @@ class Migration:
     statements: tuple[str, ...]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        version=2,
+        name='holding_notice — "확인 중" 게재 (WBS-4.5.5, FR-26)',
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS holding_notice (
+                qna_item_id      TEXT PRIMARY KEY,
+                parent_answer_id TEXT NOT NULL,
+                posted_at        TEXT NOT NULL,
+                filled_at        TEXT,
+                FOREIGN KEY (qna_item_id) REFERENCES qna_item (id)
+            )
+            """,
+        ),
+    ),
+    Migration(
+        version=3,
+        name="answer_draft.gate_signals — 왜 사람에게 왔는가 (WBS-4.5.5)",
+        statements=("ALTER TABLE answer_draft ADD COLUMN gate_signals TEXT",),
+    ),
+)
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 
-지금은 비어 있다 — `BASELINE` 이 곧 현재 스키마이기 때문이다. 다음 스키마 변경부터
-여기 한 줄씩 쌓인다.
+계단을 놓을 때는 `SCHEMA_SQL` 도 **함께** 고친다 — 새로 설치한 환경은 선언으로
+만들어지고 기존 환경은 계단으로 올라오므로, 한쪽만 고치면 환경마다 스키마가 달라진다.
+`asd migrate` 가 적용 뒤 그 둘을 대조하고 다르면 되돌린다 (ADR-010 결정 4).
 """
 
 

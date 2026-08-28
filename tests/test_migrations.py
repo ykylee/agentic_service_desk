@@ -221,22 +221,23 @@ class TestApply:
 
     def _with_migration(self, monkeypatch, *statements: str):  # noqa: ANN001, ANN202
         step = migrations.Migration(
-            version=migrations.BASELINE + 1,
+            version=migrations.schema_version() + 1,
             name="시험용 계단",
             statements=tuple(statements),
         )
-        monkeypatch.setattr(migrations, "MIGRATIONS", (step,))
+        monkeypatch.setattr(migrations, "MIGRATIONS", (*migrations.MIGRATIONS, step))
         return step
 
     def test_대기_목록을_보여준다(self, tmp_path, monkeypatch) -> None:  # noqa: ANN001
-        conn = _fresh(tmp_path)  # baseline 으로 찍힌다
+        conn = _fresh(tmp_path)  # 현재 버전으로 찍힌다
+        before = migrations.current_version(conn)
         step = self._with_migration(monkeypatch, "ALTER TABLE ticket ADD COLUMN 메모 TEXT")
         assert migrations.pending(conn) == [step]
 
         report = migrations.apply(conn, dry_run=True)
         assert report.applied == [step]
         # 적용하지 않았다.
-        assert migrations.current_version(conn) == migrations.BASELINE
+        assert migrations.current_version(conn) == before
         conn.close()
 
     def test_선언과_어긋나면_되돌린다(self, tmp_path, monkeypatch) -> None:  # noqa: ANN001
@@ -245,6 +246,7 @@ class TestApply:
         선언(`SCHEMA_SQL`)에 없는 열을 더하는 계단은 통과하지 못한다.
         """
         conn = _fresh(tmp_path)
+        before = migrations.current_version(conn)
         self._with_migration(monkeypatch, "ALTER TABLE ticket ADD COLUMN 메모 TEXT")
 
         report = migrations.apply(conn)
@@ -253,11 +255,12 @@ class TestApply:
         # 되돌렸다 — 열도 버전도 그대로다.
         columns = [c["name"] for c in conn.execute("PRAGMA table_info(ticket)")]
         assert "메모" not in columns
-        assert migrations.current_version(conn) == migrations.BASELINE
+        assert migrations.current_version(conn) == before
         conn.close()
 
     def test_중간에_터지면_절반이_남지_않는다(self, tmp_path, monkeypatch) -> None:  # noqa: ANN001
         conn = _fresh(tmp_path)
+        before = migrations.current_version(conn)
         self._with_migration(
             monkeypatch,
             "ALTER TABLE ticket ADD COLUMN 메모 TEXT",
@@ -268,7 +271,7 @@ class TestApply:
 
         columns = [c["name"] for c in conn.execute("PRAGMA table_info(ticket)")]
         assert "메모" not in columns
-        assert migrations.current_version(conn) == migrations.BASELINE
+        assert migrations.current_version(conn) == before
         conn.close()
 
     def test_올릴_것이_없으면_대조만_한다(self, tmp_path) -> None:
@@ -314,8 +317,9 @@ class TestCli:
             migrations,
             "MIGRATIONS",
             (
+                *migrations.MIGRATIONS,
                 migrations.Migration(
-                    version=migrations.BASELINE + 1,
+                    version=migrations.schema_version() + 1,
                     name="시험용 계단",
                     statements=("ALTER TABLE ticket ADD COLUMN 메모 TEXT",),
                 ),

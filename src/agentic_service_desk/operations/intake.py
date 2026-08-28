@@ -49,7 +49,8 @@ from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations.drafter import DraftReport, parse_draft
 from agentic_service_desk.operations.resolution import Ground, GroundKind
-from agentic_service_desk.pipeline import draft_store
+from agentic_service_desk.adapters.parent_system import ParentSystem
+from agentic_service_desk.pipeline import draft_store, gating, publication
 from agentic_service_desk.pipeline.answer import AnswerPipeline, Halt, Outcome
 from agentic_service_desk.pipeline.review import Reviewer, ReviewInput, Verdict
 
@@ -155,6 +156,7 @@ def run(
     *,
     pipeline: AnswerPipeline | None = None,
     reviewer: Reviewer | None = None,
+    gate: Gate | None = None,
 ) -> IntakeReport:
     """유입분을 처리한다. 한 건이 실패해도 나머지는 계속 간다.
 
@@ -165,7 +167,7 @@ def run(
     report = IntakeReport()
     for row in pending(conn):
         try:
-            report.admitted.append(_admit_one(conn, row, pipeline, reviewer))
+            report.admitted.append(_admit_one(conn, row, pipeline, reviewer, gate))
         except Exception as exc:  # noqa: BLE001 — 한 건의 실패가 주기를 세우지 않는다
             report.failures.append(f"{row['id']}: {exc}")
     return report
@@ -176,6 +178,7 @@ def _admit_one(
     row: sqlite3.Row,
     pipeline: AnswerPipeline | None,
     reviewer: Reviewer | None,
+    gate: Gate | None,
 ) -> Admission:
     qna_item_id = admit(conn, row)
     already = _already_answered(conn, row["id"])
@@ -191,6 +194,7 @@ def _admit_one(
         question=row["body"],
         pipeline=pipeline,
         reviewer=reviewer,
+        gate=gate,
         no_work=already,
     )
     return Admission(
@@ -235,6 +239,7 @@ def process(
     question: str,
     pipeline: AnswerPipeline | None,
     reviewer: Reviewer | None,
+    gate: Gate | None = None,
     no_work: bool = False,
 ) -> Processed:
     """질문 하나를 파이프라인에 태우고 **그 처리의 티켓을 발행한다.**
@@ -258,7 +263,7 @@ def process(
 
     draft_id = None
     if outcome is not None and outcome.draft is not None:
-        draft_id = _queue(conn, question, outcome, qna_item_id, reviewer)
+        draft_id = _queue(conn, question, outcome, qna_item_id, reviewer, gate)
 
     state = (
         ticket_domain.State.AUTO_CLOSED
@@ -281,23 +286,44 @@ def process(
     )
 
 
+@dataclass(frozen=True)
+class Gate:
+    """게재 판정에 필요한 것 (WBS-4.5.5, FR-25·26·57).
+
+    **없으면 게재하지 않는다** — S0~S2 는 아무것도 내보내지 않으므로(§1.5.3) 초안만
+    Q2 에 쌓인다. 인자를 통째로 비울 수 있게 둔 것이 그 단계의 표현이다.
+    """
+
+    parent: ParentSystem
+    repo: KnowledgeRepository
+    bot_accounts: frozenset[str]
+    stage: str
+    phase: int = 1
+    sample_rate: float = 0.2
+
+
 def _queue(
     conn: sqlite3.Connection,
     question: str,
     outcome: Outcome,
     qna_item_id: str,
     reviewer: Reviewer | None,
+    gate: Gate | None = None,
 ) -> str:
-    """초안을 4단계에 태우고 Q2 에 올린다.
+    """초안을 4단계에 태우고, **5단계로 보낼지 사람에게 올릴지 가른다** (FR-25).
 
     **검수를 건너뛰지 않는다.** 단계 자체가 필수이고, 누가 어느 강도로 보는지만
     국면에 따라 달라진다 (§5.1). 검수기가 없으면 판정 없이 올린다 — **검수가 없는
     것과 통과한 것은 다르므로**(§5.6.1) `verdict` 를 비워 두어 그 차이를 남긴다.
+    그리고 판정이 없는 것은 게재 판정에서 위험 신호로 잡힌다.
+
+    사람에게 올릴 때는 그 자리에 **"확인 중"을 먼저 게재한다**(FR-26). 침묵보다
+    낫고, 승인되면 같은 자리를 채운다.
     """
     verdict: Verdict | None = None
     if reviewer is not None:
         verdict = reviewer.review(ReviewInput.of(outcome.draft, outcome.hits))
-    return draft_store.save(
+    draft_id = draft_store.save(
         conn,
         question=question,
         draft=outcome.draft,
@@ -305,6 +331,38 @@ def _queue(
         qna_item_id=qna_item_id,
         generated_by=outcome.generated_by,
     )
+    if gate is None:
+        return draft_id
+
+    assessment = gating.assess(
+        conn,
+        draft=outcome.draft,
+        hits=outcome.hits,
+        analysis=outcome.analysis,
+        verdict=verdict,
+        repo=gate.repo,
+        stage=gate.stage,
+        phase=gate.phase,
+        draft_key=draft_id,
+        sample_rate=gate.sample_rate,
+    )
+    if assessment.auto:
+        draft_store.auto_approve(conn, draft_id, detail=assessment.reason)
+        publication.publish(
+            conn,
+            gate.parent,
+            draft_id,
+            bot_accounts=gate.bot_accounts,
+            repo=gate.repo,
+        )
+    elif assessment.route is gating.Route.HUMAN:
+        draft_store.note_signals(
+            conn, draft_id, tuple(str(s) for s in assessment.signals)
+        )
+        publication.hold(
+            conn, gate.parent, qna_item_id, bot_accounts=gate.bot_accounts
+        )
+    return draft_id
 
 
 def reopen_for_rejected_draft(

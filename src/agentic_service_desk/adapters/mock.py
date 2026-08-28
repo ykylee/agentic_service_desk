@@ -86,6 +86,11 @@ class MockParentSystem:
             )
         )
 
+    def add_question(self, qid: str, body: str, asker: str = "emp-0") -> None:
+        """시험이 시나리오를 더한다. **시드를 고치는 대신 보태게** 한다 —
+        시드는 §5.3 되먹임 차단의 다섯 분기를 덮고 있어 손대면 그것이 흔들린다."""
+        self._add_question(qid, body, asker)
+
     def _add_question(self, qid: str, body: str, asker: str) -> None:
         self._questions[qid] = Question(
             id=qid, body=body, asker_account=asker, created_at=_now()
@@ -141,14 +146,19 @@ class MockParentSystem:
         return answer_id
 
     def revise_answer(self, answer_id: str, body: str, reason: str) -> None:
-        """정정. **조용히 고치지 않는다** — 사유를 본문에 남긴다(PO-1)."""
+        """게재된 답변을 고친다. **조용히 고치지 않는다** — 사유를 본문에 남긴다(PO-1).
+
+        정정만이 아니라 **"확인 중"이던 자리를 채우는 것**도 이 표면을 쓴다(FR-26).
+        그래서 표시를 *정정*이 아니라 *갱신*으로 둔다 — 첫 답변이 나가는 것을
+        정정이라 부르면 이용자가 무엇이 틀렸었는지 찾게 된다.
+        """
         for qid, answers in self._answers.items():
             for i, a in enumerate(answers):
                 if a.id == answer_id:
                     answers[i] = Answer(
                         id=a.id,
                         question_id=qid,
-                        body=f"{body}\n\n---\n*정정: {reason}*",
+                        body=f"{body}\n\n---\n*갱신: {reason}*",
                         author_account=a.author_account,
                         created_at=a.created_at,
                         revised_at=_now(),

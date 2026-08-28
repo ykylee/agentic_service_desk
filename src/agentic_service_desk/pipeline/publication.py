@@ -97,6 +97,23 @@ ASK_RESOLUTION = (
 """
 
 
+HOLDING_BODY = (
+    "이 질문은 **확인 중**입니다.\n\n"
+    "자동으로 답할 수 있는 질문이 아니라고 판단해 담당자가 직접 확인하고 있습니다. "
+    "확인이 끝나면 이 답변이 갱신됩니다.\n\n"
+    "급하시면 담당자에게 직접 문의해 주세요."
+)
+"""검수를 기다리는 동안 그 자리에 올려 두는 말 (FR-26, §8.6.3).
+
+**침묵보다 낫다.** 1인 겸업이 이틀에 한 번 들어오면 답변도 이틀 뒤에 나가는데,
+그동안 아무 표시가 없으면 이용자는 이 시스템이 답하지 않는다고 배운다 — 그것이
+채택 실패(W4)로 가는 길이다. SLA 없이 경과 시간을 드러내겠다는 방침과도 맞는다.
+
+**"급하면 직접 물어라"를 적는 것**이 요점이다. 감추면 이용자는 기다리다 결국
+물어보고, 그때는 이 시스템이 늦다는 인상만 남는다.
+"""
+
+
 class Refusal(enum.StrEnum):
     """게재하지 않은 이유. **전부 정상 결과다** — 예외가 아니라 판정이다."""
 
@@ -135,6 +152,14 @@ class Published:
     body: str
     """실제로 올라간 본문. 조립이 끝난 그대로 보관한다 — 나중에 "무엇이 게재됐는가"를
     물을 때 다시 조립하면 그 사이 바뀐 형식으로 답하게 된다."""
+
+
+@dataclass(frozen=True)
+class Held:
+    """"확인 중"을 올려 자리를 잡았다 (FR-26)."""
+
+    qna_item_id: str
+    parent_answer_id: str
 
 
 @dataclass(frozen=True)
@@ -358,7 +383,18 @@ def publish(
     )
     conn.commit()
 
-    parent_answer_id = parent.publish_answer(question_id, body, list(draft.grounding))
+    notice = holding_of(conn, draft.qna_item_id)
+    if notice is None:
+        parent_answer_id = parent.publish_answer(question_id, body, list(draft.grounding))
+    else:
+        # **자리를 새로 잡지 않고 채운다** (FR-26). "확인 중"을 남겨 둔 채 답변을 하나
+        # 더 올리면 이용자의 질문에 글이 둘 달리고, 그중 하나는 영원히 "확인 중"이다.
+        parent_answer_id = notice["parent_answer_id"]
+        parent.revise_answer(parent_answer_id, body, "확인이 끝나 답변을 채웠습니다")
+        conn.execute(
+            "UPDATE holding_notice SET filled_at = ? WHERE qna_item_id = ?",
+            (datetime.now(UTC).isoformat(), draft.qna_item_id),
+        )
 
     conn.execute(
         "UPDATE answer_record SET parent_answer_id = ?, state = ?, published_at = ? "
@@ -371,6 +407,65 @@ def publish(
     )
     conn.commit()
     return Published(record_id=record_id, parent_answer_id=parent_answer_id, body=body)
+
+
+# --- "확인 중" (FR-26) --------------------------------------------------------
+
+
+def holding_of(conn: sqlite3.Connection, qna_item_id: str | None) -> sqlite3.Row | None:
+    """이 질문에 이미 "확인 중"이 올라가 있는가."""
+    if not qna_item_id:
+        return None
+    return conn.execute(
+        "SELECT * FROM holding_notice WHERE qna_item_id = ? AND filled_at IS NULL",
+        (qna_item_id,),
+    ).fetchone()
+
+
+def hold(
+    conn: sqlite3.Connection,
+    parent: ParentSystem,
+    qna_item_id: str,
+    *,
+    bot_accounts: frozenset[str],
+) -> Held | Refused:
+    """검수 대기 중임을 이용자에게 알린다 (FR-26, §8.6.3).
+
+    **자리를 먼저 잡는다.** 승인되면 이 자리를 XR-7 로 채우므로(§`publish`) 이용자의
+    질문에 글이 하나만 달린다 — 답변을 따로 올리면 "확인 중"이 영원히 남는다.
+
+    한 번만 올린다. 후속으로 재실행돼 다시 검수 대기가 되어도 **같은 자리가 그대로
+    쓰인다** — 매번 올리면 한 질문에 "확인 중"이 여러 개 달린다.
+
+    게재 관문 안에 두는 이유는 **출구가 하나여야 하기 때문**이다(NFR-3). 여기 말고
+    모 시스템에 글을 올리는 길이 생기면 감사 기록에 구멍이 난다.
+    """
+    if holding_of(conn, qna_item_id) is not None:
+        return Refused(Refusal.ALREADY_OUT, "이미 확인 중 표시가 올라가 있다")
+
+    qna = conn.execute(
+        "SELECT parent_question_id, origin FROM qna_item WHERE id = ?", (qna_item_id,)
+    ).fetchone()
+    if qna is None or not qna["parent_question_id"]:
+        return Refused(Refusal.NO_DESTINATION, "모 시스템을 거치지 않은 질문이다")
+
+    account = parent.bot_account
+    if account not in bot_accounts:
+        return Refused(
+            Refusal.UNIDENTIFIED_AUTHOR,
+            f"게재 계정 {account!r} 이 ASD_BOT_ACCOUNTS 에 없다",
+        )
+
+    parent_answer_id = parent.publish_answer(
+        qna["parent_question_id"], HOLDING_BODY, []
+    )
+    conn.execute(
+        "INSERT INTO holding_notice (qna_item_id, parent_answer_id, posted_at) "
+        "VALUES (?, ?, ?)",
+        (qna_item_id, parent_answer_id, datetime.now(UTC).isoformat()),
+    )
+    conn.commit()
+    return Held(qna_item_id=qna_item_id, parent_answer_id=parent_answer_id)
 
 
 # --- 끝을 보지 못한 게재 ----------------------------------------------------

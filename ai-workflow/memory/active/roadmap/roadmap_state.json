@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.625,
+      "progress": 0.65,
       "total_leaves": 40,
-      "done_leaves": 25,
+      "done_leaves": 26,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -378,7 +378,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 8,
-          "done_leaves": 4,
+          "done_leaves": 5,
           "children": [
             {
               "id": "WBS-4.5.1",
@@ -427,10 +427,12 @@
             {
               "id": "WBS-4.5.5",
               "title": "게재 판정",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-036"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

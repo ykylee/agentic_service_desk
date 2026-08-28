@@ -172,6 +172,7 @@ class BatchRunner:
                 conn,
                 pipeline=self._answer_pipeline(conn),
                 reviewer=self._reviewer(),
+                gate=self._gate(),
             )
         finally:
             conn.close()
@@ -202,6 +203,34 @@ class BatchRunner:
             # 모델 식별자는 **설정에서 온다** — 하네스에게 되물으면 실행기마다 답이
             # 달라진다. 이 값이 답변 이력의 생성 주체가 된다 (§6.6.1 필드 5).
             generated_by=self._cfg.llm_model,
+        )
+
+    def _gate(self) -> intake_domain.Gate | None:
+        """게재 판정에 필요한 것 (WBS-4.5.5). **못 갖추면 게재하지 않는다.**
+
+        연동이나 봇 계정이 없으면 내보낼 수도, 누가 올리는지 대조할 수도 없다 —
+        그때는 초안만 Q2 에 쌓이고 사람이 본다. S0~S2 의 동작과 같다(§1.5.3).
+        """
+        accounts = frozenset(
+            a.strip() for a in self._cfg.bot_accounts.split(",") if a.strip()
+        )
+        if not accounts:
+            return None
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return None
+        try:
+            parent = build_parent_system(self._cfg)
+        except (NotConfigured, RuntimeError) as exc:
+            print(f"[worker] 게재 판정을 건너뛴다 — {exc}")
+            return None
+        return intake_domain.Gate(
+            parent=parent,
+            repo=repo,
+            bot_accounts=accounts,
+            stage=self._cfg.stage,
+            phase=self._cfg.phase,
+            sample_rate=self._cfg.review_sample_rate,
         )
 
     def _reviewer(self) -> Reviewer | None:
@@ -235,6 +264,7 @@ class BatchRunner:
                 conn,
                 pipeline=self._answer_pipeline(conn),
                 reviewer=self._reviewer(),
+                gate=self._gate(),
             )
             settled = tracking_domain.settle_quiet(
                 conn, quiet_hours=self._cfg.quiet_hours

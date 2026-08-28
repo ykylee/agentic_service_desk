@@ -232,16 +232,26 @@ def find_similar_questions(
     **기계적으로 센다.** 중복 판정은 결정적이어야 하고, 여기서 LLM 을 부르면 모든
     질문에 호출이 하나 더 붙는다. 정밀도가 낮아도 이 단계의 쓰임(반복 질문 탐지)에는
     충분하다.
+
+    **자기 자신은 세지 않는다.** 질문은 이미 Raw Layer 에 적재된 뒤 파이프라인을
+    타므로(WBS-4.5.2) 그냥 세면 **모든 질문이 자기와 완전히 겹쳐** 유사 질문이 항상
+    하나 이상이 된다. 그러면 게재 판정의 `NOVEL` 신호가 영원히 꺼지고, 1국면에 자동
+    게재가 드물어야 한다는 §8.6.3 의 완충이 통째로 사라진다 — 라이브 배선에서 잡았다.
     """
     tokens = set(tokenize(question))
     if not tokens:
         return ()
+    normalized = question.strip()
     scored: list[tuple[int, str]] = []
     for row in conn.execute("SELECT body FROM raw_question"):
+        if row["body"].strip() == normalized:
+            continue
         overlap = len(tokens & set(tokenize(row["body"])))
         if overlap:
             scored.append((overlap, row["body"]))
     for row in conn.execute("SELECT question FROM manual_entry"):
+        if row["question"].strip() == normalized:
+            continue
         overlap = len(tokens & set(tokenize(row["question"])))
         if overlap:
             scored.append((overlap, row["question"]))
