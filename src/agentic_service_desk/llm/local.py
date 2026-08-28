@@ -10,31 +10,18 @@
 
 from __future__ import annotations
 
-import re
-
 import httpx
 
 from agentic_service_desk.llm.arbiter import YieldSignal
 from agentic_service_desk.llm.embeddings import EmbeddingProvider, build_embedding_provider
 from agentic_service_desk.llm.gateway import EmbeddingPurpose, Priority
+from agentic_service_desk.llm.text import strip_thinking
 from agentic_service_desk.llm.policy import (
     DataExposure,
     RemoteEndpointRejected,
     assert_endpoint_allowed,
     is_local_endpoint,
 )
-
-_THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
-
-
-def _strip_thinking(content: str) -> str:
-    """혹시 남은 사고 블록을 걷어낸다.
-
-    `reasoning_split` 이 대개 처리하지만 **믿고 넘기지 않는다** — 지원하지 않는
-    런타임에서는 본문에 그대로 남고, 그러면 사고 과정이 게재물에 실린다.
-    """
-    return _THINK_BLOCK.sub("", content).strip()
-
 
 __all__ = [
     "ChatLlmGateway",
@@ -107,7 +94,7 @@ class ChatLlmGateway:
             )
             res.raise_for_status()
             message = res.json()["choices"][0]["message"]
-            return _strip_thinking(message.get("content") or "")
+            return strip_thinking(message.get("content") or "")
 
     # --- 임베딩 -----------------------------------------------------------
 

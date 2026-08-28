@@ -125,6 +125,20 @@ content: '<think>\nThe user is asking me to reply with exactly "OK"...\n</think>
 옵션 하나를 믿고 넘기지 않는 이유는, 그것이 통하지 않는 런타임에서 **조용히**
 사고가 게재물에 실리기 때문이다.
 
+#### pi 가 정확히 그런 런타임이다 (2026-08-28 확인)  {#pi-thinking}
+
+지식 구축은 pi 헤드리스로 돈다(D5). **pi 는 `reasoning_split` 을 보내지 않으며**,
+아래 어느 것으로도 꺼지지 않았다.
+
+| 시도 | 결과 |
+|---|---|
+| `pi -p --thinking off` | `<think>` 가 본문에 그대로 |
+| `models.json` 의 `reasoning: false` | 그대로 |
+
+pi 의 `thinkingFormat` 목록에 MiniMax 형식이 없기 때문이다. **이 경로가 곧 지식베이스로
+들어오는 길**이므로, 정리는 옵션이 아니라 **출력을 받는 모든 곳**에서 한다
+(`llm/text.py`).
+
 ## 결정 4 — 모델을 교체 가능하게 감싼다  {#abstraction}
 
 하드웨어와 모델은 바뀐다. **호출부가 특정 런타임에 묶이지 않게** 한 겹을 둔다.

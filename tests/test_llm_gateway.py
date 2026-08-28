@@ -75,22 +75,36 @@ class TestThinkingBlocks:
     """
 
     def test_사고_블록을_걷어낸다(self) -> None:
-        from agentic_service_desk.llm.local import _strip_thinking
+        from agentic_service_desk.llm.text import strip_thinking
 
         raw = '<think>\n사용자가 OK 를 원한다.\n</think>\n\nOK'
-        assert _strip_thinking(raw) == "OK"
+        assert strip_thinking(raw) == "OK"
 
     def test_여러_블록도_걷어낸다(self) -> None:
-        from agentic_service_desk.llm.local import _strip_thinking
+        from agentic_service_desk.llm.text import strip_thinking
 
-        assert _strip_thinking("<think>가</think>답<think>나</think>변") == "답변"
+        assert strip_thinking("<think>가</think>답<think>나</think>변") == "답변"
 
     def test_블록이_없으면_그대로다(self) -> None:
-        from agentic_service_desk.llm.local import _strip_thinking
+        from agentic_service_desk.llm.text import strip_thinking
 
-        assert _strip_thinking("그냥 답변") == "그냥 답변"
+        assert strip_thinking("그냥 답변") == "그냥 답변"
 
     def test_빈_본문도_안전하다(self) -> None:
-        from agentic_service_desk.llm.local import _strip_thinking
+        from agentic_service_desk.llm.text import strip_thinking
 
-        assert _strip_thinking("") == ""
+        assert strip_thinking("") == ""
+
+    def test_닫히지_않은_블록은_건드리지_않는다(self) -> None:
+        # 잘린 출력을 더 망가뜨리지 않는다. 그런 출력은 상위에서 실패로 다룬다.
+        from agentic_service_desk.llm.text import strip_thinking
+
+        raw = "<think>중간에 잘림"
+        assert strip_thinking(raw) == raw
+
+    def test_pi_출력_형태도_처리한다(self) -> None:
+        # 2026-08-28 — pi 헤드리스는 reasoning_split 을 보내지 않아 본문에 그대로 온다.
+        from agentic_service_desk.llm.text import strip_thinking
+
+        pi_out = '<think>\nThe user wants me to reply with exactly "PI-OK".\n</think>\n\nPI-OK'
+        assert strip_thinking(pi_out) == "PI-OK"
