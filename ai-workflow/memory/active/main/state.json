@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로",
       "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적",
       "TASK-2026-08-28-main-033 — WBS-4.5.3 답변 이력",
       "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-029 — WBS-4.4.4 검수",
       "TASK-2026-08-28-main-028 — WBS-4.4.3 불확실성 표시",
       "TASK-2026-08-28-main-027 — WBS-4.4.2 파이프라인 1~3단계",
-      "TASK-2026-08-28-main-026 — WBS-4.4.1 검색",
-      "TASK-2026-08-28-main-025 — WBS-4.3.4 승격 경로 A"
+      "TASK-2026-08-28-main-026 — WBS-4.4.1 검색"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 35,
+    "task_count": 36,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -88,7 +88,8 @@
       "TASK-2026-08-28-main-031 — WBS-4.5.1 게재",
       "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행",
       "TASK-2026-08-28-main-033 — WBS-4.5.3 답변 이력",
-      "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적"
+      "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적",
+      "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로"
     ]
   },
   "next_documents": [

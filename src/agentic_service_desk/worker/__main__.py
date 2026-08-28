@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from agentic_service_desk.config import load_settings
+from agentic_service_desk.operations.preflight import check_schema
 from agentic_service_desk.worker.runner import BatchRunner
 
 
-def main() -> None:
-    BatchRunner(load_settings()).run()
+def main() -> int:
+    cfg = load_settings()
+    if not check_schema(cfg):
+        return 1
+    BatchRunner(cfg).run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

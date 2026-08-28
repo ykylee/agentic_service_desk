@@ -80,6 +80,7 @@
 | [ADR-007](./ADR-007-dashboard.md) | 대시보드 범위와 상호작용 | O28 · O51 · O55 |
 | [ADR-008](./ADR-008-parent-api-contract.md) | 모 시스템 API 계약은 우리가 정의한다 | — (연결 단계에서 재검토) |
 | [ADR-009](./ADR-009-llm-provisioning.md) | LLM 제공자를 한 곳에서 갈아 끼운다 | — |
+| [ADR-010](./ADR-010-schema-migration.md) | 스키마는 번호 매긴 계단으로 올리고, 사람이 명령으로 돌린다 | — |
 
 ## §4 요구사항 추적  {#s4-traceability}
 

@@ -4,6 +4,9 @@
                   돌리면 **애플리케이션과 pi 가 함께** 움직인다
     verify-edit   지식베이스의 사람 편집 세 조건 검사 (FR-54). **지식 저장소의
                   `pre-commit` 훅이 부른다** — 사람이 직접 칠 일은 드물다
+    migrate       운영 DB 스키마 이행 (ADR-010). **사람이 명시적으로 돌린다** —
+                  이행은 되돌리기 어려운 행위라 조용히 일어나면 안 되고, 온라인·배치
+                  두 프로세스가 자동으로 올리면 서로 경쟁한다
 """
 
 from __future__ import annotations
@@ -18,6 +21,69 @@ from agentic_service_desk.config import load_settings
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.llm.harness import render_models_json, write_models_json
 from agentic_service_desk.llm.policy import RemoteEndpointRejected
+from agentic_service_desk.operations import migrations
+from agentic_service_desk.operations.schema import connect
+
+
+def _migrate(cfg, *, dry_run: bool) -> int:  # noqa: ANN001
+    """스키마를 올린다. **무엇이 올라가는지 먼저 보여준다.**
+
+    이행은 되돌리기 어려우므로, 화면에 이름이 보이지 않는 것이 적용되어서는 안 된다.
+    """
+    if not cfg.operations_db.exists():
+        print(f"운영 DB 가 아직 없다: {cfg.operations_db}")
+        print("앱이나 워커를 한 번 띄우면 현재 스키마로 만들어진다.")
+        return 0
+
+    conn = connect(cfg.operations_db)
+    try:
+        try:
+            todo = migrations.pending(conn)
+            version = migrations.current_version(conn)
+        except migrations.SchemaProblem as exc:
+            print(f"거부: {exc}", file=sys.stderr)
+            return 1
+        if version is None:
+            print(
+                "거부: 스키마 버전을 알 수 없다 — 이행 경로(ADR-010) 도입 이전의 "
+                "DB 다. 짐작해서 번호를 찍으면 그 뒤의 모든 이행이 어긋나므로 받지 "
+                "않는다. 개발 중이라면 파일을 지우고 다시 만든다.",
+                file=sys.stderr,
+            )
+            return 1
+
+        required = migrations.schema_version()
+        if not todo:
+            print(f"스키마 v{version} — 올릴 것이 없다 (코드 요구 v{required}).")
+            problems = migrations.verify(conn)
+            if problems:
+                print("\n다만 선언과 다르다:", file=sys.stderr)
+                for problem in problems:
+                    print(f"  {problem}", file=sys.stderr)
+                return 1
+            return 0
+
+        for migration in todo:
+            print(f"{migration.version:03d} {migration.name}")
+        if dry_run:
+            print(f"\n{len(todo)}건 대기 (v{version} → v{required}). 적용하지 않았다.")
+            return 0
+
+        report = migrations.apply(conn)
+        if not report.ok:
+            print("\n되돌렸다 — 이행 결과가 선언과 다르다:", file=sys.stderr)
+            for problem in report.differences:
+                print(f"  {problem}", file=sys.stderr)
+            print(
+                "\n`schema.py` 의 SCHEMA_SQL 과 마이그레이션이 어긋났다. "
+                "둘을 맞춘 뒤 다시 돌린다.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"\n스키마 v{report.to_version}. 앱을 다시 띄운다.")
+        return 0
+    finally:
+        conn.close()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,8 +101,16 @@ def main(argv: list[str] | None = None) -> int:
         "--message-file", required=True, help="커밋 메시지 파일. commit-msg 훅이 넘긴다"
     )
 
+    m = sub.add_parser("migrate", help="운영 DB 스키마를 코드가 요구하는 버전으로 올린다")
+    m.add_argument(
+        "--dry-run", action="store_true", help="적용하지 않고 대기 목록만 보여준다"
+    )
+
     args = parser.parse_args(argv)
     cfg = load_settings()
+
+    if args.command == "migrate":
+        return _migrate(cfg, dry_run=args.dry_run)
 
     if args.command == "verify-edit":
         repo = KnowledgeRepository(Path(args.root) if args.root else cfg.knowledge_dir)

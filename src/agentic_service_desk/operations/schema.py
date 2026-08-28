@@ -16,6 +16,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from agentic_service_desk.operations import migrations
+
 SCHEMA_SQL = """
 -- QnA 항목 — 대외 관점. "이용자에게 이 질문이 어떻게 되었는가" (D15)
 CREATE TABLE IF NOT EXISTS qna_item (
@@ -329,6 +331,17 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def initialize(conn: sqlite3.Connection) -> None:
-    """스키마를 만든다. 여러 번 불러도 안전하다."""
+    """**새 DB 일 때만** 스키마를 만들고 버전을 찍는다 (ADR-010).
+
+    기존 DB 에는 손대지 않는다. 예전에는 매번 `executescript` 를 돌렸는데, 그러면
+    **표 추가는 조용히 되고 열 추가만 실패해** 이행이 반쪽이 된다 — 어느 쪽이
+    자동이고 어느 쪽이 아닌지 아무도 기억하지 못한다. 지금은 스키마를 바꾸는 길이
+    `asd migrate` 하나뿐이다.
+
+    연결을 열 때마다 불리므로 싸야 한다. 새것인지 보는 질의 하나로 끝난다.
+    """
+    if not migrations.is_fresh(conn):
+        return
     conn.executescript(SCHEMA_SQL)
+    migrations.stamp(conn, migrations.schema_version(), "baseline")
     conn.commit()

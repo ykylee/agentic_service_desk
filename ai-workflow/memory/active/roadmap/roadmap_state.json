@@ -616,6 +616,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS 자체를 분해하는 작업이므로 특정 leaf 에 속하지 않는다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-005.md"
+    },
+    {
+      "task_id": "TASK-2026-08-28-main-035",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS leaf 가 아닌 아키텍처 결정 — 4.5 를 실데이터로 켜기 전에 닫아야 할 선행 조건이다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-035.md"
     }
   ],
   "issues": []
