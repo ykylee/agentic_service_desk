@@ -47,15 +47,18 @@
 <p class="dim small">
   여덟을 나란히 두면 매번 전부 훑게 된다. <strong>방치 비용 × 경과 시간</strong>으로
   줄을 세운다 — 위험한 것이 우선하되 <strong>낮은 비용도 오래되면 올라온다</strong> (§8.6.3).
+  <strong>판정 대기열도 함께 선다</strong> — 방치해도 사고가 나지 않는 쪽이 밀리면
+  지식이 조용히 자라지 않는다 (§8.2). 판정은 대기열당 한 줄이다.
 </p>
 {% if next_up %}
 <table>
-  <tr><th style="width:3rem"></th><th>티켓</th><th style="width:6rem">경과</th><th style="width:5rem">점수</th></tr>
+  <tr><th style="width:3rem"></th><th>볼 것</th><th style="width:6rem">경과</th><th style="width:5rem">점수</th></tr>
   {% for i in next_up %}
   <tr>
     <td>{{ i.queue.id }}</td>
-    <td><a href="/queues/Q1/{{ i.ticket.id }}">{{ i.ticket.id }}</a>
-        <span class="dim small">{{ i.queue.title }}</span></td>
+    <td><a href="{{ i.href }}">{{ i.ref }}</a>
+        <span class="dim small">{{ i.label }}</span>
+        {% if i.backlog %}<span class="dim small">· 외 {{ i.backlog }}건</span>{% endif %}</td>
     <td class="small">{{ i.age_label }}</td>
     <td class="dim small">{{ '%.0f'|format(i.score) }}</td>
   </tr>

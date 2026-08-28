@@ -79,7 +79,14 @@ class TestOrdering:
             opened_at=opened,
             state_at=opened,
         )
-        return WorkItem(ticket=t, queue=QUEUES[queue_id], age_hours=hours)
+        return WorkItem(
+            queue=QUEUES[queue_id],
+            ref=t.id,
+            href=f"/queues/Q1/{t.id}",
+            label=QUEUES[queue_id].title,
+            age_hours=hours,
+            ticket=t,
+        )
 
     def test_같은_나이면_방치_비용이_높은_쪽이_먼저다(self) -> None:
         assert self._item("Q4", 10).score > self._item("Q3", 10).score
@@ -263,3 +270,139 @@ class TestConfirmClosesTheLoop:
         client.post(f"/queues/Q1/{r.ticket_id}/confirm", data={"choice": "0"})
 
         assert "열린 티켓이 없다" in client.get("/queues/Q1").text
+
+
+class TestJudgementQueuesRank:
+    """판정 대기열도 같은 자에 오른다 (§8.2, D32, FR-46).
+
+    §8.2 가 "영원히 밀린다"고 걱정한 것은 Q6·Q7·Q8 이다 — 방치해도 사고가 나지
+    않아서 밀리고, 밀리면 **아무 신호 없이 지식이 자라기를 멈춘다.** 곱셈 순위가
+    그 대응인데 티켓 있는 것만 세우면 대응이 정작 그쪽에 닿지 않는다.
+
+    여기서 지키는 것은 셋.
+
+        1. 티켓 없는 대기열도 순위에 **오른다**
+        2. 판정은 **대기열당 한 줄**이다 — 목록 화면 하나를 가리키므로 여럿을
+           올리면 같은 곳으로 가는 줄이 다섯 자리를 채운다
+        3. FR-59 는 여기에도 걸린다 — 켜지지 않은 단계의 판정은 빠진다
+    """
+
+    def _qna(self, conn, qid: str, *, state: str, grade: str | None, days: float):  # noqa: ANN001, ANN202
+        when = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        conn.execute(
+            "INSERT INTO raw_question (id, body, asker_account, created_at, collected_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (qid, f"{qid} 의 질문 원문", "u-1", when, when),
+        )
+        conn.execute(
+            "INSERT INTO qna_item (id, parent_question_id, state, resolution_grade, "
+            " opened_at, closed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (f"qi-{qid}", qid, state, grade, when, when),
+        )
+        conn.commit()
+
+    def _gap(self, conn, qid: str, days: float) -> None:  # noqa: ANN001
+        from agentic_service_desk.operations import qna_state
+
+        self._qna(conn, qid, state=qna_state.UNRESOLVED_CLOSED, grade=None, days=days)
+
+    def _implicit(self, conn, qid: str, days: float) -> None:  # noqa: ANN001
+        from agentic_service_desk.operations import qna_state
+
+        self._qna(
+            conn, qid, state=qna_state.RESOLVED, grade=qna_state.IMPLICIT, days=days
+        )
+
+    def test_티켓_없는_판정도_순위에_오른다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        self._gap(conn, "Q-old", days=60)
+        _registered(conn)  # 방금 만든 Q1 티켓 (방치 비용 높음)
+
+        ranked = _board(tmp_path, conn).next_up("S3")
+        assert [i.queue.id for i in ranked][0] == "Q8"  # 낮은 비용이지만 두 달 묵었다
+
+    def test_판정은_대기열당_한_줄이다(self, tmp_path) -> None:
+        # 다섯 자리를 같은 목록으로 가는 줄로 채우면 순위가 아무것도 고르지 못한
+        # 것과 같고, 각자 다른 화면을 가진 작업 항목이 그 뒤로 밀려난다.
+        conn = _conn(tmp_path)
+        for n in range(4):
+            self._gap(conn, f"Q-{n}", days=10 + n)
+
+        rows = [i for i in _board(tmp_path, conn).next_up("S3") if i.queue.id == "Q8"]
+        assert len(rows) == 1
+        assert rows[0].backlog == 3  # 나머지는 수로 말한다
+        assert rows[0].ref == "qi-Q-3"  # 오르는 것은 **가장 오래된 건**이다
+        assert rows[0].href == "/queues/Q8"  # 판정에는 상세 화면이 없다 (FR-45)
+
+    def test_같은_나이의_판정끼리는_방치_비용이_가른다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        self._gap(conn, "Q-gap", days=5)
+        self._implicit(conn, "Q-imp", days=5)
+
+        ranked = _board(tmp_path, conn).next_up("S3")
+        assert {i.queue.id for i in ranked} == {"Q6", "Q8"}
+
+    def test_켜지지_않은_단계의_판정은_빠진다(self, tmp_path) -> None:
+        # FR-59 — S1 에는 Q6 가 없다. 목록에 없는 것이 순위에 뜨면 갈 곳이 없다.
+        conn = _conn(tmp_path)
+        self._implicit(conn, "Q-imp", days=30)
+        assert _board(tmp_path, conn).next_up("S1") == []
+
+    def test_무엇에_대한_것인지_함께_준다(self, tmp_path) -> None:
+        # id 만 늘어놓으면 열어 보기 전에는 알 수 없다.
+        conn = _conn(tmp_path)
+        self._gap(conn, "Q-1", days=3)
+        assert "질문 원문" in _board(tmp_path, conn).next_up("S3")[0].label
+
+    def test_Q2_초안도_오른다(self, tmp_path) -> None:
+        # **방치 비용이 높다** — 사람이 답을 기다리고 있고, 밀리면 그 지연이 곧
+        # 채택 실패다 (W4, §8.6.3).
+        from agentic_service_desk.pipeline.answer import Confidence, Draft, Statement
+        from agentic_service_desk.pipeline import draft_store
+
+        conn = _conn(tmp_path)
+        draft_store.save(
+            conn,
+            question="결재 한도는 무엇으로 정해지나요?",
+            draft=Draft(
+                statements=(Statement("부서 등급으로 정해진다.", Confidence.CONFIRMED, ("k-1",)),),
+                grounding=("k-1",),
+            ),
+        )
+        conn.execute(
+            "UPDATE answer_draft SET created_at = ?",
+            ((datetime.now(UTC) - timedelta(days=2)).isoformat(),),
+        )
+        conn.commit()
+
+        rows = [i for i in _board(tmp_path, conn).next_up("S3") if i.queue.id == "Q2"]
+        assert len(rows) == 1
+        assert rows[0].href == "/queues/Q2"
+        assert "결재 한도" in rows[0].label
+
+    def test_Q7_은_자동_종결_시각부터_잰다(self, tmp_path) -> None:
+        # 발행 시각이 아니다 — 자동 처리가 끝나야 승격 판정거리가 되므로, 그
+        # 전까지 세면 파이프라인이 오래 걸린 건이 더 밀린 것처럼 보인다.
+        conn = _conn(tmp_path)
+        self._implicit(conn, "Q-p", days=30)
+        opened = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+        closed = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+        t = ticket.issue(
+            conn, source=ticket.Source.QNA, qna_item_id="qi-Q-p", state=ticket.State.AUTO_CLOSED
+        )
+        conn.execute(
+            "UPDATE ticket SET opened_at = ?, state_at = ? WHERE id = ?",
+            (opened, closed, t.id),
+        )
+        conn.commit()
+        resolution.draft(
+            conn,
+            ticket_id=t.id,
+            generalized_question="결재 한도는 무엇으로 결정되는가",
+            answer="부서 등급으로 결정된다.",
+            grounding=(Ground(kind=GroundKind.CODE, ref="src/approval/limit.py"),),
+        )
+
+        rows = [i for i in _board(tmp_path, conn).next_up("S3") if i.queue.id == "Q7"]
+        assert len(rows) == 1
+        assert 9 * 24 < rows[0].age_hours < 11 * 24  # 열흘 — 서른 날이 아니다

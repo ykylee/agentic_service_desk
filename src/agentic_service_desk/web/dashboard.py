@@ -19,14 +19,18 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agentic_service_desk.knowledge import contradiction, lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
+from agentic_service_desk.operations import tracking
+from agentic_service_desk.pipeline import draft_store
 
 
 #: 방치 비용의 크기 (§8.2). **정렬의 첫 축이다.**
@@ -114,11 +118,42 @@ class ContradictionRow:
 
 @dataclass(frozen=True)
 class WorkItem:
-    """대기열에 뜬 작업 하나."""
+    """순위에 오르는 것 하나 — **티켓이 있든 없든** (§8.2, D32).
 
-    ticket: ticket_domain.Ticket
+    티켓은 *작업* 하나의 기록 단위다 (§6.4.3-1). 판정 대기열에는 그 단위가 없는데,
+    없다고 순위에서 빼면 **§8.2 가 "영원히 밀린다"고 걱정한 바로 그 넷**
+    (Q2·Q6·Q7·Q8) 만 순위에 오르지 못한다 — Q6·Q7·Q8 은 방치해도 사고가 나지
+    않아서 밀리고, 밀리면 조용히 **지식이 자라지 않는다.** 곱셈 순위는 그 문제에
+    대한 대응인데 대상에서 빠지면 대응이 닿지 않는다.
+
+    그래서 태우려고 티켓을 발행하지는 않았다. 발행하면 §6.4.4 가 갈라 놓은 작업과
+    판정을 다시 섞어 **판정 하나하나가 Q1 에도 뜬다.** 대신 **순위의 입력을
+    일반화**했다 — 티켓은 있으면 붙고 없으면 없다.
+    """
+
     queue: Queue
+    ref: str
+    """화면이 가리키는 것 — 티켓 id · 초안 id · QnA 항목 id."""
+
+    href: str
+    """열 자리. 작업은 그 티켓의 화면으로, **판정은 그 대기열 목록으로** 간다 —
+    판정에는 상세 화면이 없다 (FR-45)."""
+
+    label: str
+    """무엇에 대한 것인가. **id 만 늘어놓으면 열어 보기 전에는 알 수 없다.**"""
+
     age_hours: float
+    ticket: ticket_domain.Ticket | None = None
+    """작업 항목에만 있다 — 상태 전이와 종결이 여기 걸린다."""
+
+    backlog: int = 0
+    """이 항목 뒤에 같은 대기열에서 기다리는 건수. **판정 대기열에만 있다.**
+
+    판정은 **대기열당 한 줄만** 올린다. 목록 화면 하나를 가리키므로 여럿을 올리면
+    같은 곳으로 가는 줄이 순위를 채우고, 그러면 각자 다른 화면을 가진 작업 항목이
+    그 뒤로 밀려난다 — 순위가 하려던 일의 반대다. 오르는 것은 **가장 오래된 건**이고
+    나머지는 이 수로 말한다.
+    """
 
     @property
     def score(self) -> float:
@@ -326,6 +361,11 @@ class Dashboard:
         오래되면 올라온다.** Q6·Q7·Q8 이 "영원히 밀리는" 문제에 대한 실질적 대응이
         곱셈이라는 형태 자체에 있다.
 
+        **작업과 판정을 함께 세운다.** 티켓을 낳는 것만 세우면 그 대응이 정작
+        Q2·Q6·Q7·Q8 에는 닿지 않는데, §8.2 가 영원히 밀린다고 걱정한 것이 바로
+        그쪽이다 — 이 셋은 방치해도 사고가 나지 않아서 밀리고, 밀리면 아무 신호 없이
+        **지식이 자라기를 멈춘다.**
+
         켜지지 않은 단계의 대기열은 여기서도 빠진다 (FR-59).
         """
         visible = {q.id for q in queues_for_stage(stage)}
@@ -334,8 +374,83 @@ class Dashboard:
             for t in ticket_domain.queue(self._conn)
             if QUEUE_BY_SOURCE.get(str(t.source)) in visible
         ]
+        items += self._judgements(visible)
         items.sort(key=lambda i: i.score, reverse=True)
         return items[:limit]
+
+    # --- 판정 대기열의 순위 ------------------------------------------------
+
+    def _judgements(self, visible: set[str]) -> list[WorkItem]:
+        """티켓 없는 대기열을 **각각 한 줄로** 순위에 올린다.
+
+        **대기열 목록을 여기서 다시 정의하지 않는다** — 각 대기열을 소유한 모듈의
+        같은 함수를 부른다. 여기 질의를 따로 쓰면 언젠가 두 정의가 어긋나고,
+        어긋나면 **순위에 뜬 것이 대기열에는 없거나 그 반대**가 된다.
+        """
+        rows: list[WorkItem] = []
+        if "Q2" in visible:
+            rows += self._one(
+                QUEUES["Q2"],
+                "/queues/Q2",
+                [(d.id, d.created_at, d.question) for d in draft_store.pending(self._conn)],
+            )
+        if "Q6" in visible:
+            rows += self._one(
+                QUEUES["Q6"],
+                "/queues/Q6",
+                [
+                    (r["id"], r["closed_at"], r["question"])
+                    for r in tracking.awaiting_confirmation(self._conn)
+                ],
+            )
+        if "Q7" in visible:
+            rows += self._one(QUEUES["Q7"], "/queues/Q7", self._promotion_waiting())
+        if "Q8" in visible:
+            rows += self._one(
+                QUEUES["Q8"],
+                "/queues/Q8",
+                [(g["id"], g["closed_at"], g["question"] or "") for g in self.knowledge_gaps()],
+            )
+        return rows
+
+    def _promotion_waiting(self) -> list[tuple[str, str | None, str]]:
+        """Q7 후보의 대기 시작점은 **티켓이 자동 종결된 시각**이다.
+
+        발행 시각이 아니다 — 자동 처리가 끝나야 승격 판정거리가 되므로, 그 전의
+        시간까지 세면 파이프라인이 오래 걸린 건이 더 밀린 것처럼 보인다.
+        """
+        out = []
+        for c in promotion_domain.awaiting_decision(self._conn):
+            try:
+                t = ticket_domain.get(self._conn, c.ticket_id)
+            except ticket_domain.TicketNotFound:
+                continue
+            out.append((c.ticket_id, t.state_at, c.record.generalized_question))
+        return out
+
+    def _one(
+        self, queue: Queue, href: str, waiting: list[tuple[str, str | None, str]]
+    ) -> list[WorkItem]:
+        """가장 오래된 하나만 올리고 나머지는 수로 말한다.
+
+        판정 대기열은 **목록 화면 하나**를 가리킨다 (FR-45). 다섯 자리를 같은 곳으로
+        가는 줄로 채우면 순위가 아무것도 고르지 못한 것과 같고, 각자 다른 화면을
+        가진 작업 항목이 그 뒤로 밀려난다.
+        """
+        if not waiting:
+            return []
+        aged = [(ref, _hours_since(since), label) for ref, since, label in waiting]
+        ref, age, label = max(aged, key=lambda w: w[1])
+        return [
+            WorkItem(
+                queue=queue,
+                ref=ref,
+                href=href,
+                label=_excerpt(label),
+                age_hours=age,
+                backlog=len(aged) - 1,
+            )
+        ]
 
     def ticket_detail(self, ticket_id: str) -> TicketDetail | None:
         """작업 화면이 필요한 것 — 원문·초안·상태 (FR-45).
@@ -370,7 +485,16 @@ class Dashboard:
 
     def _work_item(self, t: ticket_domain.Ticket) -> WorkItem:
         queue_id = QUEUE_BY_SOURCE.get(str(t.source), "Q1")
-        return WorkItem(ticket=t, queue=QUEUES[queue_id], age_hours=t.age())
+        return WorkItem(
+            queue=QUEUES[queue_id],
+            ref=t.id,
+            # 작업 대기열 넷이 모두 **티켓 화면**으로 간다 — 상세와 상태 전이가
+            # 필요한 것이 그 화면이고, 출처가 무엇이든 그 점은 같다 (FR-45).
+            href=f"/queues/Q1/{t.id}",
+            label=QUEUES[queue_id].title,
+            age_hours=t.age(),
+            ticket=t,
+        )
 
     # --- Q8 --------------------------------------------------------------
 
@@ -381,12 +505,39 @@ class Dashboard:
         ingest 우선순위로 되먹일 수가 없다 — 이 대기열의 목적이 그것이다.
         """
         rows = self._conn.execute(
-            "SELECT i.id, i.parent_question_id, q.body AS question FROM qna_item i "
+            # `closed_at` 은 순위가 쓴다 — 미해결로 닫힌 시각이 곧 이 대기열에
+            # 들어온 시각이다.
+            "SELECT i.id, i.parent_question_id, i.closed_at, q.body AS question "
+            "FROM qna_item i "
             "LEFT JOIN raw_question q ON q.id = i.parent_question_id "
             "WHERE i.state = ? ORDER BY i.closed_at",
             (qna_state.UNRESOLVED_CLOSED,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def _hours_since(when: str | None) -> float:
+    """대기열에 들어온 뒤 흐른 시간.
+
+    시각이 없으면 0 이다 — 종결·적재와 함께 반드시 쓰이는 값이라 비어 있다면 그것은
+    데이터 손상이고, **그때도 대기열 목록과 건수에는 그대로 남는다.** 순위에서만
+    맨 아래로 갈 뿐 사라지지는 않는다.
+    """
+    if not when:
+        return 0.0
+    try:
+        at = datetime.fromisoformat(when)
+    except ValueError:
+        return 0.0
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - at).total_seconds() / 3600
+
+
+def _excerpt(text: str, width: int = 40) -> str:
+    """한 줄에 들어갈 만큼. **무엇에 대한 것인지**만 알면 된다."""
+    one = " ".join((text or "").split())
+    return one if len(one) <= width else one[: width - 1] + "…"
 
 
 def build(knowledge_dir: Path, conn: sqlite3.Connection) -> Dashboard:
