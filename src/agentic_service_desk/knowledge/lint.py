@@ -60,6 +60,10 @@ class Kind(enum.StrEnum):
     BROKEN_LINK = "broken_link"
     MISSING_REFERENCE = "missing_reference"
 
+    # Q5 에는 **세 번째 출처**가 있다 — 근거가 낡은 채로 나가 있는 게재 답변
+    # (`pipeline.correction`, WBS-4.5.7). Lint 가 만드는 것이 아니므로 여기 없고,
+    # 같은 표(`lint_finding`)와 열쇠 장치를 함께 쓴다.
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -361,8 +365,13 @@ def list_open(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     )
 
 
-def resolve(conn: sqlite3.Connection, key: str) -> None:
-    """사람이 처리했다. 티켓도 함께 닫는다."""
+def resolve(conn: sqlite3.Connection, key: str, *, note: str = "") -> None:
+    """처리됐다. 티켓도 함께 닫는다.
+
+    `note` 는 **무엇으로 닫혔는가**다 — 정정 소견(WBS-4.5.7)은 *고쳐서* 닫히기도
+    하고 *여전히 맞다*로 닫히기도 하는데, 둘을 구분해 두지 않으면 나중에
+    "무시가 잦다 = stale 판정이 과하다"는 신호를 읽을 수 없다.
+    """
     now = _now().isoformat()
     row = conn.execute(
         "SELECT ticket_id, kind, subject FROM lint_finding WHERE key = ? AND state = ?",
@@ -382,7 +391,7 @@ def resolve(conn: sqlite3.Connection, key: str) -> None:
         conn,
         ticket_id=row["ticket_id"],
         generalized_question="이 Lint 소견을 어떻게 처리하는가",
-        answer=f"처리함: {row['kind']}",
+        answer=note or f"처리함: {row['kind']}",
         grounding=[
             resolution_domain.Ground(
                 kind=resolution_domain.GroundKind.PERSON,

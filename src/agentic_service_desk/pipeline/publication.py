@@ -66,6 +66,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.adapters.parent_system import ParentSystem
+from agentic_service_desk.knowledge import lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
@@ -79,6 +80,7 @@ STATE_PUBLISHED_QNA = qna_state.PUBLISHED
 IN_FLIGHT = "in_flight"
 PUBLISHED = "published"
 ABANDONED = "abandoned"
+CORRECTED = "corrected"
 
 ATTRIBUTION = "이 답변은 AI 가 작성했습니다."
 """PO-2. **숨기지 않는다** — 근거를 함께 싣는 이상 어차피 드러나고, 숨겼다가 오답이
@@ -383,8 +385,16 @@ def publish(
     )
     conn.commit()
 
+    superseded = _correction_target(conn, draft)
     notice = holding_of(conn, draft.qna_item_id)
-    if notice is None:
+    if superseded is not None:
+        # **원 답변을 고친다** (PO-1). 후속 답글로만 정정하면 원 답변이 틀린 채 남아
+        # 나중에 읽는 사람이 정정을 놓치고, 조용히 고치면 이미 읽은 사람이 잘못된
+        # 내용을 그대로 갖고 간다. 무엇이 왜 바뀌었는지는 **기계가 채운다** —
+        # 근거 버전 고정(D20)이 어느 근거가 낡았는지를 알려주기 때문이다.
+        parent_answer_id = superseded["parent_answer_id"]
+        parent.revise_answer(parent_answer_id, body, _correction_reason(conn, superseded))
+    elif notice is None:
         parent_answer_id = parent.publish_answer(question_id, body, list(draft.grounding))
     else:
         # **자리를 새로 잡지 않고 채운다** (FR-26). "확인 중"을 남겨 둔 채 답변을 하나
@@ -405,8 +415,64 @@ def publish(
         "UPDATE qna_item SET state = ? WHERE id = ?",
         (STATE_PUBLISHED_QNA, draft.qna_item_id),
     )
+    if superseded is not None:
+        # **지우지 않고 자리를 넘긴다.** 그때 무엇에 기대어 답했는지가 정정으로
+        # 사라지면 "그때는 맞았는가"를 물을 수 없게 되고, D20 이 무의미해진다.
+        conn.execute(
+            "UPDATE answer_record SET state = ?, corrected_at = ? WHERE id = ?",
+            (CORRECTED, datetime.now(UTC).isoformat(), superseded["id"]),
+        )
+        # 정정 소견은 **여기서** 닫는다 — 정정이 실제로 나간 순간이 이 자리이고,
+        # 출구가 하나라 놓칠 곳도 하나다. 호출부마다 닫게 하면 어느 한 쪽이 잊는다.
+        lint.resolve(
+            conn,
+            f"stale_answer:{superseded['id']}",
+            note="정정함 — 원 답변을 고쳤다",
+        )
     conn.commit()
     return Published(record_id=record_id, parent_answer_id=parent_answer_id, body=body)
+
+
+def _correction_target(
+    conn: sqlite3.Connection, draft: draft_store.PendingDraft
+) -> sqlite3.Row | None:
+    """이 초안이 고치려는 게재 기록. **정정 의도는 명시적이어야 한다.**
+
+    "같은 질문에 이미 답이 있으면 정정"으로 추측하지 않는다 — 후속에 대한 새 답변도
+    그 조건을 만족하는데, 그것은 글을 하나 더 올리는 것이 맞다.
+    """
+    if not draft.corrects:
+        return None
+    return conn.execute(
+        "SELECT * FROM answer_record WHERE id = ? AND state = ?",
+        (draft.corrects, PUBLISHED),
+    ).fetchone()
+
+
+def _correction_reason(conn: sqlite3.Connection, superseded: sqlite3.Row) -> str:
+    """무엇이 왜 바뀌었는가 (PO-1).
+
+    **기계가 채운다.** 근거 버전 고정(D20)이 있으므로 "어느 근거가 낡아 고쳤는지"를
+    사람에게 묻지 않아도 된다 — 물으면 정정마다 한 칸이 늘고, 그 칸은 결국 비워진다.
+    """
+    stale = [
+        p.item_id
+        for p in grounding_of(conn, superseded["id"])
+        if p.item_id in _stale_ids(conn, superseded["id"])
+    ]
+    if not stale:
+        return "근거가 바뀌어 답변을 고쳤습니다"
+    return "근거가 낡아 답변을 고쳤습니다 (" + ", ".join(stale) + ")"
+
+
+def _stale_ids(conn: sqlite3.Connection, record_id: str) -> set[str]:
+    """그 기록에 대해 열려 있는 정정 소견이 가리키는 지식 항목."""
+    rows = conn.execute(
+        "SELECT detail FROM lint_finding "
+        "WHERE subject = ? AND kind = 'stale_answer' AND state = 'open'",
+        (record_id,),
+    ).fetchall()
+    return {i for r in rows for i in json.loads(r["detail"] or "[]")}
 
 
 # --- "확인 중" (FR-26) --------------------------------------------------------

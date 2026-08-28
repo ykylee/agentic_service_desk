@@ -55,6 +55,10 @@ class PendingDraft:
     agent_outcome: str | None
     agent_reason: str | None
     agent_detail: str
+    corrects: str | None = None
+    """정정 대상 `answer_record.id` (PO-1). **후속에 대한 새 답변과 정정은 다르다** —
+    전자는 글을 하나 더 올리고 후자는 있는 글을 고친다."""
+
     gate_signals: tuple[str, ...] = ()
     """게재 판정이 잡은 위험 신호 (§5.5.4). **왜 사람에게 왔는가**다 — 에이전트 검수
     반려와는 다른 종류의 이유이므로 따로 든다."""
@@ -103,6 +107,7 @@ def save(
     verdict: Verdict | None = None,
     qna_item_id: str | None = None,
     generated_by: str = "",
+    corrects: str | None = None,
 ) -> str:
     """초안을 검수 대기열에 올린다.
 
@@ -114,8 +119,9 @@ def save(
     conn.execute(
         "INSERT INTO answer_draft "
         "(id, qna_item_id, question, statements, grounding, unanswered, "
-        " agent_outcome, agent_reason, agent_detail, generated_by, state, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " agent_outcome, agent_reason, agent_detail, generated_by, corrects, "
+        " state, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             draft_id,
             qna_item_id,
@@ -137,6 +143,7 @@ def save(
             str(verdict.reason) if verdict and verdict.reason else None,
             verdict.detail if verdict else "",
             generated_by,
+            corrects,
             PENDING,
             datetime.now(UTC).isoformat(),
         ),
@@ -258,6 +265,7 @@ def _from_row(row: sqlite3.Row) -> PendingDraft:
         agent_outcome=row["agent_outcome"],
         agent_reason=row["agent_reason"],
         agent_detail=row["agent_detail"] or "",
+        corrects=row["corrects"],
         gate_signals=tuple(json.loads(row["gate_signals"] or "[]")),
         generated_by=row["generated_by"] or "",
         state=row["state"],

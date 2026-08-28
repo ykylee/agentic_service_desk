@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주. S3(4.5) 진행 중, 40 leaf 중 27 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주. S3(4.5) 진행 중, 40 leaf 중 27 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주. S3(4.5) 진행 중, 40 leaf 중 28 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — WBS-4.2(S0)·4.3(S1)·4.4(S2) 완주. S3(4.5) 진행 중, 40 leaf 중 28 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
       "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B",
       "TASK-2026-08-28-main-036 — WBS-4.5.5 게재 판정",
       "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행",
       "TASK-2026-08-28-main-031 — WBS-4.5.1 게재",
       "TASK-2026-08-28-main-030 — WBS-4.4.5 대시보드 확장 (Q2 답변 검수)",
-      "TASK-2026-08-28-main-029 — WBS-4.4.4 검수",
-      "TASK-2026-08-28-main-028 — WBS-4.4.3 불확실성 표시"
+      "TASK-2026-08-28-main-029 — WBS-4.4.4 검수"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 38,
+    "task_count": 39,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -91,7 +91,8 @@
       "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적",
       "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로",
       "TASK-2026-08-28-main-036 — WBS-4.5.5 게재 판정",
-      "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B"
+      "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B",
+      "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정"
     ]
   },
   "next_documents": [

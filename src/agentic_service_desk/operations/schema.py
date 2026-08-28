@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS answer_record (
     -- in_flight : 내보내려 했고 결과를 모른다. **사람이 봐야 한다**
     -- published : 나갔고 모 시스템 id 를 받았다
     -- abandoned : 나가지 않은 것으로 사람이 확인했다. 그 초안은 다시 시도할 수 있다
+    -- corrected : 정정되어 뒤 기록에 자리를 넘겼다 (PO-1). **지우지 않는다** —
+    --             그때 무엇에 기대어 답했는지가 정정으로 사라지면 D20 이 무의미해진다
     state             TEXT NOT NULL DEFAULT 'in_flight',
     attempted_at      TEXT,            -- 내보내려 한 시각. 게재 시각보다 **먼저** 적힌다
     published_at      TEXT,
@@ -139,6 +141,9 @@ CREATE TABLE IF NOT EXISTS answer_draft (
     agent_outcome TEXT,           -- passed | rejected. 에이전트 검수 결과
     agent_reason TEXT,            -- P1~P5
     agent_detail TEXT,
+    corrects     TEXT,            -- 정정 대상 `answer_record.id` (PO-1, FR-35).
+                                  -- 있으면 **새로 올리지 않고 그 답변을 고친다** —
+                                  -- 후속에 대한 새 답변과 정정은 다른 행위다
     gate_signals TEXT,            -- 게재 판정이 잡은 위험 신호 JSON (§5.5.4, FR-25).
                                   -- **왜 사람에게 왔는지**를 화면이 말해 주려면 필요하다 —
                                   -- 없으면 검수자가 매번 처음부터 훑는다 (§8.6.3)

@@ -30,6 +30,8 @@ from agentic_service_desk.ingest.run import IngestRun
 from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
 from agentic_service_desk.knowledge.lint import Lint
 from agentic_service_desk.knowledge.search import Search, rebuild_embedding_index
+from agentic_service_desk.pipeline import correction as correction_domain
+from agentic_service_desk.pipeline import draft_store
 from agentic_service_desk.pipeline.answer import AnswerPipeline
 from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
@@ -90,6 +92,7 @@ class BatchRunner:
         self._draft_resolutions()
         self._ingest()
         self._lint()
+        self._correct()
         self._reindex()
 
     def _sync_source(self) -> None:
@@ -472,6 +475,61 @@ class BatchRunner:
             print(f"[worker] {note}")
 
 
+    def _correct(self) -> None:
+        """stale 을 게재물까지 밀어내고, 만들 수 있는 정정 초안을 만든다
+        (WBS-4.5.7, FR-34·35).
+
+        **Lint 다음에 돈다.** stale 표시를 붙이는 것이 Lint 이므로 순서가 뒤집히면
+        오늘 낡은 것이 하루 늦게 드러난다 — 그동안 틀린 내용이 계속 노출된다 (§8.2).
+
+        **초안까지 배치가 만든다.** 사람이 누르기를 기다리면 그 대기 자체가 노출
+        시간이고, 초안을 만들어도 나가지는 않는다 — 게재 판정과 Q2 가 그대로 걸린다.
+        무시를 누르면 소견이 닫혀 더 만들지 않으므로 비용도 거기서 멈춘다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = correction_domain.propagate(conn, repo)
+            drafted = self._draft_corrections(conn, repo)
+        except KnowledgeRepoError as exc:
+            print(f"[worker] 정정 전파 실패: {exc}")
+            return
+        finally:
+            conn.close()
+
+        if report.opened:
+            print(
+                f"[worker] 정정 후보 {len(report.opened)}건을 Q5 로 올렸다 — "
+                f"**틀린 내용이 지금 노출되고 있다** (§8.2)"
+            )
+        if drafted:
+            print(f"[worker] 정정 초안 {drafted}건 — 게재 판정과 검수를 그대로 지난다")
+
+    def _draft_corrections(self, conn, repo) -> int:  # noqa: ANN001
+        """근거가 따라잡은 건만 다시 만든다.
+
+        파이프라인이 없으면 아무것도 만들지 않는다 — 그때 Q5 는 그대로 남아 사람이
+        본다. **소견이 닫히지 않는 것이 요점이다**: 못 만든 것과 고친 것은 다르다.
+        """
+        pipeline = self._answer_pipeline(conn)
+        if pipeline is None:
+            return 0
+        count = 0
+        for candidate in correction_domain.ready(conn, repo):
+            if _has_pending_correction(conn, candidate.record_id):
+                continue
+            if correction_domain.draft_correction(
+                conn, candidate, pipeline=pipeline, reviewer=self._reviewer()
+            ):
+                count += 1
+        return count
+
     def _reindex(self) -> None:
         """임베딩 인덱스를 다시 만든다 (WBS-4.4.1, ADR-004).
 
@@ -512,6 +570,21 @@ class BatchRunner:
             conn.close()
         if indexed:
             print(f"[worker] 임베딩 인덱스 {indexed}건 재생성")
+
+
+def _has_pending_correction(conn, record_id: str) -> bool:  # noqa: ANN001
+    """이미 정정 초안이 대기 중인가.
+
+    없으면 사람이 Q2 를 처리할 때까지 **매 주기 같은 정정 초안이 쌓인다** — 후속
+    재실행(WBS-4.5.4)이 같은 이유로 막아 둔 것과 같은 함정이다.
+    """
+    return (
+        conn.execute(
+            "SELECT 1 FROM answer_draft WHERE corrects = ? AND state = ? LIMIT 1",
+            (record_id, draft_store.PENDING),
+        ).fetchone()
+        is not None
+    )
 
 
 def _lint_notes(report) -> list[str]:  # noqa: ANN001

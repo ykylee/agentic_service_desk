@@ -28,7 +28,7 @@ from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.pipeline import draft_store, review as review_domain
-from agentic_service_desk.pipeline import publication
+from agentic_service_desk.pipeline import correction, publication
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking
@@ -87,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Q1": len(board.tickets()),
                 "Q2": len(draft_store.pending(conn)),
                 "Q4": status.open_contradictions,
+                "Q5": len(correction.pending(conn)),
                 "Q6": len(tracking.awaiting_confirmation(conn)),
                 "Q7": len(promotion_domain.awaiting_decision(conn)),
                 "Q8": len(board.knowledge_gaps()),
@@ -357,6 +358,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             conn.close()
         return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
 
+    @app.get("/queues/Q5")
+    def q5(request: Request):  # noqa: ANN201
+        """정정 후보 — **작업 화면이다** (§6.4.4).
+
+        조사와 수정이 필요한 일이므로 목록과 버튼만으로 끝나지 않는다. 다만 정정
+        자체는 배치가 초안까지 만들어 두므로, 여기서 사람이 하는 판단은 **"무시할
+        것인가"** 하나다.
+        """
+        board, conn = dashboard()
+        try:
+            repo = KnowledgeRepository(cfg.knowledge_dir)
+            rows = correction.pending(conn)
+            ready = {c.record_id for c in correction.ready(conn, repo)}
+            drafting = _correcting(conn)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request,
+            "q5.html",
+            shell() | {"rows": rows, "ready": ready, "drafting": drafting},
+        )
+
+    @app.post("/queues/Q5/{record_id}/ignore")
+    def q5_ignore(record_id: str):  # noqa: ANN201
+        """근거는 낡았지만 답변은 여전히 맞다 (§8.2 의 "무시")."""
+        board, conn = dashboard()
+        try:
+            correction.ignore(conn, record_id)
+        finally:
+            conn.close()
+        return RedirectResponse("/queues/Q5", status_code=303)
+
     @app.get("/queues/Q6")
     def q6(request: Request):  # noqa: ANN201
         """암묵적 해결 확인 — **판정 화면이다** (§6.4.4).
@@ -501,6 +534,20 @@ def _chosen_invalidation(  # noqa: ANN001
     if not period_days.strip().isdigit() or int(period_days) <= 0:
         raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
     return Invalidation(kind=parsed, period_days=int(period_days))
+
+
+def _correcting(conn) -> set[str]:  # noqa: ANN001
+    """정정 초안이 이미 검수를 기다리는 답변들.
+
+    화면이 이것을 밝히지 않으면 **사람이 이미 처리 중인 건을 또 보게 된다** —
+    Q5 는 방치 비용이 높은 대기열이라 그 낭비가 곧 다른 건의 지연이다.
+    """
+    rows = conn.execute(
+        "SELECT DISTINCT corrects FROM answer_draft "
+        "WHERE corrects IS NOT NULL AND state = ?",
+        (draft_store.PENDING,),
+    ).fetchall()
+    return {r["corrects"] for r in rows}
 
 
 def _publish(cfg, conn, parent_system, draft_id: str) -> str:  # noqa: ANN001

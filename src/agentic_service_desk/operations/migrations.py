@@ -90,6 +90,11 @@ MIGRATIONS: tuple[Migration, ...] = (
             "ALTER TABLE ticket_resolution ADD COLUMN promotion_declined_at TEXT",
         ),
     ),
+    Migration(
+        version=5,
+        name="answer_draft.corrects — 정정 대상 (WBS-4.5.7, PO-1)",
+        statements=("ALTER TABLE answer_draft ADD COLUMN corrects TEXT",),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

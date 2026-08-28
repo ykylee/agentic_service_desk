@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Q5 정정 후보{% endblock %}
+{% block body %}
+<h1>Q5 — 정정 후보</h1>
+<p class="dim small">
+  근거가 낡은 채로 <strong>나가 있는</strong> 답변이다. Q6·Q7·Q8 과 달리
+  <strong>틀린 내용이 지금 이 순간 노출되고 있다</strong> — 방치 비용이 높다 (§8.2).
+  <br>정정은 조용히 하지 않는다: <strong>원 답변을 고치고 정정 사실을 본문에 남긴다</strong>
+  (PO-1). 무엇이 왜 바뀌었는지는 근거 버전 고정(D20) 덕에 기계가 채운다.
+</p>
+
+{% if not rows %}
+<p class="ok">정정을 기다리는 게재 답변이 없다.</p>
+{% endif %}
+
+{% for c in rows %}
+<h2>{{ c.question or c.record_id }}</h2>
+<p class="dim small">
+  <code>{{ c.record_id }}</code> · <span class="warn">{{ c.reason }}</span>
+  {% if c.record_id in ready %}
+  <br><span class="ok">근거가 갱신됐다 — 다시 만들 수 있다.</span>
+  {% else %}
+  <br>근거가 <strong>아직 낡아 있다.</strong> 지금 다시 돌리면 같은 답이 나오므로,
+  ingest 가 바뀐 커밋을 읽어 항목을 갱신할 때까지 기다린다 — <strong>지식이 먼저
+  따라잡아야 한다.</strong>
+  {% endif %}
+  {% if c.record_id in drafting %}
+  <br><span class="ok">정정 초안이 Q2 에서 검수를 기다린다 — 정정도 게재이므로 검수를 건너뛰지 않는다.</span>
+  {% endif %}
+</p>
+<div>{{ c.body }}</div>
+<form method="post" action="/queues/Q5/{{ c.record_id }}/ignore">
+  <p><button type="submit">무시한다 — 답변은 여전히 맞다</button>
+    <span class="dim small">항목이 낡은 것과 그것으로 만든 답이 틀린 것은 다르다.
+    무시가 잦으면 stale 판정이 과하다는 신호다.</span></p>
+</form>
+<hr>
+{% endfor %}
+{% endblock %}
