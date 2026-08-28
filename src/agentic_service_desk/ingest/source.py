@@ -155,6 +155,20 @@ class SourceMirror:
         raw = self._git("ls-tree", "-r", "--name-only", "HEAD")
         return [line for line in raw.splitlines() if line]
 
+    def has_commit(self, sha: str) -> bool:
+        """이 커밋이 저장소에 실재하는가 (ADR-002 결정 4 — 참조 부재 검사).
+
+        출처가 가리키는 커밋이 사라지면 **그 지식이 무엇에 근거했는지 알 수 없게
+        된다.** 강제 푸시나 히스토리 재작성으로 실제로 일어난다.
+        """
+        if not sha:
+            return False
+        try:
+            self._git("cat-file", "-e", f"{sha}^{{commit}}")
+        except RuntimeError:
+            return False
+        return True
+
     def read_file(self, path: str, at: str = "HEAD") -> str:
         """파일 내용. bare 클론이라 작업 트리가 아니라 객체에서 읽는다."""
         return self._git("show", f"{at}:{path}")

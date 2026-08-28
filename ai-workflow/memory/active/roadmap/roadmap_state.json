@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.225,
+      "progress": 0.25,
       "total_leaves": 40,
-      "done_leaves": 9,
+      "done_leaves": 10,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -161,7 +161,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 7,
-          "done_leaves": 5,
+          "done_leaves": 6,
           "children": [
             {
               "id": "WBS-4.2.1",
@@ -221,10 +221,12 @@
             {
               "id": "WBS-4.2.6",
               "title": "Lint",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-28-main-019"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

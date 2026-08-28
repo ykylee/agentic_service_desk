@@ -265,6 +265,23 @@ class KnowledgeRepository:
             at.unlink()
         return target
 
+    def last_commit_date(self, path: Path) -> str | None:
+        """이 파일이 마지막으로 커밋된 시각 (ISO).
+
+        **주기형 무효화 조건의 기준점이다** (§6.5.3). 항목에 "마지막으로 확인한 날"
+        필드를 따로 두지 않는 이유는, 지식이 git 위에 살기 때문에 그 답을 이미
+        저장소가 알고 있어서다 — 필드를 더하면 두 곳이 어긋날 자리가 생긴다.
+        """
+        rel = path.resolve().relative_to(self._root).as_posix()
+        try:
+            out = self._git("log", "-1", "--format=%aI", "--", rel).strip()
+        except KnowledgeRepoError:
+            # 아직 커밋이 하나도 없는 저장소다 — `git log` 가 실패한다. 방금 만들어진
+            # 지식베이스에서 실제로 일어나며, 여기서 터지면 **Lint 가 첫 주기에
+            # 통째로 죽는다.** 기준점이 없는 것이지 잘못된 것이 아니다.
+            return None
+        return out or None
+
     # --- 로그 ------------------------------------------------------------
 
     def append_log(self, line: str) -> None:

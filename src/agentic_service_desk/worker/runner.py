@@ -25,6 +25,7 @@ from agentic_service_desk.ingest.output_filter import (
 from agentic_service_desk.ingest.qna import QnaCollector
 from agentic_service_desk.ingest.run import IngestRun
 from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
+from agentic_service_desk.knowledge.lint import Lint
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
 from agentic_service_desk.operations.schema import connect, initialize
@@ -71,6 +72,7 @@ class BatchRunner:
         self._sync_source()
         self._sync_qna()
         self._ingest()
+        self._lint()
 
     def _sync_source(self) -> None:
         """소스 저장소를 갱신하고 **무엇이 바뀌었는지**만 알아 둔다 (WBS-4.2.1).
@@ -180,6 +182,56 @@ class BatchRunner:
 
         for note in _ingest_notes(result):
             print(f"[worker] {note}")
+
+
+    def _lint(self) -> None:
+        """지식베이스 정합성을 훑는다 (WBS-4.2.6, FR-7).
+
+        **ingest 뒤에 돈다.** 방금 만든 항목까지 포함해 보아야 하고, stale 표시가
+        같은 주기 안에서 최신 상태를 반영한다.
+
+        LLM 을 쓰지 않으므로 `_ingest` 와 달리 **모델 설정이 없어도 돈다** — 지식이
+        이미 쌓여 있는 환경에서 검사만 돌리는 경우가 있다.
+        """
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+        mirror = (
+            SourceMirror(self._cfg.parent_repo_url, self._cfg.source_mirror_dir)
+            if self._cfg.parent_repo_url
+            else None
+        )
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        except (KnowledgeRepoError, RuntimeError) as exc:
+            print(f"[worker] lint 실패: {exc}")
+            return
+        finally:
+            conn.close()
+
+        for note in _lint_notes(report):
+            print(f"[worker] {note}")
+
+
+def _lint_notes(report) -> list[str]:  # noqa: ANN001
+    """무엇을 알릴 것인가. **깨끗하면 조용하다** — 매 주기 '이상 없음'을 찍으면
+    실제 소견이 그 사이에 묻힌다."""
+    notes = []
+    if report.marked_stale:
+        notes.append(
+            f"stale {len(report.marked_stale)}건을 표시했다 — 삭제하지 않는다 (FR-8)"
+        )
+    if report.newly_opened:
+        notes.append(f"lint 소견 {report.newly_opened}건을 Q5 로 올렸다")
+    if report.open_contradictions:
+        notes.append(f"미해결 모순 {report.open_contradictions}건 (Q4)")
+    if report.broken_files:
+        notes.append(f"읽을 수 없는 지식 파일 {len(report.broken_files)}개")
+    if report.indexed:
+        notes.append(f"번들 목록에 {report.indexed}건을 새로 등재했다")
+    return notes
 
 
 def _ingest_notes(result) -> list[str]:  # noqa: ANN001

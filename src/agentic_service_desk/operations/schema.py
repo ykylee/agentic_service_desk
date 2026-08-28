@@ -169,6 +169,21 @@ CREATE TABLE IF NOT EXISTS contradiction (
     resolved_at       TEXT
 );
 
+-- Lint 소견 (FR-7).
+-- **주기 실행이라 같은 소견이 매번 나온다.** 열쇠(kind + 대상)로 한 번만 열고,
+-- 사람이 닫기 전까지 다시 열지 않는다 — 그러지 않으면 대기열이 같은 항목으로
+-- 메워져 우선순위를 매길 수 없게 된다 (§8.6).
+CREATE TABLE IF NOT EXISTS lint_finding (
+    key        TEXT PRIMARY KEY,  -- kind + 대상. 같은 소견을 다시 열지 않기 위한 열쇠
+    kind       TEXT NOT NULL,     -- stale | broken_link | missing_reference
+    subject    TEXT NOT NULL,     -- 지식 항목 id 또는 답변 이력 id
+    detail     TEXT NOT NULL,
+    ticket_id  TEXT,              -- Q5 대기열의 자리 (source=correction)
+    first_seen TEXT NOT NULL,
+    state      TEXT NOT NULL,     -- open | resolved
+    resolved_at TEXT
+);
+
 -- 이미 ingest 한 답변 (FR-5 증분).
 -- **커서가 아니라 목록인 이유가 있다.** 답변은 만들어진 지 한참 뒤에 ingest 자격을
 -- 얻을 수 있다 — 이용자가 나중에 해결 표시를 누르면 그렇게 된다(§5.3.2). 시각
