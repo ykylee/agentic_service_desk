@@ -43,21 +43,21 @@
       "title": "요구사항 정리",
       "sdlc_phase": "requirements",
       "declared_status": "done",
-      "derived_status": "done",
-      "progress": 1.0,
+      "derived_status": "in_progress",
+      "progress": 0.0,
       "total_leaves": 1,
-      "done_leaves": 1,
+      "done_leaves": 0,
       "deliverables_missing": [],
       "wbs": [
         {
           "id": "WBS-2.1",
           "title": "요구사항 문서 작성",
-          "derived_status": "done",
+          "derived_status": "in_progress",
           "linked_task_ids": [
             "TASK-2026-08-28-main-002"
           ],
           "total_leaves": 1,
-          "done_leaves": 1,
+          "done_leaves": 0,
           "children": []
         }
       ]
@@ -119,5 +119,16 @@
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-001.md"
     }
   ],
-  "issues": []
+  "issues": [
+    {
+      "code": "declared_derived_mismatch",
+      "detail": "M-002: 선언 done ≠ 파생 in_progress (done 경계)",
+      "where": "M-002-requirements.md"
+    },
+    {
+      "code": "done_milestone_open_task",
+      "detail": "M-002: done 선언 아래 열린 task ['TASK-2026-08-28-main-002']",
+      "where": "M-002-requirements.md"
+    }
+  ]
 }
