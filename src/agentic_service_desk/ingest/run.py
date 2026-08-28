@@ -110,13 +110,21 @@ class IngestRun:
         head = self._ingest_source(result, by_id, index)
         answer_ids = self._ingest_qna(result, by_id, index)
 
-        if not result.changed:
-            return result
-
-        self._repo.append_log(f"{result.summary()} — {self._origin_note(head, answer_ids)}")
-        result.commit = self._repo.commit(f"ingest: {result.summary()}")
+        if result.changed:
+            self._repo.append_log(
+                f"{result.summary()} — {self._origin_note(head, answer_ids)}"
+            )
+            result.commit = self._repo.commit(f"ingest: {result.summary()}")
 
         # **여기서부터가 진행 표시다.** 커밋이 끝난 뒤에만 옮긴다.
+        #
+        # 지식이 하나도 안 바뀌었어도 옮긴다. **읽은 것과 지식이 된 것은 다르다** —
+        # 원천에 뽑을 개념이 없다는 판단도 처리 결과이고, 그것을 처리로 세지 않으면
+        # 같은 원천을 매 주기 LLM 에 다시 태운다. 실제로 그런 원천이 있다
+        # (내용 없는 봇 답변 등).
+        #
+        # 옮기지 않는 경우는 **실패했을 때뿐이다.** `head` 는 소스 단계가 무사히
+        # 끝났을 때만 오고, 답변 id 는 그 호출이 성공했을 때만 담긴다.
         if head:
             set_cursor(self._conn, SOURCE, head)
         self._mark_ingested(answer_ids, result.commit)
@@ -130,9 +138,16 @@ class IngestRun:
         by_id: dict[str, StoredItem],
         index: list[tuple[str, str]],
     ) -> str | None:
-        """소스 저장소의 변경분을 읽는다. 돌려주는 것은 **이번에 읽은 HEAD** 다."""
+        """소스 저장소의 변경분을 읽는다.
+
+        돌려주는 것은 **이번 구간을 무사히 읽었을 때의 HEAD** 다. 한 묶음이라도
+        실패하면 `None` 을 돌려준다 — 그래야 커서가 그 자리에 남고 다음 주기가
+        같은 구간을 다시 읽는다. 옮겨 버리면 **그 구간의 개념이 영영 지식이 되지
+        않는데 아무도 알아채지 못한다.**
+        """
         if self._mirror is None or not self._mirror.is_cloned:
             return None
+        failures_before = len(result.failures)
 
         cursor = get_cursor(self._conn, SOURCE)
         head = self._mirror.head()
@@ -158,6 +173,7 @@ class IngestRun:
         result.dropped_config_paths.extend(dropped)
         if not material.files and not material.messages:
             return head
+        # 읽을 것이 남아 있으면 아래에서 묶음마다 돈다.
 
         for chunk in _chunks(material, self._max_chars):
             try:
@@ -173,7 +189,7 @@ class IngestRun:
                     index,
                     result,
                 )
-        return head
+        return None if len(result.failures) > failures_before else head
 
     # --- QnA 원천 --------------------------------------------------------
 

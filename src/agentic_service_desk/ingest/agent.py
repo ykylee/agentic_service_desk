@@ -179,24 +179,42 @@ def build_qna_prompt(material: QnaMaterial, index: list[tuple[str, str]]) -> str
 _FENCE = re.compile(r"```(?:json)?\s*(.+?)```", re.DOTALL)
 
 
-def extract_json(text: str) -> dict:
-    """응답에서 JSON 을 꺼낸다.
+def _snippet(text: str, limit: int = 300) -> str:
+    """실패 메시지에 응답 앞부분을 싣는다.
 
-    모델은 지시해도 앞뒤에 말을 붙인다. 코드 울타리를 먼저 보고, 없으면 **중괄호
-    균형을 세어** 가장 바깥 객체를 찾는다. 정규식으로 `{.*}` 를 잡으면 본문 안의
-    중괄호에서 끊긴다.
+    무엇이 왔는지 없이 "형식을 어겼다"만 남기면 **로그를 봐도 고칠 수가 없다.**
+    모델 출력은 비결정적이라 재현이 어려우므로, 터진 그 자리에서 증거를 남긴다.
     """
-    fenced = _FENCE.search(text)
-    candidate = fenced.group(1).strip() if fenced else _outermost_object(text)
+    flat = " ".join(text.split())
+    return flat[:limit] + ("…" if len(flat) > limit else "")
+
+
+def extract_json(text: str) -> dict:
+    """응답에서 JSON 객체를 꺼낸다.
+
+    모델은 지시해도 앞뒤에 말을 붙이고, 코드 울타리를 여러 개 쓰기도 한다. 그래서
+    **울타리를 전부 훑어 처음 읽히는 객체**를 쓰고, 하나도 없으면 중괄호 균형을
+    세어 가장 바깥 객체를 찾는다. 정규식으로 `{.*}` 를 잡으면 본문 안의 중괄호에서
+    끊기므로 쓰지 않는다.
+    """
+    for match in _FENCE.finditer(text):
+        payload = _try_object(match.group(1).strip())
+        if payload is not None:
+            return payload
+    payload = _try_object(_outermost_object(text))
+    if payload is not None:
+        return payload
+    raise AgentOutputError(f"응답에서 JSON 객체를 찾지 못했다 — 받은 것: {_snippet(text)}")
+
+
+def _try_object(candidate: str) -> dict | None:
     if not candidate:
-        raise AgentOutputError("응답에서 JSON 을 찾지 못했다")
+        return None
     try:
         payload = json.loads(candidate)
-    except json.JSONDecodeError as exc:
-        raise AgentOutputError(f"JSON 을 읽을 수 없다: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise AgentOutputError("최상위가 객체가 아니다")
-    return payload
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _outermost_object(text: str) -> str:
@@ -228,11 +246,27 @@ def _outermost_object(text: str) -> str:
 
 
 def parse_proposals(text: str) -> list[ProposedItem]:
-    """응답을 제안 목록으로 바꾼다. **제목이나 본문이 비면 버린다.**"""
+    """응답을 제안 목록으로 바꾼다. **제목이나 본문이 비면 버린다.**
+
+    형식의 **빗나감과 어김을 가른다.** 모델이 "만들 것이 없다"를 `[]` 대신 `null` 로
+    쓰거나 항목 하나를 배열로 감싸지 않는 것은 빗나감이다 — 뜻이 분명하므로 읽어
+    준다. `items` 키 자체가 없는 것은 어김이라 실패로 올린다: 그때는 모델이 다른
+    것을 답한 것이고, 조용히 "만들 것 없음"으로 넘기면 **원천 하나가 소리 없이
+    지식이 되지 못한 채 처리 완료로 표시된다.**
+    """
     payload = extract_json(text)
-    raw_items = payload.get("items")
+    if "items" not in payload:
+        raise AgentOutputError(f"`items` 가 없다 — 받은 것: {_snippet(text)}")
+
+    raw_items = payload["items"]
+    if raw_items is None:
+        raw_items = []
+    elif isinstance(raw_items, dict):
+        raw_items = [raw_items]
     if not isinstance(raw_items, list):
-        raise AgentOutputError("`items` 가 목록이 아니다")
+        raise AgentOutputError(
+            f"`items` 가 목록이 아니다 ({type(raw_items).__name__}) — 받은 것: {_snippet(text)}"
+        )
 
     proposals: list[ProposedItem] = []
     for raw in raw_items:

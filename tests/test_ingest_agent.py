@@ -84,6 +84,30 @@ class TestParsing:
         with pytest.raises(AgentOutputError):
             parse_proposals("만들 것이 없습니다.")
 
+    def test_울타리가_여럿이면_읽히는_것을_고른다(self) -> None:
+        # 실제 모델이 설명용 블록을 먼저 내놓는 일이 있다.
+        text = '```\n설명입니다\n```\n```json\n{"items": []}\n```'
+        assert parse_proposals(text) == []
+
+    def test_실패_메시지가_받은_것을_싣는다(self) -> None:
+        # 없으면 로그를 봐도 고칠 수가 없다 — 모델 출력은 재현이 어렵다.
+        with pytest.raises(AgentOutputError, match="이상한 응답"):
+            parse_proposals("이상한 응답이 왔다")
+
+    def test_items_가_null_이면_만들_것이_없는_것이다(self) -> None:
+        # 형식의 빗나감이다 — 뜻이 분명하므로 읽어 준다.
+        assert parse_proposals('{"items": null}') == []
+
+    def test_항목_하나를_배열로_안_감싸도_읽는다(self) -> None:
+        text = '{"items": {"title": "가", "body": "나"}}'
+        assert len(parse_proposals(text)) == 1
+
+    def test_items_키가_아예_없으면_실패한다(self) -> None:
+        # 형식의 어김이다. 조용히 "만들 것 없음"으로 넘기면 원천 하나가 소리 없이
+        # 지식이 되지 못한 채 처리 완료로 표시된다.
+        with pytest.raises(AgentOutputError, match="`items` 가 없다"):
+            parse_proposals('{"result": "ok"}')
+
     def test_제목이나_본문이_비면_버린다(self) -> None:
         text = '{"items": [{"title": "", "body": "본문"}, {"title": "가", "body": ""}]}'
         assert parse_proposals(text) == []

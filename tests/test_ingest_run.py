@@ -135,6 +135,44 @@ class TestFilterIsTheOnlyDoor:
         assert not result.changed
 
 
+class TestProgressIsMarkedEvenWhenNothingIsLearned:
+    """**읽은 것과 지식이 된 것은 다르다.**
+
+    라이브 실행에서 잡힌 것이다 — 내용 없는 봇 답변("설정을 확인해 보세요")에서
+    모델이 개념을 뽑지 않았고, 그러자 그 답변이 **매 주기 LLM 에 다시 실렸다.**
+    """
+
+    def test_제안이_없어도_같은_답변을_다시_읽지_않는다(self, tmp_path) -> None:
+        conn = _collected(tmp_path)
+        first = FakeHarness('{"items": []}', '{"items": []}')
+        result = _run(tmp_path, first, conn=conn).run()
+        assert not result.changed
+        assert len(first.prompts) == 2
+
+        second = FakeHarness()
+        _run(tmp_path, second, conn=conn).run()
+        assert second.prompts == []
+
+    def test_뽑을_개념이_없어도_소스_커서는_옮겨진다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirror = TestSourceIngest()._mirror(tmp_path)
+        result = _run(tmp_path, FakeHarness('{"items": []}'), mirror=mirror, conn=conn).run()
+
+        assert not result.changed
+        assert get_cursor(conn, SOURCE) == mirror.head()
+
+    def test_실패한_답변은_다시_읽는다(self, tmp_path) -> None:
+        # 진행 표시는 성공한 호출에만 붙는다.
+        conn = _collected(tmp_path)
+        first = FakeHarness("JSON 이 아니다", '{"items": []}')
+        result = _run(tmp_path, first, conn=conn).run()
+        assert len(result.failures) == 1
+
+        second = FakeHarness()
+        _run(tmp_path, second, conn=conn).run()
+        assert len(second.prompts) == 1  # 실패한 하나만 다시 온다
+
+
 class TestHumanEditsAreNotOverwritten:
     """D38 — 에이전트는 사람이 고친 것을 덮어쓰지 않는다."""
 
