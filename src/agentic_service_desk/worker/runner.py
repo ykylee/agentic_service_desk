@@ -573,7 +573,10 @@ class BatchRunner:
             for ctype in types.all():
                 try:
                     result = producer.run(ctype, source_commit=commit)
-                except content_production.UnsupportedInput as exc:
+                except (
+                    content_production.UnsupportedInput,
+                    content_production.UnknownThreshold,
+                ) as exc:
                     # **조용히 건너뛰지 않는다.** 침묵은 "만들 것이 없다"와
                     # 구분되지 않아, 선언은 있는데 아무것도 안 나오는 타입이 생긴다.
                     print(f"[worker] 콘텐츠 건너뜀 — {exc}")
@@ -695,8 +698,26 @@ def _report_content(ctype, result) -> None:  # noqa: ANN001
             f"[worker] {ctype.title} 초안을 Q3 에 올렸다 — {result.detail}. "
             "**콘텐츠는 국면과 무관하게 전수 사람 승인이다** (FR-39)"
         )
+    else:
+        print(f"[worker] {ctype.title} — {result.outcome}: {result.detail}")
+    _report_knowledge_gaps(ctype, result)
+
+
+def _report_knowledge_gaps(ctype, result) -> None:  # noqa: ANN001
+    """반복되는데 지식베이스가 답을 모르는 질문 (WBS-4.7.1, §6.2).
+
+    **초안을 만들었을 때도 말한다.** FAQ 가 나갔다는 사실은 빠진 문항을 가리지
+    못한다 — 자주 묻는데 답이 없는 자리가 곧 ingest 우선순위이고, 그것을 아는 유일한
+    시점이 여기다.
+    """
+    if not result.uncovered:
         return
-    print(f"[worker] {ctype.title} — {result.outcome}: {result.detail}")
+    print(
+        f"[worker] {ctype.title} — 반복 질문 {len(result.uncovered)}건은 지식베이스가 "
+        "답을 몰라 뺐다. **지식 공백이다** — 지어내지 않고 ingest 우선순위로 되먹인다:"
+    )
+    for question in result.uncovered[:5]:
+        print(f"[worker]   · {question[:60]}")
 
 
 def _lint_notes(report) -> list[str]:  # noqa: ANN001

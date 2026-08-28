@@ -1,4 +1,4 @@
-"""콘텐츠 제작 — 지식베이스에서 살아있는 문서를 만들고 갱신한다 (WBS-4.6.2, FR-36·43).
+"""콘텐츠 제작 — 살아있는 문서를 만들고 갱신한다 (WBS-4.6.2·4.7.1, FR-36·37·43).
 
 **새 파이프라인이 아니다** (§7.1, D10). 답변과 같은 5단계를 트리거만 바꿔 탄다 —
 질문 대신 주기·임계가 부르고, 조회 대상이 질문이 아니라 **타입이 선언한 주 입력**이다.
@@ -8,13 +8,37 @@
 
 FR-42 는 새 타입 추가에 코드 변경이 없어야 한다고 한다. 그것이 성립하는 이유는
 읽개가 **셋뿐**이기 때문이다 — 지식베이스 · QnA 통계 · 둘 다. 타입이 넷에서 열이
-되어도 읽개는 늘지 않는다. 지금 있는 것은 지식베이스 읽개 하나이고, QnA 통계는
-FAQ 가 오는 WBS-4.7.1 이 붙인다.
+되어도 읽개는 늘지 않는다. 지금 있는 것은 **지식베이스와 QnA 통계 둘**이고, 나머지
+하나(`both`)는 칼럼·뉴스레터가 오는 WBS-4.7.2·4.7.3 이 붙인다.
 
 ## 가이드가 FAQ 보다 먼저인 이유 (D50)
 
 FAQ 는 QnA 통계에 종속돼 질문이 쌓여야 만들 수 있지만, **가이드는 소스코드만으로
 만들 수 있다.** 1국면에 실제로 낼 수 있는 콘텐츠가 이것 하나다.
+
+## FAQ — 무엇을 다룰지와 무엇에 기대어 쓸지는 다른 물음이다 (WBS-4.7.1, FR-37)
+
+가이드는 그 둘이 한 원천이다. 지식베이스를 훑어 **거기 있는 것을** 쓴다.
+FAQ 는 갈린다.
+
+| | 무엇을 다루는가 | 무엇에 기대어 쓰는가 |
+|---|---|---|
+| 가이드 | 지식베이스 | 지식베이스 |
+| **FAQ** | **반복 질문 분포** (§7.2) | **지식베이스** |
+
+주 입력이 정하는 것은 앞 칸이다. 뒤 칸은 답변 파이프라인의 2단계와 같은 일이라
+(§5.1) 여기서도 같은 검색을 쓴다 — 반복 질문 하나가 질의가 되고, 걸린 지식 항목이
+그 문답의 근거가 된다.
+
+**봇의 미검증 답변을 FAQ 본문으로 옮기지 않는 것이 이 분리의 핵심이다.** §5.3 은
+반복 질문 탐지에 봇 답변을 **포함**하라고 하는데, 그것은 "무엇이 자주 묻히는가"가
+작성자와 무관하기 때문이지 그 답을 그대로 실으라는 뜻이 아니다. 실으면 §5.3 이
+막으려던 되먹임이 ingest 보다 나쁜 자리에서 일어난다 — 지식베이스에 고이는 것이
+아니라 **이용자에게 바로 나간다.**
+
+**반복되는데 근거가 없는 질문은 빼고, 뺐다고 말한다.** 그것은 FAQ 의 실패가 아니라
+**지식 공백**이다 (§6.2) — 가장 자주 묻는데 지식베이스가 답을 모르는 자리이므로
+ingest 우선순위로 되먹여야 할 것이지, 지어내서 채울 것이 아니다 (D3, FR-18).
 
 ## 여기서 정한 것 넷
 
@@ -35,19 +59,22 @@ FAQ 는 QnA 통계에 종속돼 질문이 쌓여야 만들 수 있지만, **가�
 W3 를 흡수한다"이다. 다만 **코드 변경 임계로 도는 주기**는 다르다: 지식이 아직 그
 커밋을 읽지 않았는데 지금 돌리면 **같은 글이 나오고**, 그것을 갱신이라 부르면 고쳤다는
 기록만 남는다 — 4.5.7 이 정정에서 정한 것과 같은 순서다 (§6.6.3).
+**반복 질문 임계는 기다리지 않는다**: 그것은 지식이 뒤처졌다는 신호가 아니라 사람들이
+물었다는 신호이므로, 낡은 항목을 뺀 채로 만드는 것이 맞다.
 """
 
 from __future__ import annotations
 
 import difflib
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from agentic_service_desk.content import store
+from agentic_service_desk.content import qna_stats, store
 from agentic_service_desk.content.registry import ContentType, Input
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness, extract_json
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
+from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import ticket as ticket_domain
 
 LANGUAGE = "한국어"
@@ -89,6 +116,15 @@ class Result:
     """바뀐 줄의 비율. **근거가 조금 바뀌었는데 문서가 많이 달라졌으면 거기를 먼저
     본다** — 갱신이 고쳐 쓰기가 아니라 다시 쓰기가 된 신호다 (§7.3)."""
 
+    uncovered: tuple[str, ...] = ()
+    """반복되는데 지식베이스가 답을 모르는 질문 (FAQ 만). **FAQ 의 실패가 아니라
+    지식 공백이다** (§6.2) — 가장 자주 묻는 자리이므로 ingest 우선순위로 되먹일
+    것이지 지어내서 채울 것이 아니다."""
+
+    repeats: int = 0
+    """가장 많이 반복된 질문의 횟수 (FAQ 만). 임계가 왜 찼는지·왜 안 찼는지를
+    화면과 로그가 말할 수 있어야 한다."""
+
     @property
     def produced(self) -> bool:
         return self.outcome is store.Outcome.PRODUCED
@@ -109,16 +145,40 @@ class Trigger:
     reason: str = ""
 
 
+SOURCE_CHANGED = "source_changed"
+"""가이드의 임계 — 커서를 견주므로 값이 아니라 **커밋**으로 판정한다."""
+
+REPEAT_QUESTIONS = "repeat_questions"
+"""FAQ 의 임계 — 가장 많이 반복된 질문의 **횟수** (O37, WBS-4.7.1)."""
+
+THRESHOLD_LABEL = {SOURCE_CHANGED: "코드 변경", REPEAT_QUESTIONS: "반복 질문"}
+
+
+class UnknownThreshold(NotImplementedError):
+    """선언된 임계를 아무도 재지 않는다. **조용히 안 도는 것으로 두지 않는다.**
+
+    모르는 임계를 `False` 로 취급하면 그 타입은 주기가 올 때까지 — 주기가 없으면
+    영영 — 돌지 않는데, 그 침묵은 "아직 안 찼다"와 구분되지 않는다. 선언의 오타가
+    기능의 부재로 보이는 것이 이 고장의 성질이다.
+    """
+
+
 def evaluate_trigger(
     conn: sqlite3.Connection,
     ctype: ContentType,
     *,
     source_commit: str | None = None,
+    signals: dict[str, float] | None = None,
     now: datetime | None = None,
 ) -> Trigger:
     """주기와 임계를 본다.
 
     **첫 제작은 언제나 돈다** — 한 번도 만든 적이 없으면 기다릴 직전 판본이 없다.
+
+    임계는 둘로 갈린다. `source_changed` 는 **커서 비교**라 값이 없고, 나머지는
+    **잰 값**과 선언의 `threshold_value` 를 견준다. 재는 것은 여기가 아니라 부르는
+    쪽이다 (`signals`) — 트리거가 원천을 읽기 시작하면 "돌지 않기로 한 주기"에도
+    질의가 돈다.
     """
     run = store.last_run(conn, ctype.id)
     if run is None or run.last_generated_at is None:
@@ -132,21 +192,41 @@ def evaluate_trigger(
             last = last.replace(tzinfo=UTC)
         periodic = now - last >= timedelta(days=ctype.trigger.period_days)
 
-    threshold = False
-    if ctype.trigger.threshold == "source_changed":
-        threshold = bool(source_commit) and source_commit != run.last_commit
+    threshold = _threshold_met(ctype, run, source_commit=source_commit, signals=signals)
 
     reasons = []
     if periodic:
         reasons.append(f"주기 {ctype.trigger.period_days}일")
     if threshold:
-        reasons.append("코드 변경")
+        reasons.append(THRESHOLD_LABEL.get(ctype.trigger.threshold, ctype.trigger.threshold))
     return Trigger(
         due=periodic or threshold,
         periodic=periodic,
         threshold=threshold,
         reason=" · ".join(reasons),
     )
+
+
+def _threshold_met(
+    ctype: ContentType,
+    run: store.Run,
+    *,
+    source_commit: str | None,
+    signals: dict[str, float] | None,
+) -> bool:
+    name = ctype.trigger.threshold
+    if name is None:
+        return False
+    if name == SOURCE_CHANGED:
+        return bool(source_commit) and source_commit != run.last_commit
+    measured = (signals or {}).get(name)
+    if measured is None:
+        raise UnknownThreshold(
+            f"{ctype.id}: 임계 {name!r} 를 재는 곳이 없다 — 선언의 오타이거나 "
+            "아직 만들지 않은 신호다. 모르는 임계는 '아직 안 찼다'와 구분되지 않으므로 "
+            "조용히 넘기지 않는다"
+        )
+    return measured >= (ctype.trigger.threshold_value or 0)
 
 
 # --- 3단계 생성 ---------------------------------------------------------------
@@ -165,6 +245,7 @@ _RULES = """당신은 사내 시스템의 **{kind}**을 쓴다. 제목은 "{titl
 이것은 **가치 판단이 아니라 설명**이다. "이 방식이 더 낫습니다", "앞으로는 ~하십시오"
 같은 문장을 쓰지 않는다 — 이 시스템은 조직의 입장을 대신 말할 수 없다.
 
+{type_rules}
 {update_rules}
 
 출력은 **JSON 하나만** 낸다. 설명이나 사고 과정을 붙이지 않는다.
@@ -174,6 +255,18 @@ _RULES = """당신은 사내 시스템의 **{kind}**을 쓴다. 제목은 "{titl
   "body": "문서 본문 (Markdown)",
   "grounding": ["k-..."]
 }"""
+
+_TYPE_RULES_FAQ = """이 문서는 **문답 모음**이다. 아래에 실제로 반복해서 들어온 질문과,
+각 질문에 대해 검색된 지식 항목이 있다. **자주 물은 것부터** 놓았고, 그 순서를 지킨다.
+
+**질문은 일반화해서 쓴다.** 물어온 말을 그대로 옮기지 않는다 — 이름·사번·부서·금액·
+날짜처럼 한 사람의 사정에 속하는 것은 싣지 않고, 여러 표현이 공통으로 묻는 것만
+한 줄로 다듬는다. FAQ 는 공개 문서라 물어본 사람이 드러나서는 안 된다.
+
+**근거가 답하지 못하는 질문은 빼고 쓴다.** 자주 물었다는 것이 답을 안다는 뜻은
+아니다 — 근거 없이 채운 문답은 반복 질문이라 특히 널리 읽힌다.
+
+각 문항은 질문 한 줄과 그에 대한 답으로 쓴다."""
 
 _FIRST = """이번이 **첫 제작**이다. 근거가 다루는 범위 안에서 문서를 처음부터 쓴다."""
 
@@ -185,19 +278,68 @@ _UPDATE = """아래에 **직전 판본**이 있다. 그것을 **고쳐서** 낸�
 문장은 글자 그대로 둔다.**"""
 
 
+def _item_block(item) -> str:  # noqa: ANN001
+    return f"### {item.id} — {item.title}\n{item.body}"
+
+
+def _question_blocks(covered: tuple[tuple, ...]) -> list[str]:
+    """반복 질문과 그 근거를 나란히 놓는다.
+
+    **근거를 질문 아래에 둔다.** 항목을 따로 늘어놓으면 어느 근거가 어느 질문에
+    걸린 것인지 모델이 다시 짐작해야 하고, 그 짐작이 틀리면 엉뚱한 근거를 단 문답이
+    나온다 — 검수자는 근거가 붙어 있다는 사실만 보고 넘어가기 쉽다.
+    """
+    blocks = []
+    for index, (group, items) in enumerate(covered, start=1):
+        heard = "\n".join(f'- "{v}"' for v in group.variants)
+        blocks.append(
+            f"## 질문 {index} — {group.count}회 물음 (해결 {group.resolved_count}회)\n"
+            f"물어온 말:\n{heard}\n\n근거:\n"
+            + "\n\n".join(_item_block(i) for i in items)
+        )
+    return blocks
+
+
 def build_prompt(
-    ctype: ContentType, items: list, previous: store.ContentDraft | None
+    ctype: ContentType,
+    items: list,
+    previous: store.ContentDraft | None,
+    *,
+    covered: tuple[tuple, ...] = (),
 ) -> str:
-    blocks = [f"### {i.id} — {i.title}\n{i.body}" for i in items]
+    """모델에게 줄 것. **주 입력에 따라 재료의 모양이 다르다.**
+
+    지식베이스 입력은 항목을 늘어놓고, QnA 통계 입력은 **질문마다 그 근거를 달아**
+    준다 — FAQ 는 문답 모음이라 어느 근거가 어느 문항의 것인지가 재료에 이미 있어야
+    한다.
+    """
+    if covered:
+        parts = [
+            _RULES.replace("{kind}", "살아있는 문서" if ctype.living else "발행물")
+            .replace("{title}", ctype.title)
+            .replace("{language}", LANGUAGE)
+            .replace("{type_rules}", _TYPE_RULES_FAQ)
+            .replace("{update_rules}", _UPDATE if previous else _FIRST),
+            "",
+            "반복해서 들어온 질문과 그 근거:",
+            *_question_blocks(covered),
+        ]
+        return _with_previous(parts, previous)
+
     parts = [
         _RULES.replace("{kind}", "살아있는 문서" if ctype.living else "발행물")
         .replace("{title}", ctype.title)
         .replace("{language}", LANGUAGE)
+        .replace("{type_rules}", "")
         .replace("{update_rules}", _UPDATE if previous else _FIRST),
         "",
         "근거로 쓸 수 있는 지식 항목:",
-        *blocks,
+        *[_item_block(i) for i in items],
     ]
+    return _with_previous(parts, previous)
+
+
+def _with_previous(parts: list[str], previous: store.ContentDraft | None) -> str:
     if previous:
         # **제목을 본문 앞에 붙이지 않는다.** 붙이면 모델이 그것을 본문의 일부로
         # 읽고 그대로 되받아, **갱신할 때마다 제목이 한 줄씩 는다** — 라이브에서 잡았다.
@@ -280,6 +422,44 @@ def diff_of(previous: str, current: str) -> str:
     return "\n".join(lines)
 
 
+# --- 2단계 조회 ---------------------------------------------------------------
+
+FAQ_GROUNDING_LIMIT = 3
+"""반복 질문 하나에 붙일 근거 항목의 수.
+
+답변의 기본값보다 좁게 잡는다 — FAQ 한 문항은 한 가지를 짧게 답하는 자리이고,
+후보를 넓히면 **한 문답에 관계가 옅은 항목이 근거로 달린다.**
+"""
+
+MAX_QUESTIONS = 20
+"""한 주기에 다룰 반복 질문의 수. **넘친 것은 다음 주기로 미루고, 미뤘다고 말한다.**
+
+살아있는 문서는 직전 판본이 다시 입력으로 들어가므로(§7.3) 문항이 무한히 늘면
+프롬프트가 함께 자라고, 그보다 먼저 **변경분 검수가 사람이 볼 수 없는 크기가 된다**
+(§5.5.5). 조용히 자르지 않는 이유는 잘린 채로도 화면이 "전부 다뤘다"처럼 보이기
+때문이다.
+"""
+
+
+@dataclass
+class Material:
+    """2단계가 모아 온 것. **타입마다가 아니라 주 입력 종류마다 모양이 다르다.**"""
+
+    items: list = field(default_factory=list)
+    """근거로 쓸 수 있는 지식 항목. 이것이 곧 `grounding` 에 허용되는 id 다."""
+
+    stale: tuple[str, ...] = ()
+    covered: tuple[tuple, ...] = ()
+    """(반복 질문, 근거 항목들). **FAQ 만 채운다** — 문답마다 근거가 따로 붙는다."""
+
+    uncovered: tuple[str, ...] = ()
+    """반복되는데 근거를 못 찾은 질문. **지식 공백이다** (§6.2)."""
+
+    repeats: int = 0
+    deferred: int = 0
+    """한도를 넘어 이번에 다루지 않은 반복 질문의 수."""
+
+
 # --- 실행기 -------------------------------------------------------------------
 
 
@@ -297,11 +477,15 @@ class ContentProducer:
         repo: KnowledgeRepository,
         harness: Harness | None = None,
         generated_by: str = "",
+        search: Search | None = None,
     ) -> None:
         self._conn = conn
         self._repo = repo
         self._harness = harness
         self._generated_by = generated_by
+        # **임베딩 없는 검색이 기본이다.** FAQ 의 근거 조회는 배치의 한 걸음일 뿐이라
+        # 임베딩 제공자가 없다고 서면 안 된다 — 검색이 이미 그렇게 만들어져 있다.
+        self._search = search or Search(repo=repo, conn=conn)
 
     def run(self, ctype: ContentType, *, source_commit: str | None = None) -> Result:
         # ① 앞 초안이 아직 대기 중이면 다시 만들지 않는다. 한 타입이 Q3 를 채우면
@@ -311,74 +495,140 @@ class ContentProducer:
                 ctype, store.Outcome.PENDING_REVIEW, "앞 초안이 아직 검수 대기다"
             )
 
-        trigger = evaluate_trigger(self._conn, ctype, source_commit=source_commit)
+        # ② 임계를 재는 것은 트리거보다 먼저다. **재는 것은 싸고 조회는 비싸다** —
+        #    반복 분포는 SQL 한 번이지만 근거 조회는 후보마다 지식베이스를 훑는다.
+        #    그래서 싼 쪽만 트리거 앞에 두고 비싼 쪽은 트리거가 선 뒤에 돈다.
+        groups = qna_stats.detect(self._conn) if _needs_qna(ctype) else []
+        signals = {REPEAT_QUESTIONS: float(qna_stats.peak(groups))} if _needs_qna(ctype) else None
+
+        trigger = evaluate_trigger(
+            self._conn, ctype, source_commit=source_commit, signals=signals
+        )
         if not trigger.due:
             return Result(type_id=ctype.id, outcome=store.Outcome.NOT_DUE)
 
-        # ② 근거를 모은다. 없으면 지어내지 않는다.
-        items, stale = self._read_input(ctype)
-        if not items:
-            detail = (
-                f"쓸 근거가 없다 — 낡은 항목 {len(stale)}건은 뺐다"
-                if stale
-                else "쓸 근거가 없다"
-            )
+        # ③ 근거를 모은다. 없으면 지어내지 않는다.
+        material = self._read_input(ctype, groups)
+        if not material.items:
             return self._record(
-                ctype, store.Outcome.NO_GROUNDING, detail, excluded_stale=stale
+                ctype,
+                store.Outcome.NO_GROUNDING,
+                _no_grounding_detail(ctype, material),
+                excluded_stale=material.stale,
+                material=material,
             )
 
-        # ③ 코드 변경이 부른 주기인데 지식이 아직 그 커밋을 읽지 않았으면 기다린다.
+        # ④ 코드 변경이 부른 주기인데 지식이 아직 그 커밋을 읽지 않았으면 기다린다.
         #    지금 돌리면 같은 글이 나오고, 그것을 갱신이라 부르면 고쳤다는 기록만
         #    남는다 (§6.6.3 과 같은 순서).
-        if stale and trigger.threshold and not trigger.periodic:
+        #
+        #    **이 기다림은 `source_changed` 만의 것이다.** 반복 질문이 임계에 닿은
+        #    것은 지식이 뒤처졌다는 신호가 아니라 사람들이 물었다는 신호이므로,
+        #    낡은 항목을 뺀 채로 만드는 것이 맞다.
+        if (
+            material.stale
+            and trigger.threshold
+            and not trigger.periodic
+            and ctype.trigger.threshold == SOURCE_CHANGED
+        ):
             return self._record(
                 ctype,
                 store.Outcome.HELD,
-                f"코드가 바뀌었지만 지식이 아직 낡다 ({len(stale)}건) — "
+                f"코드가 바뀌었지만 지식이 아직 낡다 ({len(material.stale)}건) — "
                 "ingest 가 따라잡은 뒤에 만든다",
-                excluded_stale=stale,
+                excluded_stale=material.stale,
+                material=material,
             )
 
         previous = store.current(self._conn, ctype.id) if ctype.living else None
-        return self._generate(ctype, items, previous, trigger, source_commit, stale)
+        return self._generate(ctype, material, previous, trigger, source_commit)
 
     # --- 2단계 조회 ----------------------------------------------------------
 
-    def _read_input(self, ctype: ContentType) -> tuple[list, tuple[str, ...]]:
+    def _read_input(self, ctype: ContentType, groups: list) -> Material:
         """주 입력을 읽는다. **읽개는 주 입력 종류마다 하나다** — 타입마다가 아니다."""
-        if ctype.input is not Input.KNOWLEDGE:
-            # **반쪽으로 만들지 않는다.** `both` 를 지식베이스만으로 돌리면 칼럼이
-            # 관찰(§7.6.2) 없이 나가는데, 관찰을 생략한 권고는 그 순간 의견이 된다.
-            raise UnsupportedInput(
-                f"{ctype.id}: 주 입력 {ctype.input} 의 읽개가 아직 없다 — QnA 통계는 "
-                "WBS-4.7.1 이 붙인다. 선언은 있으나 아직 만들 수 없다"
-            )
+        if ctype.input is Input.KNOWLEDGE:
+            return self._from_knowledge()
+        if ctype.input is Input.QNA_STATS:
+            return self._from_qna_stats(ctype, groups)
+        # **반쪽으로 만들지 않는다.** `both` 를 지식베이스만으로 돌리면 칼럼이
+        # 관찰(§7.6.2) 없이 나가는데, 관찰을 생략한 권고는 그 순간 의견이 된다.
+        raise UnsupportedInput(
+            f"{ctype.id}: 주 입력 {ctype.input} 의 읽개가 아직 없다 — 지식베이스와 "
+            "QnA 통계를 함께 읽는 것은 칼럼·뉴스레터가 오는 WBS-4.7.2·4.7.3 이 "
+            "붙인다. 선언은 있으나 아직 만들 수 없다"
+        )
 
+    def _from_knowledge(self) -> Material:
         stored, _broken = self._repo.scan()
         # **소스코드 파생 지식이 중심이다** (§7.2). QnA 승격분만으로 쓴 가이드는
         # 사람들이 물어본 것의 모음이지 시스템 사용법이 아니다.
         items = [s.item for s in stored if any(p.commit for p in s.item.provenance)]
         stale = tuple(i.id for i in items if i.stale)
-        return [i for i in items if not i.stale], stale
+        return Material(items=[i for i in items if not i.stale], stale=stale)
+
+    def _from_qna_stats(self, ctype: ContentType, groups: list) -> Material:
+        """반복 질문이 **무엇을 다룰지**를 정하고, 검색이 **무엇에 기대어 쓸지**를 정한다.
+
+        답변 파이프라인의 2단계와 같은 검색을 쓴다 (§5.1) — 반복 질문 하나가 질의가
+        되고 걸린 항목이 그 문답의 근거가 된다. **못 찾은 질문은 빼되 세어 둔다**:
+        자주 묻는데 지식베이스가 모르는 자리가 곧 지식 공백이다 (§6.2).
+
+        질의로는 **가장 최근 표현 하나**를 쓴다. 여러 표현을 이어 붙이면 낱말이
+        늘어 표현 사전이 헐겁게 걸리는데, 그때 붙는 근거는 관계가 옅다 — 답변이
+        질문 하나로 찾는 것과 같은 자리에 둔다.
+        """
+        minimum = int(ctype.trigger.threshold_value or 1)
+        picked = qna_stats.candidates(groups, minimum=minimum)
+        deferred = max(0, len(picked) - MAX_QUESTIONS)
+
+        covered: list[tuple] = []
+        uncovered: list[str] = []
+        stale: list[str] = []
+        for group in picked[:MAX_QUESTIONS]:
+            hits = self._search.find(group.representative, limit=FAQ_GROUNDING_LIMIT)
+            stale += [h.item.id for h in hits if h.is_stale]
+            fresh = [h.item for h in hits if not h.is_stale]
+            if fresh:
+                covered.append((group, fresh))
+            else:
+                uncovered.append(group.representative)
+
+        items: dict[str, object] = {}
+        for _group, found in covered:
+            for item in found:
+                items.setdefault(item.id, item)
+        return Material(
+            items=list(items.values()),
+            stale=tuple(dict.fromkeys(stale)),
+            covered=tuple(covered),
+            uncovered=tuple(uncovered),
+            repeats=qna_stats.peak(groups),
+            deferred=deferred,
+        )
 
     # --- 3단계 생성 ----------------------------------------------------------
 
     def _generate(
         self,
         ctype: ContentType,
-        items: list,
+        material: Material,
         previous: store.ContentDraft | None,
         trigger: Trigger,
         source_commit: str | None,
-        stale: tuple[str, ...],
     ) -> Result:
+        stale = material.stale
         if self._harness is None:
             return self._record(
-                ctype, store.Outcome.GENERATION_FAILED, "생성기가 없다", excluded_stale=stale
+                ctype,
+                store.Outcome.GENERATION_FAILED,
+                "생성기가 없다",
+                excluded_stale=stale,
+                material=material,
             )
 
-        prompt = build_prompt(ctype, items, previous)
-        allowed = {i.id for i in items}
+        prompt = build_prompt(ctype, material.items, previous, covered=material.covered)
+        allowed = {i.id for i in material.items}
         try:
             parsed = parse_document(self._harness.run(prompt).text, allowed)
         except (AgentOutputError, RuntimeError) as exc:
@@ -391,6 +641,7 @@ class ContentProducer:
                 store.Outcome.GENERATION_FAILED,
                 f"생성하지 못했다 — {exc}",
                 excluded_stale=stale,
+                material=material,
             )
         if parsed is None:
             return self._record(
@@ -398,6 +649,7 @@ class ContentProducer:
                 store.Outcome.GENERATION_FAILED,
                 "근거를 가리키지 않은 글이라 초안으로 받지 않는다 (D3)",
                 excluded_stale=stale,
+                material=material,
             )
 
         title, body, grounding = parsed
@@ -411,6 +663,7 @@ class ContentProducer:
                 generated=True,
                 commit=source_commit,
                 excluded_stale=stale,
+                material=material,
             )
 
         # **티켓을 함께 발행한다** (§6.4.3, FR-45). Q3 는 작업 대기열이라 초안
@@ -431,6 +684,7 @@ class ContentProducer:
             ctype,
             store.Outcome.PRODUCED,
             f"{trigger.reason} — 근거 {len(grounding)}건"
+            + (f", 반복 질문 {len(material.covered)}건" if material.covered else "")
             + (f", 낡은 항목 {len(stale)}건 제외" if stale else "")
             + (
                 f", 본문 {churn(previous.body, body) * 100:.0f}% 변경"
@@ -440,6 +694,7 @@ class ContentProducer:
             generated=True,
             commit=source_commit,
             excluded_stale=stale,
+            material=material,
         )
         result.draft_id = draft_id
         result.grounding = grounding
@@ -457,6 +712,7 @@ class ContentProducer:
         generated: bool = False,
         commit: str | None = None,
         excluded_stale: tuple[str, ...] = (),
+        material: Material | None = None,
     ) -> Result:
         store.record_run(
             self._conn,
@@ -471,4 +727,41 @@ class ContentProducer:
             outcome=outcome,
             detail=detail,
             excluded_stale=excluded_stale,
+            uncovered=material.uncovered if material else (),
+            repeats=material.repeats if material else 0,
         )
+
+
+def _needs_qna(ctype: ContentType) -> bool:
+    """이 타입이 QnA 분포를 봐야 하는가.
+
+    주 입력이 QnA 통계이거나, 임계가 그것을 재라고 선언했거나 — **둘은 같이 오는 것이
+    보통이지만 하나만 선언될 수도 있다.** 주기로만 도는 FAQ 파생 타입이 그렇다.
+    """
+    return ctype.input is Input.QNA_STATS or ctype.trigger.threshold == REPEAT_QUESTIONS
+
+
+def _no_grounding_detail(ctype: ContentType, material: Material) -> str:
+    """왜 못 만들었는지. **"근거가 없다"로 뭉치지 않는다.**
+
+    FAQ 가 비는 이유는 셋이고 대응이 다르다 — 아직 반복이 없는 것은 기다릴 일,
+    반복은 있는데 지식이 없는 것은 **ingest 우선순위**의 일(§6.2), 근거가 낡은 것은
+    Lint 와 ingest 의 일이다. 한 문장으로 뭉개면 운영자가 무엇을 해야 하는지 모른다.
+    """
+    if ctype.input is not Input.QNA_STATS:
+        return (
+            f"쓸 근거가 없다 — 낡은 항목 {len(material.stale)}건은 뺐다"
+            if material.stale
+            else "쓸 근거가 없다"
+        )
+    minimum = int(ctype.trigger.threshold_value or 1)
+    if not material.covered and not material.uncovered:
+        return (
+            f"반복 {minimum}회에 닿은 질문이 없다 (가장 많이 반복된 것 "
+            f"{material.repeats}회) — 재료가 없는 것이지 고장이 아니다"
+        )
+    return (
+        f"반복 질문 {len(material.uncovered)}건이 임계에 닿았지만 지식베이스가 "
+        "답을 모른다 — **지식 공백이다** (§6.2). 지어내지 않고 ingest 를 기다린다"
+        + (f", 낡은 항목 {len(material.stale)}건은 뺐다" if material.stale else "")
+    )

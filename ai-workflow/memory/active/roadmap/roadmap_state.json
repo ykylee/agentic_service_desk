@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.825,
+      "progress": 0.85,
       "total_leaves": 40,
-      "done_leaves": 33,
+      "done_leaves": 34,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -527,18 +527,20 @@
         {
           "id": "WBS-4.7",
           "title": "S5 FAQ · 칼럼 · 뉴스레터",
-          "derived_status": "planned",
+          "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 3,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": [
             {
               "id": "WBS-4.7.1",
               "title": "FAQ",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-29-main-001"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {

@@ -395,13 +395,16 @@ class TestOneAtATime:
 
 
 class TestUnsupportedInput:
-    """읽개는 주 입력 종류마다 하나다 — 타입마다가 아니다."""
+    """읽개는 주 입력 종류마다 하나다 — 타입마다가 아니다.
 
-    def test_QnA_통계_읽개가_없으면_조용히_건너뛰지_않는다(self, tmp_path) -> None:
+    지식베이스와 QnA 통계는 붙었고(4.6.2 · 4.7.1), 둘을 함께 읽는 `both` 만 남았다.
+    """
+
+    def test_둘을_함께_읽는_읽개가_없으면_조용히_건너뛰지_않는다(self, tmp_path) -> None:
         # 침묵은 "만들 것이 없다"와 구분되지 않아, 선언은 있는데 아무것도 안 나오는
-        # 타입이 생긴다.
+        # 타입이 생긴다. **반쪽으로 만들지도 않는다** — 관찰 없는 칼럼은 의견이다.
         conn = _conn(tmp_path)
-        with pytest.raises(production.UnsupportedInput, match="4.7.1"):
+        with pytest.raises(production.UnsupportedInput, match="4.7.2"):
             _producer(tmp_path, conn, FakeHarness()).run(COLUMN)
         conn.close()
 

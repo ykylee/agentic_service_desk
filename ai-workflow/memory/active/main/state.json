@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-08-28",
+  "generated_at": "2026-08-29",
   "purpose_digest": "모 시스템의 **소스 저장소(코드 + 히스토리)**와 **QnA·답변 이력** 두 원천을 **모 시스템 내부 API**로 지속 수집해 하나의 지식베이스로 구축한다 — 히스토리는 \"왜 그렇게 정했는가\"의 1차 출처이며, API 표면이 곧 이 시스템이 알 수 있는 것의 상한이다",
   "purpose_digest_rev": "2026-08-27",
   "source_of_truth": {
@@ -10,7 +10,7 @@
     "daily_backlog_dir": "ai-workflow/memory/active/main/backlog",
     "tasks_dir": "ai-workflow/memory/active/main/backlog/tasks",
     "sessions_dir": "ai-workflow/memory/active/main/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-29.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주. 40 leaf 중 33 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주. 40 leaf 중 33 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주, S5 착수. 40 leaf 중 34 완료.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주, S5 착수. 40 leaf 중 34 완료.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ",
       "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재",
       "TASK-2026-08-28-main-043 — WBS-4.6.4 콘텐츠 검수",
       "TASK-2026-08-28-main-042 — WBS-4.6.2 가이드 제작",
@@ -42,69 +43,24 @@
       "TASK-2026-08-28-main-039 — WBS-4.5.8 지표와 대시보드 확장",
       "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
       "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B",
-      "TASK-2026-08-28-main-036 — WBS-4.5.5 게재 판정",
-      "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로"
+      "TASK-2026-08-28-main-036 — WBS-4.5.5 게재 판정"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-28.md",
-    "task_count": 45,
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-29.md",
+    "task_count": 1,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
-      "TASK-2026-08-27-main-001 — M-001 WBS-1.2 — 컨셉 노트 작성",
-      "TASK-2026-08-28-main-001 — M-001 컨셉 최종 리뷰",
-      "TASK-2026-08-28-main-002 — M-002 WBS-2.1 — 요구사항 문서 작성",
-      "TASK-2026-08-28-main-003 — M-002 요구사항 문서 감사",
-      "TASK-2026-08-28-main-004 — M-003 WBS-3.1 — 설계 문서 / ADR 작성",
-      "TASK-2026-08-28-main-005 — M-004 구현 로드맵과 WBS 분해",
-      "TASK-2026-08-28-main-006 — WBS-4.1.1 프로젝트 골격",
-      "TASK-2026-08-28-main-007 — WBS-4.1.3 LLM 게이트웨이",
-      "TASK-2026-08-28-main-008 — WBS-4.1.4 저장소 골격",
-      "TASK-2026-08-28-main-009 — WBS-4.1.2 모 시스템 어댑터 — 계약 정의와 mock",
-      "TASK-2026-08-28-main-010 — NFR-1 집행 정밀화 — 개발 환경 원격 LLM 허용",
-      "TASK-2026-08-28-main-011 — MiniMax API 조사와 임베딩 제공자 분리",
-      "TASK-2026-08-28-main-012 — ADR-009 — LLM 제공자 단일 출처화",
-      "TASK-2026-08-28-main-013 — WBS-4.2.1 소스 수집",
-      "TASK-2026-08-28-main-014 — pi 헤드리스 연결",
-      "TASK-2026-08-28-main-015 — WBS-4.2.2 QnA 수집",
-      "TASK-2026-08-28-main-016 — WBS-4.2.3 산출물 필터",
-      "TASK-2026-08-28-main-017 — WBS-4.2.4 Ingest 에이전트",
-      "TASK-2026-08-28-main-018 — WBS-4.2.5 모순 표시와 사람 편집 보존",
-      "TASK-2026-08-28-main-019 — WBS-4.2.6 Lint",
-      "TASK-2026-08-28-main-020 — WBS-4.2.7 대시보드 최소",
-      "TASK-2026-08-28-main-021 — WBS-4.3.1 티켓 도메인",
-      "TASK-2026-08-28-main-022 — WBS-4.3.2 종결 기록",
-      "TASK-2026-08-28-main-023 — WBS-4.3.3 질문 직접 등록",
-      "TASK-2026-08-28-main-024 — WBS-4.3.5 대시보드 확장 (Q1 티켓 대기열)",
-      "TASK-2026-08-28-main-025 — WBS-4.3.4 승격 경로 A",
-      "TASK-2026-08-28-main-026 — WBS-4.4.1 검색",
-      "TASK-2026-08-28-main-027 — WBS-4.4.2 파이프라인 1~3단계",
-      "TASK-2026-08-28-main-028 — WBS-4.4.3 불확실성 표시",
-      "TASK-2026-08-28-main-029 — WBS-4.4.4 검수",
-      "TASK-2026-08-28-main-030 — WBS-4.4.5 대시보드 확장 (Q2 답변 검수)",
-      "TASK-2026-08-28-main-031 — WBS-4.5.1 게재",
-      "TASK-2026-08-28-main-032 — WBS-4.5.2 전건 티켓 발행",
-      "TASK-2026-08-28-main-033 — WBS-4.5.3 답변 이력",
-      "TASK-2026-08-28-main-034 — WBS-4.5.4 QnA 추적",
-      "TASK-2026-08-28-main-035 — ADR-010 스키마 이행 경로",
-      "TASK-2026-08-28-main-036 — WBS-4.5.5 게재 판정",
-      "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B",
-      "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
-      "TASK-2026-08-28-main-039 — WBS-4.5.8 지표와 대시보드 확장",
-      "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)",
-      "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리",
-      "TASK-2026-08-28-main-042 — WBS-4.6.2 가이드 제작",
-      "TASK-2026-08-28-main-043 — WBS-4.6.4 콘텐츠 검수",
-      "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재"
+      "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ"
     ]
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/main/session_handoff.md",
-    "ai-workflow/memory/active/main/backlog/2026-08-28.md",
+    "ai-workflow/memory/active/main/backlog/2026-08-29.md",
     "ai-workflow/memory/active/main/work_backlog.md"
   ],
   "repository_assessment": {
