@@ -108,6 +108,18 @@ def _overlap(left: set[str], right: set[str]) -> int:
     return sum(1 for t in left if any(_akin(t, u) for u in right))
 
 
+def belongs(tokens: set[str], group: "RepeatQuestion") -> bool:
+    """이 낱말들이 그 묶음의 것인가.
+
+    **묶는 조건이자 새것인지 가르는 조건**이다 (§1.3.3-d 의 "신규 유형 질문"). 둘을
+    따로 쓰면 같은 질문이 반복성에서는 반복이고 신규 유형에서는 새것이 된다.
+    """
+    return (
+        _overlap(tokens, group.tokens) >= MIN_SHARED
+        and similarity(tokens, group.tokens) >= SIMILARITY
+    )
+
+
 def similarity(left: set[str], right: set[str]) -> float:
     """짧은 쪽의 낱말이 얼마나 덮이는가. 낱말이 없으면 0 이다."""
     if not left or not right:
@@ -231,10 +243,7 @@ def cluster(questions: list[Question]) -> list[RepeatQuestion]:
         if not tokens:
             continue
         for group in groups:
-            if (
-                _overlap(tokens, group.tokens) >= MIN_SHARED
-                and similarity(tokens, group.tokens) >= SIMILARITY
-            ):
+            if belongs(tokens, group):
                 group.questions.append(question)
                 break
         else:

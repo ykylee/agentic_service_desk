@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from agentic_service_desk.content import registry
 from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import store as content_store
+from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.pipeline import draft_store
 
@@ -334,31 +335,215 @@ def _published(conn: sqlite3.Connection, reg: registry.Registry) -> list[str]:
     return out
 
 
-def phase_status(conn: sqlite3.Connection, *, stage: str, phase: int) -> Status:
+@dataclass
+class PhaseView:
+    """국면 화면이 필요한 것 (WBS-4.8.1, FR-49).
+
+    **판정과 화면을 함께 들고 다닌다.** 제안 버튼이 보는 판정과 표가 말하는 판정이
+    다른 셈에서 나오면, 화면은 "전진할 수 있다"고 적고 버튼은 거부한다.
+    """
+
+    current: int
+    seed: int
+    status: Status
+    judgment: phase_domain.Judgment | None = None
+    error: str = ""
+
+    @property
+    def drifted(self) -> bool:
+        """설정과 DB 가 어긋났는가. **DB 가 이긴다** — 설정은 씨앗일 뿐이다."""
+        return self.current != self.seed
+
+
+_AXIS_LABELS = {
+    phase_domain.COVERAGE: "커버리지 — 근거를 찾아 초안까지 간 비율",
+    phase_domain.EXPLICIT: "명시적 해결률 — 정확도 축",
+    phase_domain.REJECTION: "검수 반려율 — 정확도 축 (낮을수록 좋다)",
+    phase_domain.REPETITION: "반복성 — FAQ 재료가 생겼는가",
+    phase_domain.AGREEMENT: "자동·사람 판정 일치율 — 2→3 에만 붙는다",
+    phase_domain.NOVELTY: "신규 유형 질문 비율 — 역행 신호",
+    phase_domain.STALE: "stale 비율 — 역행 신호",
+}
+
+
+def phase_view(
+    conn: sqlite3.Connection,
+    *,
+    stage: str,
+    seed: int,
+    thresholds_path=None,  # noqa: ANN001
+    window_days: int = 30,
+    min_sample: int = 10,
+) -> PhaseView:
     """국면 상태 (§8.3, §1.3.3).
 
     **국면과 단계는 다른 축이다** (§1.5.3) — 단계는 *우리가 무엇을 켰는가*이고
     국면은 *지식베이스가 무엇을 할 수 있는가*다. 대응은 느슨하며 고정 매핑이 아니다.
+
+    **관측하지 않는다.** 여기서 세면 화면을 열 때마다 창이 옮겨 가 추이가 볼 때마다
+    달라지고, 지식 저장소를 통째로 훑는 셈이 요청마다 돈다. 세는 것은 배치이고
+    화면은 남은 것을 읽는다.
     """
-    names = {1: "1국면 — 콜드 스타트", 2: "2국면 — 축적", 3: "3국면 — 성숙"}
-    return Status(
-        title="국면 상태",
-        question="지금 이 시스템이 어느 단계에 있는가",
-        rows=[
-            ("국면", f"{names.get(phase, phase)} — 검수 강도와 자동 승격 범위를 정한다"),
-            ("단계", f"{stage} — 무엇을 켰는가. **국면과 다른 축이다**"),
+    current = phase_domain.current(conn, seed=seed)
+    observation = phase_domain.latest(conn)
+    history = phase_domain.history(conn, limit=3)
+
+    rows: list[tuple[str, str]] = [
+        (
+            "국면",
+            f"{phase_domain.NAMES.get(current, current)} — 검수 강도(FR-57)와 "
+            f"자동 승격 범위(§6.8.4-b)를 정한다"
+            + (f" · {history[0].decided_at[:10]} {history[0].direction}" if history else ""),
+        ),
+        ("단계", f"{stage} — 무엇을 켰는가. **국면과 다른 축이다**"),
+    ]
+
+    try:
+        thresholds = phase_domain.load_thresholds(thresholds_path)
+    except phase_domain.InvalidThresholds as exc:
+        rows.append(("임계 선언", f"**읽을 수 없다** — {exc}"))
+        return PhaseView(
+            current=current,
+            seed=seed,
+            status=Status(title="국면 상태", question=_PHASE_QUESTION, rows=rows),
+            error=str(exc),
+        )
+
+    judgment = None
+    if observation is None:
+        rows.append(
             (
                 "세 축 추이",
-                "**아직 없다** — 커버리지·정확도·반복성의 추이와 전진 제안/역행 "
-                "경고는 WBS-4.8.1 이다 (FR-49)",
+                "**아직 관측이 없다** — 배치가 한 주기도 돌지 않았다. "
+                "빈 값과 0 은 다르다",
+            )
+        )
+    else:
+        judgment = phase_domain.judge(
+            observation,
+            phase_domain.baseline(
+                conn,
+                before=observation.observed_on,
+                lookback_days=thresholds.regression.lookback_days,
             ),
+            current=current,
+            thresholds=thresholds,
+        )
+        rows.extend(_trend_rows(conn, observation, window_days))
+        rows.append(("전진 제안", _proposal_text(judgment)))
+        rows.append(("역행", _regression_text(judgment, thresholds.regression)))
+
+    rows.append(("국면별 임계", _threshold_text(thresholds, current)))
+    for decision in history:
+        rows.append(
             (
-                "국면별 임계",
-                "**아직 정해지지 않았다** (O8) — 실데이터 없이 정할 수 없다. "
-                "지어내 붙이면 **1국면의 정상 상태가 빨간불이 된다**",
-            ),
-        ],
+                f"{decision.decided_at[:10]} {decision.direction}",
+                f"{decision.from_phase or '—'} → {decision.to_phase} "
+                f"({decision.decided_by}) — {decision.reason}",
+            )
+        )
+
+    return PhaseView(
+        current=current,
+        seed=seed,
+        judgment=judgment,
+        status=Status(
+            title="국면 상태",
+            question=_PHASE_QUESTION,
+            rows=rows,
+            note="**전진은 제안까지다** — 검수를 느슨하게 하는 결정은 운영자가 "
+            "승인한다. 반대로 **후퇴는 배치가 그냥 내린다**: 안전한 방향으로 "
+            "되돌리는 것을 지체할 이유가 없다 (§1.3.3-c).",
+        ),
     )
+
+
+_PHASE_QUESTION = "지금 이 시스템이 어느 국면에 있는가, **올라가도 되는가** (§1.3.3)"
+
+
+def _trend_rows(
+    conn: sqlite3.Connection, observation, window_days: int  # noqa: ANN001
+) -> list[tuple[str, str]]:
+    """축마다 최근 추이 한 줄. **한 점이 아니라 흐름을 보여 준다.**
+
+    값 하나만 두면 40% 가 오르는 중인지 내리는 중인지 알 수 없는데, 국면 판정에서
+    중요한 것은 수준이 아니라 **방향**이다 — 역행 신호가 전부 변화폭인 이유와 같다.
+    """
+    trend = phase_domain.trend(conn, limit=4)
+    rows = [
+        (
+            "관측 창",
+            f"최근 {observation.window_days or window_days}일 · "
+            f"마지막 관측 {observation.observed_on}",
+        )
+    ]
+    for metric, label in _AXIS_LABELS.items():
+        points = [o.get(metric) for o in reversed(trend)]
+        drawn = " → ".join(p.percent for p in points)
+        now = observation.get(metric)
+        detail = f"{drawn} (분모 {now.denominator})" if now.available else f"**{now.unavailable}**"
+        rows.append((label, detail))
+    return rows
+
+
+def _proposal_text(judgment) -> str:  # noqa: ANN001
+    """제안이 없을 때 **왜 없는지**를 말한다.
+
+    "조건 미달"과 "잴 수 없다"와 "임계 미정"은 다른 상태인데, 셋을 다 침묵으로
+    두면 운영자는 시스템이 판정을 하고 있는지조차 알 수 없다.
+    """
+    if judgment.proposal is not None:
+        return (
+            f"**{judgment.proposal}국면 전진이 제안됐다** — "
+            + " · ".join(judgment.met)
+            + ". 아래 버튼이 그 승인이다"
+        )
+    if judgment.undecidable:
+        return f"제안 없음 — {judgment.undecidable}"
+    if judgment.unmet:
+        return "조건 미달 — " + " · ".join(judgment.unmet) + (
+            " (충족: " + " · ".join(judgment.met) + ")" if judgment.met else ""
+        )
+    return "제안 없음"
+
+
+def _regression_text(judgment, rule) -> str:  # noqa: ANN001
+    if judgment.regression is not None:
+        return (
+            f"**{judgment.regression}국면으로 내려간다** (배치가 자동으로) — "
+            + " · ".join(judgment.signals)
+        )
+    if judgment.signals:
+        return "신호는 있으나 내릴 곳이 없다 — " + " · ".join(judgment.signals)
+    return (
+        f"신호 없음 — 기준선 대비 커버리지 −{rule.coverage_drop:.0%} · "
+        f"stale +{rule.stale_rise:.0%} · 신규 유형 +{rule.novelty_rise:.0%} · "
+        f"반려율 +{rule.rejection_rise:.0%} 중 하나라도 넘으면 **자동으로 내린다** "
+        f"(기준선은 {rule.lookback_days}일 이상 묵은 관측)"
+    )
+
+
+def _threshold_text(thresholds, current: int) -> str:  # noqa: ANN001
+    target = current + 1
+    if target > phase_domain.MATURE:
+        return "3국면이 끝이다 — 올라갈 곳이 없다"
+    rule = thresholds.for_phase(target)
+    if not rule.declared:
+        return (
+            f"**{target}국면 전진 임계가 아직 정해지지 않았다** (O8) — 실데이터 없이 "
+            "정할 수 없다. 지어내 붙이면 1국면의 정상 상태가 빨간불이 되거나, "
+            "반대로 근거 없이 검수가 느슨해진다. "
+            "`operations/phase_thresholds.toml` 에 네 축을 **함께** 채운다"
+        )
+    parts = [
+        f"커버리지 ≥ {rule.coverage:.0%}",
+        f"명시적 해결률 ≥ {rule.explicit_resolution:.0%}",
+        f"반려율 ≤ {rule.rejection:.0%}",
+        f"반복성 ≥ {rule.repetition:.0%}",
+    ]
+    if target == phase_domain.MATURE and rule.agreement is not None:
+        parts.append(f"일치율 ≥ {rule.agreement:.0%}")
+    return f"{target}국면 전진 — " + " · ".join(parts)
 
 
 # --- 셈 --------------------------------------------------------------------

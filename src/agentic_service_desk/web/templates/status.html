@@ -8,6 +8,42 @@
   <a href="/">대기열로 돌아가기</a>
 </p>
 
+{% if outcome %}<p class="warn"><strong>{{ outcome }}</strong></p>{% endif %}
+
+{% if phase.judgment and phase.judgment.proposal %}
+<div class="card">
+  <p><strong>{{ phase.judgment.proposal }}국면 전진이 제안됐다</strong> —
+     {{ phase.judgment.met | join(' · ') }}</p>
+  <p class="dim small">
+    <strong>지표가 제안하고 운영자가 승인한다</strong> (§1.3.3-c). 올리면 검수가
+    느슨해지고 자동 승격 범위가 함께 넓어진다 — 되돌리는 것은 시스템이 하지만,
+    올리는 것은 사람이 한다.
+  </p>
+  <form method="post" action="/phase/advance">
+    <input type="hidden" name="to" value="{{ phase.judgment.proposal }}">
+    <button type="submit">{{ phase.judgment.proposal }}국면으로 올린다</button>
+  </form>
+</div>
+{% endif %}
+
+{% if phase.judgment and phase.judgment.signals %}
+<p class="warn"><strong>역행 신호</strong> — {{ phase.judgment.signals | join(' · ') }}.
+  {% if phase.judgment.regression %}
+  배치가 <strong>{{ phase.judgment.regression }}국면으로 내린다</strong> — 승인을 기다리지 않는다.
+  {% else %}
+  더 내려갈 곳이 없다.
+  {% endif %}
+</p>
+{% endif %}
+
+{% if phase.drifted %}
+<p class="dim small">
+  설정 <code>ASD_PHASE={{ phase.seed }}</code> 과 지금 국면({{ phase.current }})이 다르다.
+  <strong>국면의 SSOT 는 DB 다</strong> — 설정은 처음 한 번의 씨앗이고, 그 뒤로는
+  전진 승인과 자동 후퇴만이 이 값을 바꾼다.
+</p>
+{% endif %}
+
 <h2>핵심 지표</h2>
 <p class="dim small">
   국면별 임계와 함께 봐야 하지만 <strong>그 수치는 아직 정해지지 않았다</strong> (O8) —

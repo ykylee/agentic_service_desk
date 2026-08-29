@@ -168,7 +168,7 @@ class TestUnmeasurable:
     def test_국면별_임계가_미정임을_밝힌다(self, tmp_path) -> None:
         """지어내 붙이면 **1국면의 정상 상태가 빨간불이 된다.**"""
         conn = _conn(tmp_path)
-        rows = dict(metrics.phase_status(conn, stage="S3", phase=1).rows)
+        rows = dict(metrics.phase_view(conn, stage="S3", seed=1).status.rows)
         assert "아직 정해지지 않았다" in rows["국면별 임계"]
         conn.close()
 

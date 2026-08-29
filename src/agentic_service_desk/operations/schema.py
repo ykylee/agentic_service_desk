@@ -417,6 +417,47 @@ CREATE TABLE IF NOT EXISTS content_run (
     detail            TEXT
 );
 
+-- 국면 상태 (WBS-4.8.1, FR-49, §1.3.3). **한 행짜리 표다.**
+-- 국면이 설정이 아니라 DB 에 있는 이유는 하나다 — **후퇴는 시스템이 자동으로 한다.**
+-- 환경변수는 시스템이 내릴 수 없으므로, 국면이 설정에 있는 한 §1.3.3-c 의
+-- "강화는 자동"은 성립하지 않는다. `ASD_PHASE` 는 이 행이 없을 때의 **씨앗**이다.
+CREATE TABLE IF NOT EXISTS phase_state (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),  -- 전역 국면 하나다. 영역별은 O49
+    phase      INTEGER NOT NULL,   -- 1 콜드 스타트 | 2 축적 | 3 성숙
+    since      TEXT NOT NULL,      -- 지금 국면이 된 시각. **역행 기준선이 여기서 잘린다**
+    decided_by TEXT NOT NULL       -- seed | operator | system
+);
+
+-- 국면이 바뀐 사건 (§1.3.3-c). **왜 바뀌었는지가 값보다 중요하다.**
+-- 국면은 검수 강도(FR-57)와 자동 승격 범위(§6.8.4-b)를 함께 넓히므로, 그것이
+-- 느슨해진 경위는 되짚을 수 있어야 한다 — 전진에는 어느 축이 어떻게 올랐는지가,
+-- 후퇴에는 어떤 신호가 잡혔는지가 남는다.
+CREATE TABLE IF NOT EXISTS phase_decision (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_phase INTEGER,            -- 씨앗일 때만 비어 있다
+    to_phase   INTEGER NOT NULL,
+    decided_by TEXT NOT NULL,      -- seed | operator | system.
+                                   -- **전진은 operator, 후퇴는 system 뿐이다**
+    reason     TEXT NOT NULL,
+    decided_at TEXT NOT NULL
+);
+
+-- 세 축의 관측 (§1.3.3-a). **추이를 보려면 남아 있어야 한다.**
+-- 가로가 아니라 세로로 둔다 — 축이 늘어도 열이 늘지 않고, "커버리지의 추이"가
+-- 열 하나를 훑는 질의가 된다. 하루에 한 벌이고 다시 돌면 덮는다: 배치가 하루에도
+-- 여러 번 도는데 매번 쌓으면 "지난달 대비"가 무엇을 견주는지 흐려진다.
+CREATE TABLE IF NOT EXISTS phase_observation (
+    observed_on TEXT NOT NULL,     -- 날짜. 이것이 추이의 눈금이다
+    metric      TEXT NOT NULL,     -- coverage | explicit_resolution | rejection |
+                                   -- repetition | agreement | novelty | stale
+    value       REAL,              -- **NULL 은 0 이 아니라 없음**이다 (§1.3.1)
+    denominator INTEGER NOT NULL DEFAULT 0,
+    unavailable TEXT NOT NULL DEFAULT '',  -- 없다면 그 이유. 빈 값과 못 잰 것은 다르다
+    window_days INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY (observed_on, metric)
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (

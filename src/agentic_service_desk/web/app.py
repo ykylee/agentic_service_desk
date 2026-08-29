@@ -32,6 +32,7 @@ from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import intake
 from agentic_service_desk.operations import manual_entry
+from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.adapters.factory import build_parent_system
@@ -139,7 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse("/queues/Q4", status_code=303)
 
     @app.get("/status")
-    def status(request: Request):  # noqa: ANN201
+    def status(request: Request, phase: str = ""):  # noqa: ANN201
         """현황 다섯 종 + 핵심 지표 여섯 (FR-47·58).
 
         **대기열과 화면을 나눈다** (§8.1). 한 화면에 섞으면 숫자가 대기열을 밀어내고,
@@ -147,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """
         board, conn = dashboard()
         try:
+            view = _phase_view(cfg, conn)
             ctx = {
                 "core": metrics.core(conn),
                 "screens": [
@@ -154,12 +156,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     metrics.qna_status(conn),
                     metrics.content_status(conn, content_types),
                     metrics.agent_status(conn),
-                    metrics.phase_status(conn, stage=cfg.stage, phase=cfg.phase),
+                    view.status,
                 ],
+                # **전진 제안은 대기열이 아니라 이 화면의 알림이다** (§8.3) —
+                # 운영 전체에서 두어 번 일어나는 일이라 대기열을 하나 더 만들 일이
+                # 아니다.
+                "phase": view,
+                "outcome": phase,
             }
         finally:
             conn.close()
         return TEMPLATES.TemplateResponse(request, "status.html", shell() | ctx)
+
+    @app.post("/phase/advance")
+    def phase_advance(to: int = Form(...)):  # noqa: ANN201
+        """전진 승인 — **운영자만 누른다** (§1.3.3-c, FR-49).
+
+        **제안이 없으면 거부된다.** 이 버튼이 국면 다이얼이 되면 "지표가 제안하고
+        운영자가 승인한다"가 "운영자가 정한다"가 되고, 그러면 검수를 느슨하게 한
+        결정에 근거가 남지 않는다. 후퇴 버튼을 두지 않은 것도 같은 결정의 뒷면이다 —
+        후퇴는 사람이 누르는 것이 아니라 시스템이 내리는 것이다.
+        """
+        _, conn = dashboard()
+        try:
+            view = _phase_view(cfg, conn)
+            if view.judgment is None:
+                return RedirectResponse("/status?phase=관측이 아직 없다", status_code=303)
+            try:
+                decision = phase_domain.advance(conn, to=to, judgment=view.judgment)
+            except phase_domain.NotProposed as exc:
+                return RedirectResponse(f"/status?phase={quote(str(exc))}", status_code=303)
+        finally:
+            conn.close()
+        return RedirectResponse(
+            f"/status?phase={quote(f'{decision.to_phase}국면으로 올렸다 — 검수 강도와 자동 승격 범위가 함께 넓어진다')}",
+            status_code=303,
+        )
 
     @app.get("/queues/Q3")
     def q3(request: Request, outcome: str = ""):  # noqa: ANN201
@@ -604,10 +636,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         board, conn = dashboard()
         try:
             rows = promotion_domain.awaiting_decision(conn)
+            # **설정이 아니라 DB 다** (WBS-4.8.1) — 화면이 말하는 국면과 자동 승격이
+            # 보는 국면이 다르면, 역행 뒤에도 화면은 "자동으로 올라간다"고 적는다.
+            current_phase = phase_domain.current(conn, seed=cfg.phase)
         finally:
             conn.close()
         return TEMPLATES.TemplateResponse(
-            request, "q7.html", shell() | {"rows": rows, "phase": cfg.phase}
+            request, "q7.html", shell() | {"rows": rows, "phase": current_phase}
         )
 
     @app.post("/queues/Q7/{ticket_id}/promote")
@@ -709,6 +744,22 @@ def _chosen_invalidation(  # noqa: ANN001
     if not period_days.strip().isdigit() or int(period_days) <= 0:
         raise ValueError("주기형에는 재확인 주기(일수)가 필요하다")
     return Invalidation(kind=parsed, period_days=int(period_days))
+
+
+def _phase_view(cfg, conn):  # noqa: ANN001
+    """국면 화면과 판정을 한 셈에서 낸다 (WBS-4.8.1).
+
+    표가 보는 판정과 버튼이 보는 판정이 갈리면, 화면은 "전진할 수 있다"고 적고
+    버튼은 거부한다.
+    """
+    return metrics.phase_view(
+        conn,
+        stage=cfg.stage,
+        seed=cfg.phase,
+        thresholds_path=cfg.phase_thresholds_path,
+        window_days=cfg.phase_window_days,
+        min_sample=cfg.phase_min_sample,
+    )
 
 
 def _knowledge_screen(status) -> metrics.Status:  # noqa: ANN001

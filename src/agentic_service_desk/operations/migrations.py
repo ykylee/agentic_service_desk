@@ -178,6 +178,46 @@ MIGRATIONS: tuple[Migration, ...] = (
             "ALTER TABLE content_draft ADD COLUMN agent_findings TEXT",
         ),
     ),
+    Migration(
+        version=10,
+        name="phase_state · phase_decision · phase_observation — 국면 판정 (WBS-4.8.1, FR-49)",
+        statements=(
+            # **국면의 SSOT 가 설정에서 DB 로 옮겨 온다.** 이행이 값을 심지 않는
+            # 이유가 있다 — 씨앗은 `ASD_PHASE` 이고 그 값은 이행 시점이 아니라
+            # 프로세스가 처음 국면을 물을 때 읽힌다. 여기서 1 을 박아 두면 3국면으로
+            # 돌던 환경이 이행 한 번으로 조용히 1국면이 된다.
+            """
+            CREATE TABLE IF NOT EXISTS phase_state (
+                id         INTEGER PRIMARY KEY CHECK (id = 1),
+                phase      INTEGER NOT NULL,
+                since      TEXT NOT NULL,
+                decided_by TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS phase_decision (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_phase INTEGER,
+                to_phase   INTEGER NOT NULL,
+                decided_by TEXT NOT NULL,
+                reason     TEXT NOT NULL,
+                decided_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS phase_observation (
+                observed_on TEXT NOT NULL,
+                metric      TEXT NOT NULL,
+                value       REAL,
+                denominator INTEGER NOT NULL DEFAULT 0,
+                unavailable TEXT NOT NULL DEFAULT '',
+                window_days INTEGER NOT NULL,
+                observed_at TEXT NOT NULL,
+                PRIMARY KEY (observed_on, metric)
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

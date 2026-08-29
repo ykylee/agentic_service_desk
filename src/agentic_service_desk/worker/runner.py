@@ -42,6 +42,7 @@ from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import intake as intake_domain
+from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking as tracking_domain
@@ -88,6 +89,7 @@ class BatchRunner:
 
     def _tick(self) -> None:
         """한 주기. 단계에 따라 할 일이 붙는다."""
+        self._judge_phase()
         self._sync_source()
         self._sync_qna()
         self._intake()
@@ -102,6 +104,65 @@ class BatchRunner:
         self._inspect_content()
         self._publish_content()
         self._reindex()
+
+    def _judge_phase(self) -> None:
+        """세 축을 관측하고, 필요하면 **국면을 내린다** (WBS-4.8.1, FR-49, §1.3.3).
+
+        **주기의 맨 앞이다.** 이 값이 이번 주기의 게재 판정(FR-57)과 자동 승격
+        범위(§6.8.4-b)를 정하므로, 뒤에 두면 역행이 잡힌 주기의 답변들이 **느슨한
+        강도로 이미 나간 뒤에** 강도가 올라간다 — 강화는 지체하지 않는다는 결정이
+        한 주기만큼 지체된다.
+
+        **올리는 일은 여기서 하지 않는다.** 전진은 운영자 승인이고(§1.3.3-c) 배치가
+        승인을 대신할 수는 없다. 배치가 하는 것은 제안의 재료를 남기는 것까지다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            thresholds = phase_domain.load_thresholds(self._cfg.phase_thresholds_path)
+            observation = phase_domain.observe(
+                conn,
+                repo=repo,
+                window_days=self._cfg.phase_window_days,
+                min_sample=self._cfg.phase_min_sample,
+            )
+            phase_domain.save(conn, observation)
+            judgment = phase_domain.judge(
+                observation,
+                phase_domain.baseline(
+                    conn,
+                    before=observation.observed_on,
+                    lookback_days=thresholds.regression.lookback_days,
+                ),
+                current=phase_domain.current(conn, seed=self._cfg.phase),
+                thresholds=thresholds,
+            )
+            decision = None
+            if judgment.regression is not None:
+                decision = phase_domain.regress(
+                    conn, to=judgment.regression, signals=judgment.signals
+                )
+        except phase_domain.InvalidThresholds as exc:
+            print(f"[worker] 국면 판정을 건너뛴다 — 임계 선언이 성립하지 않는다: {exc}")
+            return
+        finally:
+            conn.close()
+
+        if decision is not None:
+            print(
+                f"[worker] 국면을 {decision.from_phase} → {decision.to_phase} 로 "
+                f"**내렸다.** 승인을 기다리지 않는다 (§1.3.3-c) — {decision.reason}"
+            )
+        elif judgment.signals:
+            print(f"[worker] 역행 신호 — {' · '.join(judgment.signals)}")
+        if judgment.proposal is not None:
+            print(
+                f"[worker] {judgment.proposal}국면 전진이 제안됐다 — "
+                f"**운영자가 승인해야 올라간다** (/status)"
+            )
 
     def _sync_source(self) -> None:
         """소스 저장소를 갱신하고 **무엇이 바뀌었는지**만 알아 둔다 (WBS-4.2.1).
@@ -185,7 +246,7 @@ class BatchRunner:
                 conn,
                 pipeline=self._answer_pipeline(conn),
                 reviewer=self._reviewer(),
-                gate=self._gate(),
+                gate=self._gate(conn),
             )
         finally:
             conn.close()
@@ -218,7 +279,7 @@ class BatchRunner:
             generated_by=self._cfg.llm_model,
         )
 
-    def _gate(self) -> intake_domain.Gate | None:
+    def _gate(self, conn) -> intake_domain.Gate | None:  # noqa: ANN001
         """게재 판정에 필요한 것 (WBS-4.5.5). **못 갖추면 게재하지 않는다.**
 
         연동이나 봇 계정이 없으면 내보낼 수도, 누가 올리는지 대조할 수도 없다 —
@@ -242,7 +303,9 @@ class BatchRunner:
             repo=repo,
             bot_accounts=accounts,
             stage=self._cfg.stage,
-            phase=self._cfg.phase,
+            # **국면은 설정이 아니라 DB 에서 온다** (WBS-4.8.1). 역행이 자동인 이상
+            # 이 값은 시스템이 내릴 수 있는 자리에 있어야 한다 (§1.3.3-c).
+            phase=phase_domain.current(conn, seed=self._cfg.phase),
             sample_rate=self._cfg.review_sample_rate,
         )
 
@@ -277,7 +340,7 @@ class BatchRunner:
                 conn,
                 pipeline=self._answer_pipeline(conn),
                 reviewer=self._reviewer(),
-                gate=self._gate(),
+                gate=self._gate(conn),
             )
             settled = tracking_domain.settle_quiet(
                 conn, quiet_hours=self._cfg.quiet_hours
@@ -323,7 +386,7 @@ class BatchRunner:
             report = promotion_domain.run_auto(
                 conn,
                 repo,
-                phase=self._cfg.phase,
+                phase=phase_domain.current(conn, seed=self._cfg.phase),
                 relax_clean_review=self._cfg.relax_promotion,
             )
         except KnowledgeRepoError as exc:
