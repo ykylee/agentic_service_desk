@@ -660,6 +660,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS-4.3.5/4.5.8 이 남긴 결함 보수 — 새 leaf 가 아니라 이미 done 인 leaf 의 배선 누락",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-28-main-040.md"
+    },
+    {
+      "task_id": "TASK-2026-08-30-main-001",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS 리프가 아니다 — 저장소 산출물이 아니라 워크플로우 메타 층(ai-workflow 킷 진입점)의 유지보수다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-30-main-001.md"
     }
   ],
   "issues": []

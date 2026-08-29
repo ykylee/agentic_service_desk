@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-08-29
+- Updated: 2026-08-30
 - Related docs: [Project Profile](../../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -375,6 +375,7 @@ uv run pytest -q         # 1005개 통과
 
 -
 -
+- TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용: done
 - TASK-2026-08-29-main-007 — WBS-4.8.3 보존 만료: done
 - TASK-2026-08-29-main-006 — WBS-4.8.2 알림 웹훅: done
 - TASK-2026-08-29-main-005 — WBS-4.8.4 표본 재검증: done
@@ -384,9 +385,29 @@ uv run pytest -q         # 1005개 통과
 - TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ: done
 - TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재: done
 - TASK-2026-08-28-main-043 — WBS-4.6.4 콘텐츠 검수: done
-- TASK-2026-08-28-main-042 — WBS-4.6.2 가이드 제작: done
 
 ## Key Changes
+
+- **워크플로우 킷 v1.7.0 — 진입점은 갱신하고 프로파일은 포크로 지켰다.**
+  `wk` 는 v1.7.0 인데 저장소 진입점 6개(`CLAUDE.md` · slash command 4 · `SKILL.md`)가
+  v1.6.0 에 멈춰 있어 bootstrap 을 재적용했다. 본문 차이는 없고 marker·날짜만
+  올랐으며, `CLAUDE.md` 의 run defaults TODO 5줄을 실제 명령으로 채웠다.
+  **`docs/PROJECT_PROFILE.md` 는 돌리기 전에 포크를 선언했다.** PRESERVE 경로는
+  `ai-workflow/memory/active/` · `ai-workflow/README.md` · `WORKFLOW_INDEX.md`
+  뿐이고 프로파일은 그 밖이라 **버전이 높으면 그냥 덮인다.** 게다가 설치된 wheel 에
+  프로파일 템플릿이 번들되지 않아 v1.7.0 렌더 결과가 `MISSING TEMPLATE:
+  project_workflow_profile_template.md` **한 줄**이다 — 선언이 없었으면 손으로 채운
+  §1~§5 가 통째로 그 한 줄이 됐다. 포크 marker 는 버전 marker 와 **별개 줄**로 두어
+  갈라진 시점(v1.6.0)이 남는다.
+  **`--dry-run` 은 판단 근거가 못 된다** — 아무것도 쓰지 않고 `file_actions` 도 비워
+  돌려주므로 "무엇이 덮이는가"를 말해 주지 않는다. 실제로 본 것은 적용 뒤의
+  `file_actions` 와 `git diff` 다.
+  bootstrap 이 만든 placeholder backlog·task 와 `repository_assessment.md` 는 지웠다 —
+  전자는 도입 시점 잔재인데 **`state.json` 의 done 7건을 날리고 `current_focus` 를
+  가짜 task 로 채웠고**, 후자는 §5 권고가 이미 branch-scoped 경로로 대체돼 링크가
+  깨져 있다. `state.json` 은 `wk refresh-state` 로 재생성했다.
+  프로파일 하단 "다음에 읽을 문서" 링크 둘도 실경로로 고쳤다 — `main/sessions/` 는
+  **비어 있어** 인계 문서의 실체인 `main/session_handoff.md` 를 가리킨다.
 
 - **WBS-4.6.3 문서 면 게재 — S4 완주. 멱등한 것과 아닌 것을 다르게 다룬다.**
   승인된 콘텐츠가 모 시스템으로 나간다. **출구는 하나**이고(시험이 센다) 기록을 먼저
@@ -790,6 +811,11 @@ uv run pytest -q         # 1005개 통과
 
 ## Next Actions
 
+- [ ] **claude CLI 를 재시작한다.** 플러그인 v1.7.0 은 2026-08-28 에 설치됐는데
+      지금 도는 프로세스는 그보다 먼저 시작해 **v1.6.0 스킬 본문을 보고 있다**
+      (`wk doctor` 의 `runtime_load` 가 잡았다). 플러그인은 *프로세스 시작 때*
+      로드되므로 `/clear` 로는 부족하다. 저장소 쪽 진입점은 이미 v1.7.0 이라
+      급하지는 않다
 - [ ] **4.2 완료 판정 — 실제 모 시스템 저장소를 붙여 본다.** 지금까지는 전부 합성
       저장소와 mock QnA 다. 완료 조건은 지식 항목이 쌓이고 **Lint 가 안정**되는 것
       (모순 미해결 0, 깨진 링크 0)이며 `LintReport.clean` 이 그 판정이다.
@@ -810,6 +836,10 @@ uv run pytest -q         # 1005개 통과
 
 ## Risks & Blockers
 
+- **`docs/PROJECT_PROFILE.md` 는 포크 선언이 붙어 이후 킷 갱신이 자동으로 반영되지
+  않는다.** 그것이 목적이지만(손으로 채운 §1~§5 를 지킨다) 대가가 있다 — 킷의 프로파일
+  템플릿이 바뀌면 `bootstrap` 이 조용히 건너뛰므로 **손으로 대조해야 한다.** 버전
+  marker 를 v1.6.0 으로 남긴 것이 그때의 기준점이다: 그 버전과 diff 하면 놓친 변경이 보인다.
 - ~~API 표면 미확보 위험~~ — **해소됨.** XR-2·XR-7 확보를 확인했고 전제 2·3 이 충족됐다.
   다만 요구사항 §2.2 의 대안 표는 **폐기하지 않고 남겼다** — 모 시스템 API 가 나중에
   바뀔 수 있고, 그때 무엇이 먼저 무너지는지를 그 표가 알려준다.
