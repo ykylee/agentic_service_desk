@@ -30,6 +30,7 @@ from agentic_service_desk.content import store as content_store
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import qna_state
 from agentic_service_desk.operations import recheck as recheck_domain
+from agentic_service_desk.operations import retention as retention_domain
 from agentic_service_desk.pipeline import draft_store
 
 
@@ -181,7 +182,7 @@ class Status:
     note: str = ""
 
 
-def qna_status(conn: sqlite3.Connection) -> Status:
+def qna_status(conn: sqlite3.Connection, *, retention_days: int | None = None) -> Status:
     """QnA 처리 현황 (§8.3)."""
     total = _count(conn, "SELECT count(*) c FROM qna_item")
     manual = _count(
@@ -219,7 +220,31 @@ def qna_status(conn: sqlite3.Connection) -> Status:
                 _fmt(_ratio(followups, total), "회") + " — 높으면 한 번에 풀지 못하고 있다",
             ),
             ("정정된 답변", f"{corrected}건 — 게재 후 진실이 바뀐 건이다 (W3)"),
+            ("보존", _retention_text(conn, retention_days)),
         ],
+    )
+
+
+def _retention_text(conn: sqlite3.Connection, retention_days: int | None) -> str:
+    """**무제한이 결정이라는 것을 화면이 말한다** (PO-4).
+
+    설정 줄이 비어 있는 것과 두지 않기로 정한 것은 화면에서 같아 보인다. 그 둘이
+    같아 보이면, 개인정보 이슈가 생겼을 때 "아무도 정하지 않았다"로 읽힌다.
+    """
+    if retention_days is None:
+        return (
+            "**무제한** — 사내에 정해진 보존 정책이 없어 **두지 않기로 정했다** "
+            "(PO-4, 2026-08-28 확인). 정책이 생기면 `ASD_RETENTION_DAYS` 에 값만 넣는다"
+        )
+    run = retention_domain.last_run(conn)
+    when = (
+        f"마지막 만료 {run['ran_at'][:10]} — {run['questions']}건의 질문 원문이 사라졌다"
+        if run
+        else "**아직 한 번도 돌지 않았다**"
+    )
+    return (
+        f"{retention_days}일 — 그 뒤에 닫힌 건의 **원문**이 지워진다. "
+        f"지식 항목과 통계의 분모는 남는다 (FR-51). {when}"
     )
 
 

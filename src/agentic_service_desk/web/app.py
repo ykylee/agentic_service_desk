@@ -161,7 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "core": metrics.core(conn),
                 "screens": [
                     _knowledge_screen(board.knowledge_status()),
-                    metrics.qna_status(conn),
+                    metrics.qna_status(conn, retention_days=cfg.retention_days),
                     metrics.content_status(conn, content_types),
                     metrics.agent_status(conn),
                     view.status,

@@ -46,6 +46,7 @@ from agentic_service_desk.operations import intake as intake_domain
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import recheck as recheck_domain
+from agentic_service_desk.operations import retention as retention_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking as tracking_domain
 from agentic_service_desk.operations.drafter import Drafter
@@ -107,6 +108,7 @@ class BatchRunner:
         self._inspect_content()
         self._publish_content()
         self._reindex()
+        self._expire()
         self._notify()
 
     def _judge_phase(self) -> None:
@@ -460,6 +462,40 @@ class BatchRunner:
                     if unseen
                     else ""
                 )
+            )
+
+    def _expire(self) -> None:
+        """보존 기간이 지난 원문을 지운다 (WBS-4.8.3, FR-51, PO-4).
+
+        **기본은 무제한이라 대개 아무 일도 하지 않는다.** 그것이 정책 부재가 아니라
+        결정이다 — 사내에 정해진 보존 정책이 없어 두지 않기로 정했고, 정책이 생기면
+        `ASD_RETENTION_DAYS` 에 값만 넣으면 된다.
+
+        **주기의 뒤쪽이다.** 이번 주기의 수집·파이프라인·ingest 가 원문을 다 쓰고 난
+        뒤에 지운다 — 앞에 두면 방금 들어온 후속이 붙을 건의 원문이 같은 주기에
+        사라질 수 있다.
+        """
+        if self._cfg.retention_days is None:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            report = retention_domain.expire(
+                conn, retention_days=self._cfg.retention_days
+            )
+        except retention_domain.InvalidRetention as exc:
+            # **설정이 이상하면 지우지 않는다.** 되돌릴 수 없는 쪽으로 기울지 않는다.
+            print(f"[worker] 보존 만료를 건너뛴다 — {exc}")
+            return
+        finally:
+            conn.close()
+
+        if report.changed:
+            print(
+                f"[worker] 보존 만료 — {report.summary}. "
+                f"**지식 항목과 통계는 남는다** (FR-51)"
             )
 
     def _notify(self) -> None:

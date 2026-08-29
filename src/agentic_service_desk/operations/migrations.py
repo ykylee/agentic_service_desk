@@ -259,6 +259,28 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=13,
+        name="retention_run — 보존 만료 (WBS-4.8.3, FR-51)",
+        statements=(
+            # **이행이 아무것도 지우지 않는다.** 보존 기간은 설정이고 기본은 무제한
+            # 이므로(PO-4), 이행 시점에 값을 짐작해 적용하면 정책이 없는 곳에서
+            # 원문이 사라진다 — 되돌릴 수 없는 일을 짐작으로 하지 않는다.
+            """
+            CREATE TABLE IF NOT EXISTS retention_run (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                ran_at         TEXT NOT NULL,
+                cutoff         TEXT NOT NULL,
+                questions      INTEGER NOT NULL DEFAULT 0,
+                answers        INTEGER NOT NULL DEFAULT 0,
+                followups      INTEGER NOT NULL DEFAULT 0,
+                resolutions    INTEGER NOT NULL DEFAULT 0,
+                manual_entries INTEGER NOT NULL DEFAULT 0,
+                anonymized     INTEGER NOT NULL DEFAULT 0
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

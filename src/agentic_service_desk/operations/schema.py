@@ -266,7 +266,11 @@ CREATE TABLE IF NOT EXISTS raw_question (
     body         TEXT NOT NULL,
     asker_account TEXT NOT NULL,    -- 사내 식별자. 지식·콘텐츠로 넘어가지 않는다 (PO-3)
     created_at   TEXT NOT NULL,     -- 모 시스템 기준 시각. QnA 커서가 이 값을 따른다
-    collected_at TEXT NOT NULL      -- 우리가 가져온 시각. 보존 만료의 기준이다 (FR-51)
+    collected_at TEXT NOT NULL      -- 우리가 가져온 시각.
+                                    -- **보존 만료는 이 값이 아니라 `qna_item.closed_at`
+                                    -- 을 본다** (WBS-4.8.3). 수집 시각으로 재면 오래
+                                    -- 끌던 건이 해결되자마자 원문을 잃는다 — 후속이
+                                    -- 달릴 여지가 아직 있는데도 (§6.1)
 );
 
 -- 답변. **`author_account` 가 이 표에서 가장 중요한 열이다** (D7).
@@ -492,6 +496,22 @@ CREATE TABLE IF NOT EXISTS alert_sent (
     fingerprint TEXT NOT NULL,
     sent_at     TEXT NOT NULL,   -- **성공했을 때만 적는다** — 실패에 적으면 영영 안 간다
     PRIMARY KEY (kind, fingerprint)
+);
+
+-- 보존 만료 이력 (WBS-4.8.3, FR-51, PO-4). **건수만 남는다.**
+-- 삭제는 되돌릴 수 없는 행위인데, 무엇이 몇 건 사라졌는지가 남지 않으면 "원래
+-- 없었다"와 "지웠다"를 구분할 수 없다. 그렇다고 **무엇을 지웠는지는 남기지 않는다** —
+-- 지웠다면서 흔적을 남기는 것은 모순이다.
+CREATE TABLE IF NOT EXISTS retention_run (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    ran_at         TEXT NOT NULL,
+    cutoff         TEXT NOT NULL,   -- 이 시각 이전에 닫힌 건이 대상이었다
+    questions      INTEGER NOT NULL DEFAULT 0,
+    answers        INTEGER NOT NULL DEFAULT 0,
+    followups      INTEGER NOT NULL DEFAULT 0,
+    resolutions    INTEGER NOT NULL DEFAULT 0,
+    manual_entries INTEGER NOT NULL DEFAULT 0,
+    anonymized     INTEGER NOT NULL DEFAULT 0   -- 행은 남기고 식별자만 지운 건수
 );
 
 -- 배치 진행 지점 (ADR-005 · ADR-006)

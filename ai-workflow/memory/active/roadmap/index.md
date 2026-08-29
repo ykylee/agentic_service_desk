@@ -21,5 +21,5 @@
   - path: [`./M-002-requirements.md`](./M-002-requirements.md)
 - **M-003** [design] 설계 — status: done
   - path: [`./M-003-design.md`](./M-003-design.md)
-- **M-004** [implementation] 구현 — status: in_progress
+- **M-004** [implementation] 구현 — status: done
   - path: [`./M-004-implementation.md`](./M-004-implementation.md)

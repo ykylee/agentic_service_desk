@@ -90,11 +90,11 @@
       "id": "M-004",
       "title": "구현",
       "sdlc_phase": "implementation",
-      "declared_status": "in_progress",
-      "derived_status": "in_progress",
-      "progress": 0.975,
+      "declared_status": "done",
+      "derived_status": "done",
+      "progress": 1.0,
       "total_leaves": 40,
-      "done_leaves": 39,
+      "done_leaves": 40,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -570,10 +570,10 @@
         {
           "id": "WBS-4.8",
           "title": "운영 부가 (4.5 이후 병행)",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 4,
-          "done_leaves": 3,
+          "done_leaves": 4,
           "children": [
             {
               "id": "WBS-4.8.1",
@@ -600,10 +600,12 @@
             {
               "id": "WBS-4.8.3",
               "title": "보존 만료",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-29-main-007"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             },
             {
@@ -622,7 +624,7 @@
       ]
     }
   ],
-  "current_milestone_id": "M-004",
+  "current_milestone_id": null,
   "exempt_tasks": [
     {
       "task_id": "TASK-2026-08-28-main-001",
