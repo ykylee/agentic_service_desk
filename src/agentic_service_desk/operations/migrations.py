@@ -242,6 +242,23 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=12,
+        name="alert_sent — 알림 웹훅 (WBS-4.8.2, ADR-007 결정 2)",
+        statements=(
+            # **비어 있는 채로 시작한다.** 지금 밀려 있는 Q4·Q5 는 이행 직후 한 번
+            # 알림이 가는데, 그것이 맞다 — 이 장치가 생기기 전까지 아무도 모르고
+            # 있었다는 뜻이기 때문이다.
+            """
+            CREATE TABLE IF NOT EXISTS alert_sent (
+                kind        TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                sent_at     TEXT NOT NULL,
+                PRIMARY KEY (kind, fingerprint)
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

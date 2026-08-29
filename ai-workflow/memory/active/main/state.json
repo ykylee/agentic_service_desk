@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 38 완료, 남은 것은 4.8.2 알림 웹훅과 4.8.3 보존 만료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 38 완료, 남은 것은 4.8.2 알림 웹훅과 4.8.3 보존 만료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 39 완료, 남은 것은 WBS-4.8.3 보존 만료 하나.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 39 완료, 남은 것은 WBS-4.8.3 보존 만료 하나.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-29-main-006 — WBS-4.8.2 알림 웹훅",
       "TASK-2026-08-29-main-005 — WBS-4.8.4 표본 재검증",
       "TASK-2026-08-29-main-004 — WBS-4.8.1 국면 판정과 전환",
       "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터",
@@ -42,15 +43,14 @@
       "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재",
       "TASK-2026-08-28-main-043 — WBS-4.6.4 콘텐츠 검수",
       "TASK-2026-08-28-main-042 — WBS-4.6.2 가이드 제작",
-      "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리",
-      "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)"
+      "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-29.md",
-    "task_count": 5,
+    "task_count": 6,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -58,7 +58,8 @@
       "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼",
       "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터",
       "TASK-2026-08-29-main-004 — WBS-4.8.1 국면 판정과 전환",
-      "TASK-2026-08-29-main-005 — WBS-4.8.4 표본 재검증"
+      "TASK-2026-08-29-main-005 — WBS-4.8.4 표본 재검증",
+      "TASK-2026-08-29-main-006 — WBS-4.8.2 알림 웹훅"
     ]
   },
   "next_documents": [

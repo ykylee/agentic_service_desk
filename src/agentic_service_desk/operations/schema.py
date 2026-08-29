@@ -481,6 +481,19 @@ CREATE TABLE IF NOT EXISTS recheck (
     decided_at  TEXT
 );
 
+-- 보낸 알림 (WBS-4.8.2, ADR-007 결정 2). **무엇을 보냈는지가 아니라 무엇을 또 보내지
+-- 않을지를 위한 표다.** 배치는 분 단위로 도는데 성립할 때마다 보내면 하루에 수백 건이
+-- 가고, 그러면 사람은 채널을 음소거한다 — 알림이 있으나 마나가 되는 가장 흔한 방식이다.
+--
+-- 지문은 "가장 오래 밀린 것이 무엇인가"다. 건수를 지문에 넣지 않는 이유는, 한 건 늘어난
+-- 사이에 사람이 할 수 있는 일이 달라지지 않기 때문이다.
+CREATE TABLE IF NOT EXISTS alert_sent (
+    kind        TEXT NOT NULL,   -- risk_queue | phase_regression
+    fingerprint TEXT NOT NULL,
+    sent_at     TEXT NOT NULL,   -- **성공했을 때만 적는다** — 실패에 적으면 영영 안 간다
+    PRIMARY KEY (kind, fingerprint)
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (

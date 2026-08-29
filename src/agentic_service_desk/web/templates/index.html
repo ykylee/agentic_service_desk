@@ -6,6 +6,12 @@
   <a href="/status"><strong>핵심 지표와 현황 다섯 종</strong></a>
 </p>
 
+{% for a in alerts %}
+<p class="warn">
+  <strong>{{ a.title }}</strong> — {{ a.body }}
+</p>
+{% endfor %}
+
 <div class="cards">
   <div class="card"><div class="dim small">지식 항목</div><div class="n">{{ s.total }}</div></div>
   <div class="card">

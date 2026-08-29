@@ -30,6 +30,7 @@ from agentic_service_desk.web import metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
+from agentic_service_desk.operations import alert as alert_domain
 from agentic_service_desk.operations import intake
 from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.operations import phase as phase_domain
@@ -111,6 +112,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Q8": len(board.knowledge_gaps()),
             }
             next_up = board.next_up(cfg.stage)
+            # **배너는 웹훅이 있어도 뜬다** (ADR-007 결정 2). 알림이 도착하지 않은
+            # 것과 경고가 없는 것을 화면에서 구분할 수 없으면 침묵이 안전으로 읽힌다.
+            alerts = alert_domain.pending(
+                conn, neglect_hours=cfg.alert_neglect_hours
+            )
         finally:
             conn.close()
         ctx = shell()
@@ -119,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "s": status,
             "counts": {q.id: counts.get(q.id, 0) for q in ctx["queues"]},
             "next_up": next_up,
+            "alerts": alerts,
         }
         return TEMPLATES.TemplateResponse(request, "index.html", ctx)
 

@@ -41,6 +41,7 @@ from agentic_service_desk.pipeline.answer import AnswerPipeline
 from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
+from agentic_service_desk.operations import alert as alert_domain
 from agentic_service_desk.operations import intake as intake_domain
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import promotion as promotion_domain
@@ -106,6 +107,7 @@ class BatchRunner:
         self._inspect_content()
         self._publish_content()
         self._reindex()
+        self._notify()
 
     def _judge_phase(self) -> None:
         """세 축을 관측하고, 필요하면 **국면을 내린다** (WBS-4.8.1, FR-49, §1.3.3).
@@ -459,6 +461,40 @@ class BatchRunner:
                     else ""
                 )
             )
+
+    def _notify(self) -> None:
+        """대시보드를 열지 않아도 알게 한다 (WBS-4.8.2, ADR-007 결정 2).
+
+        **주기의 맨 뒤다.** 이번 주기가 만든 것까지 세고 나서 알려야 한다 — 앞에 두면
+        방금 Lint 가 찾은 모순이 다음 주기에나 알려진다.
+
+        **웹훅이 없으면 아무 일도 하지 않는다.** 그때는 배너가 같은 것을 말하고,
+        배너는 웹훅이 있어도 함께 뜬다.
+        """
+        if not self._cfg.alert_webhook_url:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            waiting = alert_domain.unsent(
+                conn,
+                alert_domain.pending(
+                    conn, neglect_hours=self._cfg.alert_neglect_hours
+                ),
+            )
+            sent, failures = alert_domain.dispatch(
+                conn, url=self._cfg.alert_webhook_url, alerts=waiting
+            )
+        finally:
+            conn.close()
+
+        for alert in sent:
+            print(f"[worker] 알림 — {alert.title}")
+        for failure in failures:
+            # **보냈다고 적지 않았다.** 다음 주기가 다시 시도한다.
+            print(f"[worker] 알림 실패 — {failure}")
 
     def _output_filter(self) -> OutputFilter:
         """되먹임 차단 필터. **한 번 만들어 재사용한다** (NFR-4)."""
