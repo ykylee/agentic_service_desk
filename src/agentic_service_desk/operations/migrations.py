@@ -218,6 +218,30 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=11,
+        name="recheck · qna_item.upgraded_at — 표본 재검증 (WBS-4.8.4, FR-50)",
+        statements=(
+            # **옛 상향은 표본에 들어오지 않는다.** 이행 전에 눌린 Q6 클릭은 시각이
+            # 남지 않았고, 지금 `closed_at` 으로 채우면 이용자의 해결 표시로 올라간
+            # 건까지 우리 클릭으로 둔갑한다 — 재검증이 재려는 것이 바로 그 클릭이라
+            # 섞이면 숫자가 뜻을 잃는다. 비워 두는 것이 정직하다.
+            "ALTER TABLE qna_item ADD COLUMN upgraded_at TEXT",
+            """
+            CREATE TABLE IF NOT EXISTS recheck (
+                id          TEXT PRIMARY KEY,
+                point       TEXT NOT NULL,
+                subject_id  TEXT NOT NULL,
+                original_by TEXT NOT NULL,
+                original_at TEXT NOT NULL,
+                selected_at TEXT NOT NULL,
+                state       TEXT NOT NULL,
+                note        TEXT NOT NULL DEFAULT '',
+                decided_at  TEXT
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

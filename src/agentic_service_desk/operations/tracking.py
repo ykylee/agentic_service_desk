@@ -356,13 +356,18 @@ def upgrade(conn: sqlite3.Connection, qna_item_id: str) -> bool:
     ).fetchone()
     if row is None or row["resolution_grade"] != qna_state.IMPLICIT:
         return False
+    now = datetime.now(UTC).isoformat()
+    # **클릭을 남긴다** (WBS-4.8.4). 등급만 바꾸면 이용자의 해결 표시로 올라간 건과
+    # 구분되지 않아, §5.6.2 가 최고 위험으로 꼽은 이 판정을 표본 재검증이 집어낼 수
+    # 없다 — 재는 장치가 재야 할 것을 못 보는 셈이다.
     conn.execute(
         "UPDATE qna_item SET state = ?, resolution_grade = ?, "
-        "closed_at = COALESCE(closed_at, ?) WHERE id = ?",
+        "closed_at = COALESCE(closed_at, ?), upgraded_at = ? WHERE id = ?",
         (
             qna_state.RESOLVED,
             qna_state.EXPLICIT,
-            datetime.now(UTC).isoformat(),
+            now,
+            now,
             qna_item_id,
         ),
     )

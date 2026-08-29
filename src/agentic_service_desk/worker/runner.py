@@ -44,6 +44,7 @@ from agentic_service_desk.knowledge.repository import KnowledgeRepoError, Knowle
 from agentic_service_desk.operations import intake as intake_domain
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import promotion as promotion_domain
+from agentic_service_desk.operations import recheck as recheck_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking as tracking_domain
 from agentic_service_desk.operations.drafter import Drafter
@@ -96,6 +97,7 @@ class BatchRunner:
         self._track()
         self._promote()
         self._release_held_tickets()
+        self._sample_recheck()
         self._draft_resolutions()
         self._ingest()
         self._lint()
@@ -426,6 +428,37 @@ class BatchRunner:
             conn.close()
         if reopened:
             print(f"[worker] 응답이 와 보류를 푼 티켓 {len(reopened)}건 — Q1 로 돌아간다")
+
+    def _sample_recheck(self) -> None:
+        """다시 볼 표본을 뽑는다 (WBS-4.8.4, FR-50, §5.6.7).
+
+        **승격 다음에 돈다.** 방금 자동으로 올라간 건이 그 주기의 표본 후보에
+        들어와야 한다 — 사람이 본 적 없는 것이 재검증 우선순위 1번이기 때문이다
+        (§6.8.4-a).
+
+        **뽑기만 한다.** 다시 보는 것은 사람 몫이고, 배치가 대신 판정하면 "사람
+        승인이 실질인가"를 기계가 답하는 셈이 되어 재려던 것이 사라진다.
+        """
+        if not self._cfg.operations_db.exists():
+            return
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            if not recheck_domain.due(conn, period_days=self._cfg.recheck_period_days):
+                return
+            taken = recheck_domain.select(conn, size=self._cfg.recheck_sample_size)
+        finally:
+            conn.close()
+        if taken:
+            unseen = sum(1 for s in taken if s.unseen)
+            print(
+                f"[worker] 재검증 표본 {len(taken)}건을 뽑았다 (/recheck)"
+                + (
+                    f" — 그중 {unseen}건은 **사람이 본 적이 없다** (§6.8.4-a)"
+                    if unseen
+                    else ""
+                )
+            )
 
     def _output_filter(self) -> OutputFilter:
         """되먹임 차단 필터. **한 번 만들어 재사용한다** (NFR-4)."""

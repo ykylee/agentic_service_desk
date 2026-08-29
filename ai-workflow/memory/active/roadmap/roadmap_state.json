@@ -92,9 +92,9 @@
       "sdlc_phase": "implementation",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.925,
+      "progress": 0.95,
       "total_leaves": 40,
-      "done_leaves": 37,
+      "done_leaves": 38,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -573,7 +573,7 @@
           "derived_status": "in_progress",
           "linked_task_ids": [],
           "total_leaves": 4,
-          "done_leaves": 1,
+          "done_leaves": 2,
           "children": [
             {
               "id": "WBS-4.8.1",
@@ -607,10 +607,12 @@
             {
               "id": "WBS-4.8.4",
               "title": "표본 재검증",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-08-29-main-005"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

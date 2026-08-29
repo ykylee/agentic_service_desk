@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}표본 재검증{% endblock %}
+{% block body %}
+<h1>표본 재검증</h1>
+<p class="dim small">
+  승인된 것 중 일부를 <strong>다시 본다</strong> (§5.6.7) — 승인이 실질이었는지 재는
+  <strong>유일한 사후 장치</strong>다. 자동 판정과 사람 판정의 일치율(§1.3.3-b)과
+  대칭이고 방향만 반대다: 그쪽은 자동을 믿어도 되는지, 이쪽은 <strong>사람 승인이
+  실질이었는지</strong>를 묻는다.
+  <a href="/status">현황으로 돌아가기</a>
+</p>
+<p class="dim small">
+  <strong>대기열이 아니다.</strong> Q1~Q8 옆에 세우면 밀린 대기열을 비우는 손이 여기까지
+  와서, 이 화면이 재려던 바로 그 형식적 승인이 재검증에서 일어난다.
+  <strong>천천히 봐도 된다 — 대신 읽고 누른다.</strong>
+</p>
+
+{% if outcome %}<p class="warn"><strong>{{ outcome }}</strong></p>{% endif %}
+
+<div class="cards">
+  <div class="card">
+    <div class="dim small">일치율</div>
+    <div class="n">{{ agreement.percent }}</div>
+    <div class="dim small">분모 {{ agreement.decided }}건</div>
+  </div>
+  <div class="card">
+    <div class="dim small">다시 볼 것</div>
+    <div class="n {% if agreement.waiting %}warn{% endif %}">{{ agreement.waiting }}</div>
+    <div class="dim small">배치가 주기마다 뽑는다</div>
+  </div>
+  <div class="card">
+    <div class="dim small">다르다고 본 것</div>
+    <div class="n {% if agreement.disagreed %}warn{% else %}ok{% endif %}">{{ agreement.disagreed }}</div>
+    <div class="dim small">사유가 함께 남는다</div>
+  </div>
+</div>
+
+{% if rows %}
+{% for sample, ctx in rows %}
+<h2>{{ sample.label }}</h2>
+<p class="dim small">
+  {{ sample.original_at[:16] }} · {{ sample.original_by }} 판정 · 대상 <code>{{ sample.subject_id }}</code>
+  {% if sample.unseen %}<br><span class="warn"><strong>사람이 본 적이 없다</strong> — 자동으로 넘어간 건이라 재검증이 유일한 안전망이다 (§6.8.4-a)</span>{% endif %}
+</p>
+<table>
+  {% for label, value in ctx %}
+  <tr><th style="width:11rem">{{ label }}</th><td class="small">{{ value }}</td></tr>
+  {% endfor %}
+</table>
+<form method="post" action="/recheck/{{ sample.id }}">
+  <input type="hidden" name="verdict" value="agreed">
+  <button type="submit">같게 판단한다</button>
+</form>
+<form method="post" action="/recheck/{{ sample.id }}">
+  <input type="hidden" name="verdict" value="disagreed">
+  <input type="text" name="note" placeholder="무엇이 다른가 (사유 없이는 받지 않는다)" size="52">
+  <button type="submit">다르게 판단한다</button>
+</form>
+{% endfor %}
+{% else %}
+<p class="dim">다시 볼 표본이 없다. 배치가 주기마다 위험도 순으로 뽑는다 (§5.6.2).</p>
+{% endif %}
+
+{% if decided %}
+<h2>이미 다시 본 것</h2>
+<table>
+  <tr><th style="width:14rem">지점</th><th style="width:5rem">판정</th><th>사유</th></tr>
+  {% for s in decided %}
+  <tr>
+    <td class="small">{{ s.label }}<br><span class="dim">{{ s.subject_id }}</span></td>
+    <td class="small">{% if s.state == 'agreed' %}같다{% else %}<span class="warn">다르다</span>{% endif %}</td>
+    <td class="small">{{ s.note or '—' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

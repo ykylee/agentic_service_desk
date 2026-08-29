@@ -34,7 +34,12 @@ CREATE TABLE IF NOT EXISTS qna_item (
     resolution_grade  TEXT,                   -- explicit | implicit — ingest 자격을 가른다 (D8)
     language          TEXT,                   -- 1단계에서 판정 (D53)
     opened_at         TEXT NOT NULL,
-    closed_at         TEXT
+    closed_at         TEXT,
+    -- 운영자가 **암묵 → 명시로 올린 시각** (Q6, FR-32, WBS-4.8.4).
+    -- §5.6.2 가 최고 위험으로 꼽은 클릭인데 지금까지 **어디에도 남지 않았다** —
+    -- 등급만 바뀌어, 이용자의 해결 표시로 올라간 건과 구분되지 않았다. 표본
+    -- 재검증이 "그 클릭이 실질이었는가"를 물으려면 클릭이 기록돼 있어야 한다.
+    upgraded_at       TEXT
 );
 
 -- 수동 등록 원문 (FR-10, §1.4.3).
@@ -456,6 +461,24 @@ CREATE TABLE IF NOT EXISTS phase_observation (
     window_days INTEGER NOT NULL,
     observed_at TEXT NOT NULL,
     PRIMARY KEY (observed_on, metric)
+);
+
+-- 표본 재검증 (WBS-4.8.4, FR-50, §5.6.7). **승인이 실질이었는지 사후에 묻는다.**
+-- 승인 이력을 여기 복사하지 않는다 — 각 지점의 SSOT(review · ticket_resolution ·
+-- qna_item)를 그대로 읽고, 이 표에는 **무엇을 뽑았고 다시 본 결과가 무엇인지**만
+-- 남긴다. 복사해 두면 두 벌이 어긋나고, 어긋난 쪽을 재검증하는 순간 이 장치는
+-- 거짓을 재게 된다.
+CREATE TABLE IF NOT EXISTS recheck (
+    id          TEXT PRIMARY KEY,   -- `rc-<지점>-<대상>`. **같은 건은 두 번 뽑히지 않는다**
+    point       TEXT NOT NULL,      -- auto_promotion | promotion | upgrade |
+                                    -- resolution | answer_review | content_review (§5.6.2)
+    subject_id  TEXT NOT NULL,      -- 그 지점의 대상 id (ticket_id | qna_item.id | review.id)
+    original_by TEXT NOT NULL,      -- human | gate — **gate 는 사람이 본 적 없다** (§6.8.4-a)
+    original_at TEXT NOT NULL,
+    selected_at TEXT NOT NULL,      -- 뽑힌 시각. 주기 판정이 이것을 본다 (O50)
+    state       TEXT NOT NULL,      -- pending | agreed | disagreed
+    note        TEXT NOT NULL DEFAULT '',  -- 다르다면 사유. **사유 없는 불일치는 받지 않는다**
+    decided_at  TEXT
 );
 
 -- 배치 진행 지점 (ADR-005 · ADR-006)

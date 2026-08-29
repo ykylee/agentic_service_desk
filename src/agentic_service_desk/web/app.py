@@ -35,6 +35,7 @@ from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.knowledge.search import Search
 from agentic_service_desk.operations import promotion as promotion_domain
+from agentic_service_desk.operations import recheck as recheck_domain
 from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.pipeline import draft_store, review as review_domain
@@ -167,6 +168,50 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return TEMPLATES.TemplateResponse(request, "status.html", shell() | ctx)
+
+    @app.get("/recheck")
+    def recheck(request: Request, outcome: str = ""):  # noqa: ANN201
+        """표본 재검증 (WBS-4.8.4, FR-50, §5.6.7).
+
+        **대기열이 아니다.** Q1~Q8 옆에 세우면 밀린 대기열을 비우는 손이 여기까지
+        와서, 이 화면이 재려던 바로 그 형식적 승인이 재검증에서 일어난다 — 그러면
+        일치율은 100% 로 수렴하고 아무것도 재지 못한다. 그래서 현황에서 열고,
+        순위 목록(§8.2)에도 넣지 않는다.
+        """
+        _, conn = dashboard()
+        try:
+            rows = [
+                (sample, recheck_domain.context(conn, sample))
+                for sample in recheck_domain.pending(conn)
+            ]
+            ctx = {
+                "rows": rows,
+                "agreement": recheck_domain.agreement(conn),
+                "decided": recheck_domain.decided(conn),
+                "outcome": outcome,
+            }
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "recheck.html", shell() | ctx)
+
+    @app.post("/recheck/{sample_id}")
+    def recheck_decide(  # noqa: ANN201
+        sample_id: str, verdict: str = Form(...), note: str = Form("")
+    ):
+        """다시 본 결과를 남긴다. **다르다면 사유를 받는다** (§5.5.6 과 같은 이유)."""
+        _, conn = dashboard()
+        try:
+            try:
+                recheck_domain.decide(
+                    conn, sample_id, agreed=verdict == "agreed", note=note
+                )
+                outcome = ""
+            except recheck_domain.NotPending as exc:
+                outcome = str(exc)
+        finally:
+            conn.close()
+        suffix = f"?outcome={quote(outcome)}" if outcome else ""
+        return RedirectResponse(f"/recheck{suffix}", status_code=303)
 
     @app.post("/phase/advance")
     def phase_advance(to: int = Form(...)):  # noqa: ANN201

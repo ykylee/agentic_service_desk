@@ -157,12 +157,12 @@ class TestUnmeasurable:
         assert "잴 수 없다" in rows["무수정 승인 비율"]
         conn.close()
 
-    def test_표본_재검증은_아직_없다고_말한다(self, tmp_path) -> None:
-        # **빈 값과 아직 만들지 않은 것은 다르다.**
+    def test_뽑힌_표본이_없는_것과_0퍼센트는_다르다(self, tmp_path) -> None:
+        """장치는 생겼지만(4.8.4) **뽑힌 것과 판정한 것은 또 다르다.**"""
         conn = _conn(tmp_path)
         rows = dict(metrics.agent_status(conn).rows)
-        assert "아직 없다" in rows["표본 재검증 일치율"]
-        assert "4.8.4" in rows["표본 재검증 일치율"]
+        assert "아직 뽑힌 표본이 없다" in rows["표본 재검증 일치율"]
+        assert "0% 가 아니다" in rows["표본 재검증 일치율"]
         conn.close()
 
     def test_국면별_임계가_미정임을_밝힌다(self, tmp_path) -> None:

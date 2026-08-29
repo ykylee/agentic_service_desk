@@ -6,8 +6,9 @@
 ## 셀 수 없는 것을 세는 척하지 않는다
 
 지표 중에는 지금 구조로 **잴 수 없는 것**이 있다 — 무수정 승인 비율은 초안을 고치는
-기능이 없어 언제나 100% 로 나오고, 표본 재검증 일치율은 그 장치(WBS-4.8.4)가 아직
-없다. 그런 값을 0 이나 100 으로 내보내면 **없는 신호가 있는 것처럼 읽힌다.**
+기능이 없어 언제나 100% 로 나온다. 표본 재검증 일치율은 장치가 생겼지만(WBS-4.8.4)
+**뽑힌 표본과 판정한 표본이 다르다**: 아무도 다시 보지 않았으면 값이 아니라 없음이다.
+그런 값을 0 이나 100 으로 내보내면 **없는 신호가 있는 것처럼 읽힌다.**
 
 > 빈 값과 "아직 만들지 않았다"는 다르다. 화면은 그 구분을 말해야 한다.
 
@@ -28,6 +29,7 @@ from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import store as content_store
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import qna_state
+from agentic_service_desk.operations import recheck as recheck_domain
 from agentic_service_desk.pipeline import draft_store
 
 
@@ -145,6 +147,25 @@ def core(conn: sqlite3.Connection) -> list[Metric]:
     ]
 
 
+def _recheck_text(conn: sqlite3.Connection) -> str:
+    """**뽑기만 하고 보지 않은 것은 분모가 아니다** (§5.6.7).
+
+    대기 중인 표본을 분모에 넣으면 재검증이 밀릴수록 일치율이 떨어지는데, 그것은
+    승인 품질이 아니라 부하의 신호다. 다만 몇 건이 기다리는지는 함께 말한다 —
+    그 숫자가 0 이 아닌데 일치율이 없다면, 장치가 아니라 **사람이 멈춰 있다.**
+    """
+    result = recheck_domain.agreement(conn)
+    if result.decided:
+        return (
+            f"{result.percent} (분모 {result.decided}건"
+            + (f" · 대기 {result.waiting}건" if result.waiting else "")
+            + ")"
+        )
+    if result.waiting:
+        return f"**아직 판정한 표본이 없다** — {result.waiting}건이 기다린다 (/recheck)"
+    return "**아직 뽑힌 표본이 없다** — 0% 가 아니다"
+
+
 # --- FR-47 현황 다섯 종 -------------------------------------------------------
 
 
@@ -254,8 +275,10 @@ def agent_status(conn: sqlite3.Connection) -> Status:
             ),
             (
                 "표본 재검증 일치율",
-                "**아직 없다** — 표본 재검증 장치가 WBS-4.8.4 다. "
-                "빈 값과 아직 만들지 않은 것은 다르다",
+                _recheck_text(conn)
+                + " — **사람 승인이 실질이었는지**를 사후에 묻는다 (§5.6.7). "
+                "낮으면 승인이 형식적으로 흐르고 있다는 뜻이고, 대응은 사람이 아니라 "
+                "부하를 향한다",
             ),
         ],
         note="이 숫자들은 **개인 평가가 아니라 시스템 건강도**로 읽는다 (NFR-9). "
