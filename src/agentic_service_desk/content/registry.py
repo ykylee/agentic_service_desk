@@ -52,11 +52,19 @@ class InvalidDeclaration(ValueError):
 
 
 class Input(enum.StrEnum):
-    """주 입력 — 무엇을 읽는가 (§7.5-1)."""
+    """주 입력 — 무엇을 읽는가 (§7.5-1).
+
+    **읽개는 타입마다가 아니라 여기 값마다 하나다.** 타입이 넷에서 열이 되어도
+    읽개는 늘지 않는 것이 FR-42 가 성립하는 이유이고, 반대로 **새 값을 더하는 것은
+    코드를 더하는 일**이다 — 새 종류의 원천을 읽는다는 뜻이므로 그것이 맞다.
+    """
 
     QNA_STATS = "qna_stats"
     KNOWLEDGE = "knowledge"
     BOTH = "both"
+    PERIOD_SUMMARY = "period_summary"
+    """기간 내 변경·발행 요약 (§7.2). 뉴스레터가 쓴다 — 칼럼과 같은 발행 면에
+    나가지만 **다른 것을 읽는다**: 한 주제가 아니라 그 기간에 무슨 일이 있었는가다."""
 
 
 class Nature(enum.StrEnum):

@@ -46,11 +46,12 @@
 {% endif %}
 
 {% if d.observations %}
-<h2>관찰</h2>
+<h2>{{ d.facts_label }}</h2>
 <p class="dim small">
-  <strong>권고의 근거다</strong> (§7.6.2). 관찰을 밝히지 않은 조언은 그 순간 의견이
-  되므로, 본문의 권고가 <strong>아래 중 무엇에 기댔는지</strong>를 본다. 여기 없는
-  관찰을 든 문장은 지어낸 것이다.
+  <strong>세어서 박은 사실이다</strong> (§7.6.2). 밝히지 않은 조언은 그 순간 의견이
+  되므로, 본문이 <strong>아래 중 무엇에 기댔는지</strong>를 본다. 여기 없는 것을 든
+  문장은 지어낸 것이고, <strong>본문에 적힌 숫자인데 여기 없으면</strong> 그것도
+  지어낸 것이다.
 </p>
 <ul class="small">
   {% for cited, text in d.observations %}

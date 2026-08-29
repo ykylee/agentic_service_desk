@@ -55,9 +55,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.adapters.parent_system import ParentSystem
-from agentic_service_desk.content import qna_stats, store
+from agentic_service_desk.content import store
 from agentic_service_desk.content.registry import (
     ContentType,
+    Input,
     InvalidDeclaration,
     Place,
     Registry,
@@ -121,10 +122,10 @@ def compose(ctype: ContentType, draft: store.ContentDraft) -> str:
     # 다루지도 않은 관찰이 근거로 붙었다. 읽는 사람은 그 조언이 그것에 기댄 줄로
     # 읽고, 검수자도 밝혀진 줄로 본다 — 근거 목록을 부풀리는 것은 근거가 없는 것과
     # 다른 종류의 거짓말이다.
-    for payload in draft.observations:
-        observation = qna_stats.Observation.of(payload)
-        if observation.cited:
-            parts.append(f"관찰: {observation.text}")
+    label = "집계" if ctype.input is Input.PERIOD_SUMMARY else "관찰"
+    for fact in store.facts_of(draft):
+        if fact.cited:
+            parts.append(f"{label}: {fact.text}")
     return "\n".join(parts)
 
 

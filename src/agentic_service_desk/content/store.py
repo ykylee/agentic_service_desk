@@ -50,6 +50,45 @@ class Outcome(enum.StrEnum):
 
 
 @dataclass(frozen=True)
+class Fact:
+    """초안에 **박은 사실** 하나.
+
+    관찰(§7.6.2)이든 기간 요약(§7.2)이든 쓰는 쪽이 필요한 것은 셋뿐이다 — 번호와
+    문장과 **본문이 그것을 밝혔는가**. 만드는 쪽은 저마다 다르지만(QnA 분포 ·
+    지식 변경 · 게재 실적) 검수·게재·화면은 이 모양만 안다.
+
+    **왜 박는가**: 발행물은 회수할 수 없는데(§7.3) 지금 다시 세면 숫자가 달라져
+    검수가 본문과 대조할 수 없다 — 답변의 근거 버전 고정(D20)과 같은 이유다.
+    """
+
+    id: str
+    text: str
+    cited: bool = True
+    """본문이 이 사실을 밝혔다고 신고했는가.
+
+    **검수는 전부를 보고 나가는 글은 쓴 것만 싣는다.** 전부를 봐야 지어낸 것을
+    가려낼 수 있고, 쓰지 않은 사실이 근거로 붙으면 읽는 사람은 그 글이 그것에 기댄
+    줄로 읽는다. 옛 초안에는 이 표시가 없으므로 **기본은 실린 것**으로 본다.
+    """
+
+    def as_dict(self) -> dict:
+        return {"id": self.id, "text": self.text, "cited": self.cited}
+
+    @classmethod
+    def of(cls, payload: dict) -> Fact:
+        return cls(
+            id=str(payload.get("id") or ""),
+            text=str(payload.get("text") or ""),
+            cited=bool(payload.get("cited", True)),
+        )
+
+
+def facts_of(draft: ContentDraft) -> list[Fact]:
+    """초안에 박힌 사실 전부. **빈 문장은 버린다** — 대조할 것이 없다."""
+    return [f for f in (Fact.of(raw) for raw in draft.observations) if f.text]
+
+
+@dataclass(frozen=True)
 class ContentDraft:
     """검수를 기다리는 콘텐츠 하나."""
 

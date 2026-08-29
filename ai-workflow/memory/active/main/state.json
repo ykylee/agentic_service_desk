@@ -27,13 +27,14 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주, S5 진행. 40 leaf 중 35 완료.**",
-    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S4 완주, S5 진행. 40 leaf 중 35 완료.**",
+    "current_baseline": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 36 완료, 남은 것은 4.8 운영 부가 넷.**",
+    "current_axis": "**M-001~M-003 완료. M-004(구현) 진행 중 — S0~S5 완주. 40 leaf 중 36 완료, 남은 것은 4.8 운영 부가 넷.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터",
       "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼",
       "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ",
       "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재",
@@ -42,20 +43,20 @@
       "TASK-2026-08-28-main-041 — WBS-4.6.1 콘텐츠 타입 레지스트리",
       "TASK-2026-08-28-main-040 — 판정 대기열 순위 편입 (Q2·Q6·Q7·Q8)",
       "TASK-2026-08-28-main-039 — WBS-4.5.8 지표와 대시보드 확장",
-      "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정",
-      "TASK-2026-08-28-main-037 — WBS-4.5.6 승격 경로 B"
+      "TASK-2026-08-28-main-038 — WBS-4.5.7 stale 전파와 정정"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-29.md",
-    "task_count": 2,
+    "task_count": 3,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ",
-      "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼"
+      "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼",
+      "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터"
     ]
   },
   "next_documents": [

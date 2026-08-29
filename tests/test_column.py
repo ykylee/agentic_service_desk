@@ -219,7 +219,7 @@ class TestPinnedObservation:
         result = self._produced(tmp_path, conn, "지난 30일 동안 문의가 4건 있었다.")
 
         assert result.outcome is store.Outcome.PRODUCED
-        assert "관찰 1건" in result.detail
+        assert "센 사실 1건" in result.detail
         draft = store.pending(conn, "column")[0]
         assert draft.observations[0]["count"] == 4
         conn.close()

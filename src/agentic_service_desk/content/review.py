@@ -54,7 +54,7 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 
-from agentic_service_desk.content import qna_stats, store
+from agentic_service_desk.content import store
 from agentic_service_desk.content.registry import ContentType
 from agentic_service_desk.ingest.agent import AgentOutputError, extract_json
 from agentic_service_desk.pipeline import review as review_domain
@@ -164,19 +164,18 @@ def sources_of(
 ) -> tuple[tuple[str, ...], dict[str, str]]:
     """근거 원문 — **지식 항목과 관찰을 함께.**
 
-    관찰도 근거다 (§7.6.2). 검사에 넣지 않으면 "지난 30일 동안 4건"의 `4` 가 근거
-    원문에 없는 수치가 되어 **P1 이 관찰을 밝힌 문장을 지목한다** — FR-41 이 요구한
-    바로 그 문장이다.
+    박은 사실도 근거다 — 관찰(§7.6.2)이든 기간 요약(§7.2)이든. 검사에 넣지 않으면
+    "지난 30일 동안 4건"의 `4` 가 근거 원문에 없는 수치가 되어 **P1 이 관찰을 밝힌
+    문장을 지목한다** — FR-41 이 요구한 바로 그 문장이다.
 
     **저장에서는 나눠 두고 검사에서만 합친다.** `grounding` 에는 stale 판정과
     지식베이스 커밋 고정이 걸려 있어 관찰이 섞이면 없는 항목을 찾게 된다.
     """
     merged = dict(source_text)
     ids = list(draft.grounding)
-    for payload in draft.observations:
-        observation = qna_stats.Observation.of(payload)
-        merged[observation.id] = observation.text
-        ids.append(observation.id)
+    for fact in store.facts_of(draft):
+        merged[fact.id] = fact.text
+        ids.append(fact.id)
     return tuple(ids), merged
 
 

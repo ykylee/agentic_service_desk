@@ -300,6 +300,36 @@ class KnowledgeRepository:
             return None
         return out or None
 
+    def changed_since(self, since: str) -> tuple[set[str], set[str]]:
+        """기간 안에 손댄 항목 파일과 **그중 새로 생긴 것** (WBS-4.7.3).
+
+        항목마다 `last_commit_date` 를 부르지 않는다 — 항목이 수백~수천이면 git 을
+        그만큼 부르게 되고, 그것은 배치의 한 걸음이 저장소 크기에 비례해 느려진다는
+        뜻이다. 두 번의 `git log` 로 끝난다.
+
+        **새로 생긴 것과 갱신된 것을 나눈다.** 뉴스레터가 "무엇이 새로 생겼는가"와
+        "무엇이 고쳐졌는가"를 같은 말로 적으면 읽는 사람은 없던 것이 생긴 줄로 읽는다.
+
+        커밋이 하나도 없는 저장소에서는 빈 것을 돌려준다 — 기준점이 없는 것이지
+        잘못된 것이 아니다 (`last_commit_date` 와 같은 자리).
+        """
+        return self._paths_since(since), self._paths_since(since, added_only=True)
+
+    def _paths_since(self, since: str, *, added_only: bool = False) -> set[str]:
+        """**`-z` 로 받는다.** git 은 비 ASCII 경로를 `"\352\262\260..."` 처럼
+        따옴표로 감싸 내놓는데, 지식 항목 제목이 대부분 한국어라 그대로 쓰면
+        **사실상 전부가 목록과 어긋난다** — `staged_item_paths` 가 이미 밟은 자리다.
+        """
+        args = ["log", f"--since={since}", "--name-only", "-z", "--pretty=format:"]
+        if added_only:
+            args.append("--diff-filter=A")
+        args += ["--", f"{self._area}/"]
+        try:
+            out = self._git(*args)
+        except KnowledgeRepoError:
+            return set()
+        return {name for name in out.split("\0") if name.strip().endswith(".md")}
+
     # --- 로그 ------------------------------------------------------------
 
     def append_log(self, line: str) -> None:

@@ -321,8 +321,11 @@ class Observation:
         )
 
     def as_dict(self) -> dict:
+        """박을 모양. **문장을 함께 넣는다** — 읽는 쪽(`store.Fact`)이 아는 것은
+        번호와 문장뿐이고, 셈에 쓴 부분은 나중에 왜 그 숫자였는지를 위해 남긴다."""
         return {
             "id": self.id,
+            "text": self.text,
             "question": self.question,
             "count": self.count,
             "resolved": self.resolved,

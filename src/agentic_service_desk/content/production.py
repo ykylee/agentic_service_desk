@@ -7,9 +7,19 @@
 ## 입력 읽개는 타입마다가 아니라 주 입력 종류마다 하나다
 
 FR-42 는 새 타입 추가에 코드 변경이 없어야 한다고 한다. 그것이 성립하는 이유는
-읽개가 **셋뿐**이기 때문이다 — 지식베이스 · QnA 통계 · 둘 다. 타입이 넷에서 열이
-되어도 읽개는 늘지 않는다. **셋이 다 붙었다** — 지식베이스(가이드) · QnA 통계(FAQ) ·
-둘 다(칼럼·뉴스레터).
+**읽개가 타입 수보다 적기** 때문이다 — 타입이 넷에서 열이 되어도, 같은 종류의 원천을
+읽는 한 읽개는 늘지 않는다.
+
+| 주 입력 | 무엇을 읽는가 | 쓰는 타입 |
+|---|---|---|
+| `knowledge` | 지식베이스 | 가이드 |
+| `qna_stats` | 반복 질문 분포 | FAQ |
+| `both` | 지식베이스 + 관찰 | 칼럼 |
+| `period_summary` | 기간 내 변경·발행 요약 | 뉴스레터 |
+
+**새 주 입력을 더하는 것은 코드를 더하는 일이 맞다.** 그것은 새 종류의 원천을
+읽는다는 뜻이고, FR-42 가 없애려던 것은 "타입마다 구현이 쌓이는 것"이지
+"새 원천을 읽는 것"이 아니다 (`registry.Input`).
 
 ## 가이드가 FAQ 보다 먼저인 이유 (D50)
 
@@ -65,6 +75,22 @@ ingest 우선순위로 되먹여야 할 것이지, 지어내서 채울 것이 �
 `grounding` 과는 다른 열에 둔다: 저쪽은 지식 항목 id 라 stale 판정이 걸려 있고,
 관찰은 **갱신되는 항목이 아니라 그 시점의 사실**이다.
 
+## 뉴스레터 — 같은 발행 면, 다른 원천 (WBS-4.7.3, FR-38)
+
+칼럼과 뉴스레터는 둘 다 발행물이고 같은 자리에 나가지만 **읽는 것이 다르다**
+(§7.2) — 칼럼이 한 주제를 깊이 다룬다면 뉴스레터는 **그 기간에 무슨 일이
+있었는가**를 적는다. 그래서 주 입력이 `period_summary` 이고 읽개가 따로 있다
+(`content.period`).
+
+**요약은 세는 것이지 판단하는 것이 아니다.** 모델에게 "이번 기간이 어땠는가"를 묻지
+않는다 — 그 답은 검증할 수 없고, 검증할 수 없는 서술이 발행물에 실리면 회수할 방법이
+없다 (§7.3). 세어서 만든 문장을 주고 그것으로 쓰게 한다: diff 를 모델에게 묻지 않는
+것(③)과 같은 자리다.
+
+**할 말이 없으면 내지 않는다.** 근거는 기간 안에 바뀐 지식 항목이고, 아무것도
+바뀌지 않았으면 초안을 만들지 않는다 — 발행 면에 빈 회차가 쌓이는 것도 회수할 수
+없는 종류다.
+
 ## 여기서 정한 것 넷
 
 **① 언어는 판정하지 않고 고정한다** (FR-43, D55). 답변은 질문 언어로 쓰지만(FR-17)
@@ -91,11 +117,12 @@ W3 를 흡수한다"이다. 다만 **코드 변경 임계로 도는 주기**는 
 from __future__ import annotations
 
 import difflib
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from agentic_service_desk.content import qna_stats, store
+from agentic_service_desk.content import period, qna_stats, store
 from agentic_service_desk.content.registry import ContentType, Input
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness, extract_json
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
@@ -290,9 +317,10 @@ _SHAPE_WITH_OBSERVATIONS = """{
   "observations": ["obs-..."]
 }
 
-`observations` 에는 **본문이 실제로 밝힌 관찰의 번호만** 넣는다. 아래 목록에 없는
-번호를 만들지 않고, 쓰지 않은 관찰을 넣지도 않는다 — 이 목록이 나가는 글에 **근거로
-함께 실리므로**, 쓰지 않은 것을 넣으면 읽는 사람은 그 조언이 그것에 기댄 줄로 읽는다."""
+`observations` 에는 **본문이 실제로 쓴 사실의 번호를 빠짐없이** 넣는다 (아래 목록의
+`[obs-...]` · `[sum-...]`). 목록에 없는 번호를 만들지 않고, 쓰지 않은 것을 넣지도
+않는다 — 이 목록이 나가는 글에 **근거로 함께 실린다.** 넣지 않으면 본문에 적은 숫자의
+출처가 사라지고, 쓰지 않은 것을 넣으면 읽는 사람은 그 글이 그것에 기댄 줄로 읽는다."""
 
 _TYPE_RULES_FAQ = """이 문서는 **문답 모음**이다. 아래에 실제로 반복해서 들어온 질문과,
 각 질문에 대해 검색된 지식 항목이 있다. **자주 물은 것부터** 놓았고, 그 순서를 지킨다.
@@ -326,6 +354,25 @@ _TYPE_RULES_COLUMN = """이 문서는 **칼럼**이다. 쓸 수 있는 것과 �
 
 이번 회차가 다룰 주제를 근거 안에서 **골라서** 쓴다 — 가진 것을 전부 늘어놓는 것은
 칼럼이 아니라 목록이다."""
+
+_TYPE_RULES_NEWSLETTER = """이 문서는 **뉴스레터 한 회차**다. 이번 기간에 무슨 일이
+있었는지를 적는다 — 한 주제를 깊이 다루는 글이 아니다.
+
+**아래 요약에 있는 사실만 쓴다.** 숫자를 바꾸거나 더하지 않고, 요약에 없는 일을
+지어내지 않는다. 세어서 준 것이므로 **그대로 옮기되 읽히게 다듬는다.**
+
+**새로 생긴 것과 고쳐진 것을 섞지 않는다.** 한 말로 적으면 읽는 사람은 없던 것이
+생긴 줄로 읽는다.
+
+**이번 기간의 일만 적는다.** 회차는 시계열로 쌓이므로, 지난 회차가 이미 적은 것을
+다시 적으면 같은 소식이 두 번 나간다.
+
+바뀐 지식 항목을 다룰 때는 **무엇이 달라졌는지**를 근거 안에서 짧게 밝힌다.
+가진 항목을 전부 늘어놓는 것은 뉴스레터가 아니라 목록이다 — **읽는 사람에게 소식이
+되는 것**을 고른다.
+
+이것은 **소식이지 논평이 아니다.** "잘 되고 있습니다", "앞으로 기대됩니다" 같은
+평가를 붙이지 않는다."""
 
 _FIRST = """이번이 **첫 제작**이다. 근거가 다루는 범위 안에서 문서를 처음부터 쓴다."""
 
@@ -398,16 +445,20 @@ def build_prompt(
         ]
         return _with_previous(parts, previous)
 
-    if ctype.input is Input.BOTH:
+    if ctype.input in (Input.BOTH, Input.PERIOD_SUMMARY):
+        column = ctype.input is Input.BOTH
         parts = [
             _head(
-                ctype, previous, _TYPE_RULES_COLUMN, observations=bool(observations)
+                ctype,
+                previous,
+                _TYPE_RULES_COLUMN if column else _TYPE_RULES_NEWSLETTER,
+                observations=bool(observations),
             ),
             "",
             "근거로 쓸 수 있는 지식 항목:",
             *[_item_block(i) for i in items],
             "",
-            *_observation_block(observations),
+            *_observation_block(observations, column=column),
         ]
         return _with_previous(parts, previous)
 
@@ -420,22 +471,73 @@ def build_prompt(
     return _with_previous(parts, previous)
 
 
-def _observation_block(observations: tuple) -> list[str]:
-    """관찰 목록. **비어 있으면 비어 있다고 말한다** (§7.6.2).
+_NUMERIC = re.compile(r"[0-9][0-9,._]*")
 
-    조용히 빼면 모델은 관찰이 있는지 없는지 모른 채 권고를 쓰고, 그 권고는 관찰을
-    밝히지 않았으므로 의견이 된다.
+
+def distinguishing_numbers(facts: tuple) -> dict[str, set[str]]:
+    """사실마다 **그것만 가진 수치**.
+
+    여러 사실에 함께 있는 수치는 어느 하나를 가리키지 못한다 — 기간(`30`)이 모든
+    문장에 들어가는 것이 그 예다. `search._drop_indistinct` 가 표현 사전에서 한 것과
+    같은 셈이고, 여기서도 **언어를 몰라도 셀 수 있다.**
     """
+    seen: dict[str, int] = {}
+    per: dict[str, set[str]] = {}
+    for fact in facts:
+        per[fact.id] = set(_NUMERIC.findall(fact.text))
+        for number in per[fact.id]:
+            seen[number] = seen.get(number, 0) + 1
+    return {fid: {n for n in nums if seen[n] == 1} for fid, nums in per.items()}
+
+
+def cited_facts(facts: tuple, body: str, items: list, reported: tuple[str, ...]) -> tuple[dict, ...]:
+    """어느 사실을 나가는 글의 근거로 실을 것인가.
+
+    모델의 신고를 받되 **신고하지 않았어도 본문이 그 사실에만 있는 수치를 적었으면
+    싣는다.** 라이브에서 양쪽을 다 봤다 — 칼럼은 쓰지도 않은 관찰이 근거로 붙었고,
+    뉴스레터는 본문이 그대로 옮겨 적은 요약 셋을 신고하지 않아 **적힌 숫자의 출처가
+    목록에서 빠졌다.**
+
+    안전망이 **더하기만 하는** 것이 요점이다. 부풀리는 것보다 빠뜨리는 것이 나쁘다:
+    본문에 "5건"이라 적혀 있는데 근거 목록에 그 출처가 없으면, 그 숫자는 근거 없이
+    나간 것과 같아진다.
+
+    지식 항목에 이미 있는 수치는 그 사실을 가리키지 않으므로 뺀다 — 근거 본문의
+    "300만원"이 관찰을 실리게 해서는 안 된다.
+    """
+    knowledge = set(
+        _NUMERIC.findall(" ".join(f"{i.title} {i.body}" for i in items))
+    )
+    in_body = set(_NUMERIC.findall(body))
+    own = distinguishing_numbers(facts)
+    return tuple(
+        f.as_dict()
+        | {"cited": f.id in reported or bool((own[f.id] - knowledge) & in_body)}
+        for f in facts
+    )
+
+
+def _observation_block(observations: tuple, *, column: bool = True) -> list[str]:
+    """박은 사실 목록. **비어 있으면 비어 있다고 말한다** (§7.6.2).
+
+    조용히 빼면 모델은 그것이 있는지 없는지 모른 채 쓰고, 칼럼에서는 그렇게 쓴 권고가
+    관찰을 밝히지 않았으므로 의견이 된다.
+
+    **번호를 함께 낸다.** 본문이 어느 것을 밝혔는지 신고해야 나가는 글의 근거 목록이
+    부풀지 않는다 — 라이브에서 다루지도 않은 관찰이 근거로 붙는 것을 봤다.
+    """
+    title = "관찰된 것 (권고의 근거):" if column else "이번 기간에 센 것:"
     if not observations:
         return [
-            "관찰된 것 (권고의 근거):",
-            "- **없다.** 이번 기간에 셀 만한 반복이 없었다 — **권고를 쓰지 않고 "
-            "해설만 쓴다.**",
+            title,
+            (
+                "- **없다.** 이번 기간에 셀 만한 반복이 없었다 — **권고를 쓰지 않고 "
+                "해설만 쓴다.**"
+                if column
+                else "- **없다.** 셀 것이 없었다면 그 사실을 적지 않는다."
+            ),
         ]
-    return [
-        "관찰된 것 (권고의 근거):",
-        *[f"- {o.text}" for o in observations],
-    ]
+    return [title, *[f"- [{o.id}] {o.text}" for o in observations]]
 
 
 def _with_previous(parts: list[str], previous: store.ContentDraft | None) -> str:
@@ -684,6 +786,8 @@ class ContentProducer:
             return self._from_qna_stats(ctype, groups)
         if ctype.input is Input.BOTH:
             return self._from_both(ctype, groups)
+        if ctype.input is Input.PERIOD_SUMMARY:
+            return self._from_period(ctype, groups)
         raise UnsupportedInput(f"{ctype.id}: 주 입력 {ctype.input} 의 읽개가 없다")
 
     def _from_knowledge(self) -> Material:
@@ -713,6 +817,33 @@ class ContentProducer:
             observations=qna_stats.observations(
                 groups, window_days=ctype.trigger.period_days or 0
             ),
+        )
+
+    def _from_period(self, ctype: ContentType, groups: list) -> Material:
+        """기간을 요약한다 (§7.2, WBS-4.7.3).
+
+        **근거는 기간 안에 바뀐 지식 항목이다.** 아무것도 바뀌지 않았으면 근거가
+        없고, 그때는 초안을 만들지 않는다 (D3) — 발행 면에 빈 회차가 쌓이는 것도
+        회수할 수 없는 종류다.
+
+        낡은 항목은 요약의 셈에는 들어가지만 **근거에서는 뺀다.** 그 기간에 손댄
+        것은 사실이므로 세되, 낡은 것을 근거로 이번 회차를 쓸 수는 없다 —
+        가이드가 정한 것과 같은 규칙이다(④).
+        """
+        window = ctype.trigger.period_days or 0
+        since = _window_start(ctype) or ""
+        summary = period.summarize(
+            self._conn,
+            self._repo,
+            since=since,
+            window_days=window,
+            groups=groups,
+        )
+        stale = tuple(i.id for i in summary.items if i.stale)
+        return Material(
+            items=[i for i in summary.items if not i.stale],
+            stale=stale,
+            observations=summary.facts,
         )
 
     def _from_qna_stats(self, ctype: ContentType, groups: list) -> Material:
@@ -838,9 +969,8 @@ class ContentProducer:
             based_on=previous.id if previous else None,
             generated_by=self._generated_by,
             ticket_id=ticket.id,
-            observations=tuple(
-                o.as_dict() | {"cited": o.id in parsed.cited}
-                for o in material.observations
+            observations=cited_facts(
+                material.observations, body, material.items, parsed.cited
             ),
         )
         result = self._record(
@@ -848,7 +978,11 @@ class ContentProducer:
             store.Outcome.PRODUCED,
             f"{trigger.reason} — 근거 {len(grounding)}건"
             + (f", 반복 질문 {len(material.covered)}건" if material.covered else "")
-            + (f", 관찰 {len(material.observations)}건" if material.observations else "")
+            + (
+                f", 센 사실 {len(material.observations)}건"
+                if material.observations
+                else ""
+            )
             + (f", 낡은 항목 {len(stale)}건 제외" if stale else "")
             + (
                 f", 본문 {churn(previous.body, body) * 100:.0f}% 변경"
@@ -903,7 +1037,9 @@ def _window_start(ctype: ContentType) -> str | None:
     그 안에서 세야 한다 (§7.6.2). FAQ 는 살아있는 문서라 창이 없다 — 오래전부터
     반복된 것도 지금 자주 묻히면 여전히 FAQ 다.
     """
-    if ctype.input is not Input.BOTH or not ctype.trigger.period_days:
+    if ctype.input not in (Input.BOTH, Input.PERIOD_SUMMARY):
+        return None
+    if not ctype.trigger.period_days:
         return None
     return (datetime.now(UTC) - timedelta(days=ctype.trigger.period_days)).isoformat()
 
@@ -915,7 +1051,7 @@ def _needs_qna(ctype: ContentType) -> bool:
     보통이지만 하나만 선언될 수도 있다.** 주기로만 도는 FAQ 파생 타입이 그렇다.
     """
     return (
-        ctype.input in (Input.QNA_STATS, Input.BOTH)
+        ctype.input in (Input.QNA_STATS, Input.BOTH, Input.PERIOD_SUMMARY)
         or ctype.trigger.threshold == REPEAT_QUESTIONS
     )
 

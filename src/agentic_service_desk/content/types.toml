@@ -43,7 +43,8 @@ review = { scope = "full", final_check = true, extra_rejections = ["P6", "P7", "
 
 [newsletter]
 title = "뉴스레터"
-input = "both"
+# 칼럼과 같은 발행 면이지만 **읽는 것이 다르다** (§7.2) — 한 주제가 아니라 기간이다.
+input = "period_summary"
 nature = "issued"
 trigger = { period_days = 30 }
 # **발송하지 않고 게시한다** (§7.7.3). 그래서 수신자 명단이 필요 없다.

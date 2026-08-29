@@ -22,7 +22,6 @@ from fastapi.templating import Jinja2Templates
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.content import registry as content_registry
-from agentic_service_desk.content import qna_stats as content_qna_stats
 from agentic_service_desk.content import production as content_production
 from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import review as content_review
@@ -859,6 +858,19 @@ class _ContentDetail:
         return self.ctype.review.scope is content_registry.Scope.DIFF
 
     @property
+    def facts_label(self) -> str:
+        """이 타입에서 박은 사실을 뭐라고 부르는가.
+
+        칼럼에서는 **관찰**(권고의 근거)이고 뉴스레터에서는 **집계**(그 기간에 센 것)다 —
+        같은 자리에 담기지만 검수자가 볼 이유가 다르다.
+        """
+        return (
+            "이번 기간에 센 것"
+            if self.ctype.input is content_registry.Input.PERIOD_SUMMARY
+            else "관찰"
+        )
+
+    @property
     def observations(self) -> list[tuple[bool, str]]:
         """그때 무엇을 관찰했는가 — **(본문이 밝혔는가, 문장)** (§7.6.2, FR-41).
 
@@ -868,12 +880,7 @@ class _ContentDetail:
         **본 것을 전부 보여 주고 밝힌 것을 표시한다.** 전부를 봐야 지어낸 관찰을
         가려낼 수 있고, 표시가 있어야 "이 권고가 무엇에 기댔는가"를 한눈에 본다.
         """
-        return [
-            (o.cited, o.text)
-            for o in (
-                content_qna_stats.Observation.of(raw) for raw in self.draft.observations
-            )
-        ]
+        return [(f.cited, f.text) for f in content_store.facts_of(self.draft)]
 
     @property
     def awaiting_final_check(self) -> bool:
