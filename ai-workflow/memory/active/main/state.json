@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-08-29",
+  "generated_at": "2026-08-30",
   "purpose_digest": "모 시스템의 **소스 저장소(코드 + 히스토리)**와 **QnA·답변 이력** 두 원천을 **모 시스템 내부 API**로 지속 수집해 하나의 지식베이스로 구축한다 — 히스토리는 \"왜 그렇게 정했는가\"의 1차 출처이며, API 표면이 곧 이 시스템이 알 수 있는 것의 상한이다",
   "purpose_digest_rev": "2026-08-27",
   "source_of_truth": {

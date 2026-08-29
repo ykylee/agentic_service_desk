@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v1.6.0 -->
+<!-- standard-ai-workflow-kit: v1.7.0 -->
 
 # CLAUDE.md (Claude Code entry point)
 
@@ -6,7 +6,7 @@
 - Scope: session restore, the order to consult workflow state docs, working principles, session close order
 - Audience: Claude Code, repository maintainer, workflow designer
 - Status: beta
-- Last updated: 2026-08-27
+- Last updated: 2026-08-30
 - Related: `ai-workflow/memory/active/<branch>/state.json`, `docs/PROJECT_PROFILE.md`
 
 ## What this file is for
@@ -102,11 +102,11 @@ When the user invokes `/workflow-session-start` (or on automatic read), it attem
 
 ## Project run defaults
 
-- **install**: TODO: 설치 명령 입력
-- **run**: TODO: 로컬 실행 명령 입력
-- **quick test**: TODO: 빠른 테스트 명령 입력
-- **isolated test**: TODO: 격리 테스트 명령 입력
-- **smoke check**: TODO: 실행 확인 명령 입력
+- **install**: uv sync
+- **run**: uv run asd-web / uv run asd-worker
+- **quick test**: uv run pytest -q
+- **isolated test**: uv run pytest tests/ -q
+- **smoke check**: uv run asd-web 후 curl -s localhost:8000/health
 
 These commands are inferred. Correct them to the project's real commands before committing.
 

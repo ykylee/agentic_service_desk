@@ -1,4 +1,5 @@
 <!-- standard-ai-workflow-kit: v1.6.0 -->
+<!-- standard-ai-workflow-kit-fork: 프로젝트가 소유한다 — v1.6.0 에서 갈라져 §1~§5 를 손으로 채웠다 -->
 
 # Project Workflow Profile
 
