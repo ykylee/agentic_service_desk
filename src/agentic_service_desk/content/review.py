@@ -27,9 +27,25 @@
 | **P1** | 본문의 수치가 근거 원문에 있는가 | 없는 수치는 지어낸 것이다 |
 | **인용 어긋남** | 따옴표 안 문장이 근거 원문에 있는가 | **라이브에서 잡았다** — 근거가 갱신됐는데 옛 문장을 그대로 인용한 채 남았다 |
 | **P8** | 명령형·당위 표현이 있는가 | 정책 공지처럼 읽힌다 (§7.6.4). **칼럼류에만 붙는다** |
+| **P6·P7** | 가치 판단인가, 관찰을 넘겨 말했는가 | **의미 판정이라 모델이 본다** (§7.6.4) |
 
-P6·P7 은 의미 판정이 필요해 여기서 세지 않는다 (§7.6.4) — 칼럼이 실제로 도는
-WBS-4.7.2 의 일이다. **세지 않는 것을 센 척하지 않는다.**
+## 의미 판정은 따로 돌고, 결과는 초안에 박힌다 (WBS-4.7.2)
+
+P6·P7 은 문장 형태로 확정되지 않는다 — "이 방식이 더 낫습니다"는 형태로 잡히지만
+"X 를 쓰면 대개 문제가 없습니다"는 형태가 같은 해설과 구분되지 않는다. 그래서 모델이
+본다. 다만 **답변 검수와 역할이 다르다**: 여기서 나온 것은 소견이지 판정이 아니다.
+
+**배치에서 돌고 화면에서 돌지 않는다.** 화면이 열릴 때마다 모델을 부르면 같은 초안이
+볼 때마다 다른 소견을 내고, 검수자는 곧 그 소견을 믿지 않게 된다. 결과는
+`content_draft.agent_findings` 에 박히며 — **`None` 은 "아직 안 봤다"이고 `[]` 는
+"봤는데 없다"다.** 구분하지 않으면 판정이 돌지 않은 초안이 통과한 것처럼 보인다
+(§5.6.1).
+
+**관찰도 근거로 준다.** FR-41 이 요구하는 "관찰을 함께 밝혔는가"는 초안만 봐서는
+판정할 수 없다 — 무엇이 관찰됐는지를 알아야 지어낸 관찰을 가려낼 수 있다.
+
+**선언이 정한다** (FR-42). P6·P7 을 든 타입만 이 판정을 받는다 — 가이드에 붙이면
+사용 설명의 권고 문장이 전부 걸려 소견이 소음이 된다.
 """
 
 from __future__ import annotations
@@ -38,8 +54,9 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 
-from agentic_service_desk.content import store
+from agentic_service_desk.content import qna_stats, store
 from agentic_service_desk.content.registry import ContentType
+from agentic_service_desk.ingest.agent import AgentOutputError, extract_json
 from agentic_service_desk.pipeline import review as review_domain
 from agentic_service_desk.pipeline.review import Reject, ReviewInput, Verdict
 
@@ -75,6 +92,11 @@ class Findings:
     """한 초안에 대한 소견 전부."""
 
     items: list[Finding] = field(default_factory=list)
+    pending_semantic: bool = False
+    """의미 판정을 받아야 하는 타입인데 **아직 돌지 않았다** (§7.6.4).
+
+    "봤는데 없다"와 섞으면 판정이 돌지 않은 초안이 통과한 것처럼 보인다 (§5.6.1).
+    """
 
     @property
     def look_here_first(self) -> str:
@@ -83,12 +105,17 @@ class Findings:
         비어 있는 것이 "통과"가 아니다 — 여기 없는 것은 기계가 확정할 수 없는
         것뿐이고, 사람이 볼 이유는 그대로 남는다.
         """
+        waiting = (
+            " **P6·P7 의미 판정은 아직 돌지 않았다** — 다음 배치가 본다."
+            if self.pending_semantic
+            else ""
+        )
         if not self.items:
             return (
                 "기계 검사에 걸린 것은 없다. **통과가 아니라 지목할 것이 없다는 "
-                "뜻이다** — 근거 대조와 어조는 사람이 본다."
+                "뜻이다** — 근거 대조와 어조는 사람이 본다." + waiting
             )
-        return " · ".join(f"{f.label} {f.detail}" for f in self.items)
+        return " · ".join(f"{f.label} {f.detail}" for f in self.items) + waiting
 
 
 def check_quotations(body: str, source_text: dict[str, str]) -> Finding | None:
@@ -132,6 +159,49 @@ def check_policy_voice(body: str) -> Finding | None:
     )
 
 
+def sources_of(
+    draft: store.ContentDraft, source_text: dict[str, str]
+) -> tuple[tuple[str, ...], dict[str, str]]:
+    """근거 원문 — **지식 항목과 관찰을 함께.**
+
+    관찰도 근거다 (§7.6.2). 검사에 넣지 않으면 "지난 30일 동안 4건"의 `4` 가 근거
+    원문에 없는 수치가 되어 **P1 이 관찰을 밝힌 문장을 지목한다** — FR-41 이 요구한
+    바로 그 문장이다.
+
+    **저장에서는 나눠 두고 검사에서만 합친다.** `grounding` 에는 stale 판정과
+    지식베이스 커밋 고정이 걸려 있어 관찰이 섞이면 없는 항목을 찾게 된다.
+    """
+    merged = dict(source_text)
+    ids = list(draft.grounding)
+    for payload in draft.observations:
+        observation = qna_stats.Observation.of(payload)
+        merged[observation.id] = observation.text
+        ids.append(observation.id)
+    return tuple(ids), merged
+
+
+def stored_findings(draft: store.ContentDraft) -> list[Finding]:
+    """박아 둔 의미 판정 소견을 되살린다. **판정이 아직 안 돌았으면 그렇다고 말한다.**"""
+    if draft.agent_findings is None:
+        return []
+    out = []
+    for payload in draft.agent_findings:
+        raw = str(payload.get("reason") or "")
+        try:
+            reason = Reject(raw)
+        except ValueError:
+            reason = None
+        out.append(Finding(reason=reason, detail=str(payload.get("detail") or "")))
+    return out
+
+
+def needs_semantic(ctype: ContentType) -> bool:
+    """이 타입이 의미 판정을 받는가. **선언이 정한다** (FR-42, §7.6.4)."""
+    return any(
+        str(r) in ctype.review.extra_rejections for r in (Reject.P6, Reject.P7)
+    )
+
+
 def inspect(
     ctype: ContentType,
     draft: store.ContentDraft,
@@ -139,15 +209,16 @@ def inspect(
     source_text: dict[str, str],
     stale_ids: frozenset[str] = frozenset(),
 ) -> Findings:
-    """기계가 확정할 수 있는 것을 모은다. **판정하지 않는다.**"""
-    findings = Findings()
+    """기계가 확정할 수 있는 것과 **박아 둔 의미 판정**을 모은다. 판정하지 않는다."""
+    findings = Findings(pending_semantic=needs_semantic(ctype) and draft.agent_findings is None)
+    grounding, sources = sources_of(draft, source_text)
 
     # P4·P1 은 답변과 같은 검사다 — 두 벌로 만들면 "근거 원문에 있다"의 뜻이
     # 두 곳에서 갈린다.
     shared = ReviewInput(
         draft_body=draft.body,
-        grounding=draft.grounding,
-        source_text=source_text,
+        grounding=grounding,
+        source_text=sources,
         stale_ids=stale_ids,
     )
     for check in review_domain.MECHANICAL:
@@ -155,7 +226,7 @@ def inspect(
         if verdict is not None:
             findings.items.append(Finding(reason=verdict.reason, detail=verdict.detail))
 
-    quoted = check_quotations(draft.body, source_text)
+    quoted = check_quotations(draft.body, sources)
     if quoted is not None:
         findings.items.append(quoted)
 
@@ -166,6 +237,91 @@ def inspect(
         if policy is not None:
             findings.items.append(policy)
 
+    findings.items.extend(stored_findings(draft))
+    return findings
+
+
+# --- 의미 판정 (P6·P7, FR-41) -------------------------------------------------
+
+_SEMANTIC_RULES = """아래 **칼럼 초안**을 읽고 문제가 되는 곳을 지목한다.
+
+당신은 이 글이 왜 이렇게 쓰였는지 **모른다.** 알 필요도 없다 — 글에 적힌 것과 아래
+근거·관찰만 본다. **판정하지 않는다**: 사람이 판정하므로 당신이 할 일은 어디를 먼저
+볼지 말해 주는 것이다.
+
+칼럼은 **해설과 권고까지만** 쓸 수 있다. 셋을 지목한다.
+
+- **P6 — 가치 판단.** 근거로 환원되지 않는 평가다. "이 방식이 더 낫습니다",
+  "~하는 것이 옳습니다", "권장할 만합니다". 사실의 재구성(해설)은 P6 가 아니다.
+- **P7 — 관찰의 확대.** 센 것보다 넓게 말했다. "4건 있었다"는 사실이지만 "다들
+  그렇게 씁니다", "대부분의 이용자가", "일반적으로 그렇습니다"는 사실이 아니다.
+- **관찰 없는 권고.** 조언인데 무엇을 관찰했는지 밝히지 않았거나, **아래 관찰
+  목록에 없는 관찰**을 들었다. 관찰을 생략한 조언은 그 순간 의견이 된다.
+
+**해설은 지목하지 않는다.** 근거에 있는 사실을 이어 설명한 것은 이 글이 해야 할
+일이다 — 트집을 잡는 것이 목적이 아니다.
+
+출력은 **JSON 하나만** 낸다. 지목할 것이 없으면 빈 목록을 낸다.
+
+{"findings": [{"reason": "P6", "quote": "문제가 되는 문장 그대로", "detail": "왜 그런지 한 문장"}]}
+{"findings": []}"""
+
+
+def build_semantic_prompt(draft: store.ContentDraft, sources: dict[str, str]) -> str:
+    """의미 판정 프롬프트. **초안과 근거·관찰뿐이다** (§5.5.2, FR-20)."""
+    grounding, merged = sources_of(draft, sources)
+    blocks = "\n\n".join(
+        f"### {g}\n{merged.get(g, '(원문 없음)')}" for g in grounding
+    )
+    return "\n".join([_SEMANTIC_RULES, "", "초안:", draft.body, "", "근거와 관찰:", blocks])
+
+
+def parse_semantic(text: str) -> list[dict]:
+    """응답을 소견 목록으로.
+
+    **사유를 못 댄 지목은 버리지 않고 사유 없는 소견으로 남긴다** — 여기서 나오는
+    것은 반려가 아니라 지목이므로, 분류가 안 되어도 "여기를 보라"는 값은 남는다.
+    """
+    payload = extract_json(text)
+    out = []
+    for raw in payload.get("findings") or []:
+        if not isinstance(raw, dict):
+            continue
+        reason = str(raw.get("reason") or "").strip()
+        detail = str(raw.get("detail") or "").strip()
+        quote = str(raw.get("quote") or "").strip()
+        if quote:
+            detail = f'"{quote[:60]}" — {detail}' if detail else f'"{quote[:60]}"'
+        if not detail:
+            continue
+        out.append({"reason": reason if reason in _SEMANTIC_REASONS else "", "detail": detail})
+    return out
+
+
+_SEMANTIC_REASONS = {str(Reject.P6), str(Reject.P7)}
+
+
+def inspect_semantically(
+    conn: sqlite3.Connection,
+    ctype: ContentType,
+    draft: store.ContentDraft,
+    *,
+    harness,  # noqa: ANN001 — Harness. 없으면 부르지 않는다
+    source_text: dict[str, str],
+) -> list[dict] | None:
+    """모델에게 P6·P7 을 묻고 결과를 초안에 박는다. **실패는 박지 않는다.**
+
+    실패를 빈 목록으로 박으면 "봤는데 없다"가 되어 **돌지 않은 판정이 통과한 것처럼
+    보인다** (§5.6.1). 박지 않으면 다음 주기가 다시 시도하고, 그때까지 화면은
+    "아직 안 봤다"고 말한다.
+    """
+    if harness is None:
+        return None
+    try:
+        findings = parse_semantic(harness.run(build_semantic_prompt(draft, source_text)).text)
+    except (AgentOutputError, RuntimeError):
+        return None
+    store.record_findings(conn, draft.id, findings)
     return findings
 
 

@@ -65,6 +65,14 @@ class ContentDraft:
     """Q3 대기열의 자리 (§6.4.3). **Q3 는 작업 대기열이다** (FR-45) — 초안 하나가
     처리 하나이고, 티켓이 그 기록 단위다."""
 
+    observations: tuple[dict, ...] = ()
+    """그때 무엇을 관찰했는가 (§7.6.2, FR-41). **권고의 근거이고 박혀 있다** —
+    지금 다시 세면 숫자가 달라져 검수가 대조할 수 없다."""
+
+    agent_findings: tuple[dict, ...] | None = None
+    """의미 판정의 소견 (§7.6.4). **`None` 은 '아직 안 봤다'이고 `()` 는 '봤는데
+    없다'다** — 구분하지 않으면 판정이 돌지 않은 초안이 통과한 것처럼 보인다."""
+
     state: str = PENDING
     generated_by: str = ""
     created_at: str = ""
@@ -79,6 +87,12 @@ def _from_row(row: sqlite3.Row) -> ContentDraft:
         grounding=tuple(json.loads(row["grounding"] or "[]")),
         based_on=row["based_on"],
         ticket_id=row["ticket_id"],
+        observations=tuple(json.loads(row["observations"] or "[]")),
+        agent_findings=(
+            None
+            if row["agent_findings"] is None
+            else tuple(json.loads(row["agent_findings"]))
+        ),
         state=row["state"],
         generated_by=row["generated_by"] or "",
         created_at=row["created_at"],
@@ -95,12 +109,13 @@ def save(
     based_on: str | None = None,
     generated_by: str = "",
     ticket_id: str | None = None,
+    observations: tuple[dict, ...] = (),
 ) -> str:
     draft_id = f"cd-{uuid.uuid4().hex[:12]}"
     conn.execute(
         "INSERT INTO content_draft "
-        "(id, type_id, title, body, grounding, based_on, ticket_id, state, "
-        " generated_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, type_id, title, body, grounding, based_on, ticket_id, observations, "
+        " state, generated_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             draft_id,
             type_id,
@@ -109,6 +124,7 @@ def save(
             json.dumps(list(grounding), ensure_ascii=False),
             based_on,
             ticket_id,
+            json.dumps(list(observations), ensure_ascii=False),
             PENDING,
             generated_by,
             datetime.now(UTC).isoformat(),
@@ -167,6 +183,36 @@ def current(conn: sqlite3.Connection, type_id: str) -> ContentDraft | None:
         (type_id, APPROVED),
     ).fetchone()
     return _from_row(row) if row else None
+
+
+def record_findings(
+    conn: sqlite3.Connection, draft_id: str, findings: list[dict]
+) -> None:
+    """의미 판정의 소견을 박는다 (§7.6.4).
+
+    **빈 목록도 쓴다.** 안 쓰면 "봤는데 없다"가 "아직 안 봤다"와 같은 모양이 되고,
+    그러면 판정이 돌지 않은 초안이 통과한 것처럼 보인다 (§5.6.1).
+
+    **판정 대기 중인 초안에만 쓴다.** 사람이 이미 판정한 뒤에 소견이 바뀌면 화면이
+    그때 무엇을 보고 눌렀는지를 다르게 말한다.
+    """
+    conn.execute(
+        "UPDATE content_draft SET agent_findings = ? WHERE id = ? AND state = ?",
+        (json.dumps(findings, ensure_ascii=False), draft_id, PENDING),
+    )
+    conn.commit()
+
+
+def awaiting_inspection(conn: sqlite3.Connection) -> list[ContentDraft]:
+    """의미 판정이 아직 돌지 않은 대기 초안. **오래된 것이 먼저다.**"""
+    return [
+        _from_row(r)
+        for r in conn.execute(
+            "SELECT * FROM content_draft WHERE state = ? AND agent_findings IS NULL "
+            "ORDER BY created_at",
+            (PENDING,),
+        )
+    ]
 
 
 def decide(conn: sqlite3.Connection, draft_id: str, *, approved: bool) -> None:

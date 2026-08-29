@@ -165,8 +165,15 @@ class RepeatQuestion:
         return tuple(q.id for q in self.questions)
 
 
-def load_questions(conn: sqlite3.Connection) -> list[Question]:
+def load_questions(
+    conn: sqlite3.Connection, *, since: str | None = None
+) -> list[Question]:
     """물어온 것 전부. **거르지 않는다** (§5.3).
+
+    `since` 는 **발행물이 쓴다.** 칼럼은 회차라 그 회차가 다루는 기간이 있고, 관찰이
+    "지난 30일 동안"이라는 말이 되려면 그 기간 안에서 세야 한다 (§7.6.2). FAQ 는
+    살아있는 문서라 창을 두지 않는다 — 오래전에 반복된 것도 지금 자주 묻히면 여전히
+    FAQ 다.
 
     원천이 둘이다 — 모 시스템에서 온 것과 담당자가 직접 등록한 것 (§1.4.3). 후자를
     빼면 **메신저로 오간 반복이 통계에서 사라지고**, 그것을 흡수하려고 수동 등록을
@@ -185,13 +192,16 @@ def load_questions(conn: sqlite3.Connection) -> list[Question]:
         FROM raw_question q
         LEFT JOIN raw_resolution r ON r.question_id = q.id
         LEFT JOIN qna_item i ON i.parent_question_id = q.id
+        WHERE (? IS NULL OR q.created_at >= ?)
         UNION ALL
         SELECT m.qna_item_id AS id, m.question AS text, m.registered_at AS created_at,
                CASE WHEN i.resolution_grade IS NOT NULL THEN 1 ELSE 0 END AS resolved
         FROM manual_entry m
         JOIN qna_item i ON i.id = m.qna_item_id
+        WHERE (? IS NULL OR created_at >= ?)
         ORDER BY created_at, id
-        """
+        """,
+        (since, since, since, since),
     ).fetchall()
     return [
         Question(
@@ -232,13 +242,15 @@ def cluster(questions: list[Question]) -> list[RepeatQuestion]:
     return groups
 
 
-def detect(conn: sqlite3.Connection) -> list[RepeatQuestion]:
+def detect(
+    conn: sqlite3.Connection, *, since: str | None = None
+) -> list[RepeatQuestion]:
     """읽고 묶는다. **한 주기에 한 번만 부른다** — 트리거와 재료가 같은 셈을 본다.
 
     두 번 세면 트리거가 본 분포와 실제로 쓴 분포가 어긋날 수 있고, 그때 "돌긴
     도는데 재료는 없는" 주기가 생긴다.
     """
-    return cluster(load_questions(conn))
+    return cluster(load_questions(conn, since=since))
 
 
 def peak(groups: list[RepeatQuestion]) -> int:
@@ -261,3 +273,94 @@ def candidates(groups: list[RepeatQuestion], *, minimum: int) -> list[RepeatQues
     found = [g for g in groups if g.count >= max(minimum, 1)]
     found.sort(key=lambda g: (-g.count, g.representative))
     return found
+
+
+# --- 관찰 — 권고의 근거 (§7.6.2, FR-41) ---------------------------------------
+
+OBSERVATION_MIN = 2
+"""관찰로 셀 최소 반복. **두 번은 관찰이고 한 번은 일화다.**
+
+권고가 조건부로 허용되는 근거는 "QnA 통계 자체가 사실"이라는 것인데(§7.6.2), 한 건은
+분포가 아니라 사례다. 그것으로 조언을 쓰면 관찰을 밝힌 형식만 남고 §7.6.2 가 요구한
+실질은 없다.
+"""
+
+MAX_OBSERVATIONS = 5
+"""한 회차에 실을 관찰의 수. 많으면 칼럼이 통계 보고서가 된다."""
+
+
+@dataclass(frozen=True)
+class Observation:
+    """관찰된 현상 하나. **이것이 권고의 근거다** (§7.6.2).
+
+    §2 는 QnA 이력을 "관찰된 현상"으로 정의했다 — 무엇이 자주 묻히는지는 데이터다.
+    관찰을 근거로 쓰는 것은 원칙의 예외가 아니라 **원칙 그대로**이며, 관찰을 생략하고
+    조언만 남기면 그 순간 의견이 된다.
+    """
+
+    id: str
+    question: str
+    count: int
+    resolved: int
+    window_days: int
+    cited: bool = True
+    """본문이 이 관찰을 밝혔다고 신고했는가 (§7.6.2).
+
+    **검수는 전부를 보고 나가는 글은 쓴 것만 싣는다.** 전부를 봐야 지어낸 관찰을
+    가려낼 수 있고, 쓰지 않은 관찰이 근거로 붙으면 읽는 사람은 그 조언이 그것에
+    기댄 줄로 읽는다. 옛 초안에는 이 표시가 없으므로 **기본은 실린 것**으로 본다 —
+    그때는 전부가 실렸기 때문이다.
+    """
+
+    @property
+    def text(self) -> str:
+        """검수자가 대조할 문장. **숫자가 여기 있다** — 본문의 수치를 P1 이 이것과 견준다."""
+        return (
+            f'지난 {self.window_days}일 동안 "{self.question}" 형태의 문의가 '
+            f"{self.count}건 있었다 (그중 해결 {self.resolved}건)."
+        )
+
+    def as_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "question": self.question,
+            "count": self.count,
+            "resolved": self.resolved,
+            "window_days": self.window_days,
+        }
+
+    @classmethod
+    def of(cls, payload: dict) -> Observation:
+        return cls(
+            id=str(payload.get("id") or ""),
+            question=str(payload.get("question") or ""),
+            count=int(payload.get("count") or 0),
+            resolved=int(payload.get("resolved") or 0),
+            window_days=int(payload.get("window_days") or 0),
+            cited=bool(payload.get("cited", True)),
+        )
+
+
+def observations(
+    groups: list[RepeatQuestion], *, window_days: int, limit: int = MAX_OBSERVATIONS
+) -> tuple[Observation, ...]:
+    """묶음에서 관찰을 만든다. **많이 물은 것부터.**
+
+    **번호를 여기서 붙인다.** 초안에 박히는 것이 이 목록이고, 본문은 번호가 아니라
+    문장으로 관찰을 밝히지만(§7.6.2) 검수는 이 목록과 대조해야 한다 — 그때 무엇을
+    관찰했는지가 남아 있지 않으면 발행 뒤에는 다시 셀 수 없다.
+    """
+    picked = sorted(
+        (g for g in groups if g.count >= OBSERVATION_MIN),
+        key=lambda g: (-g.count, g.representative),
+    )[:limit]
+    return tuple(
+        Observation(
+            id=f"obs-{index}",
+            question=" ".join(group.representative.split()),
+            count=group.count,
+            resolved=group.resolved_count,
+            window_days=window_days,
+        )
+        for index, group in enumerate(picked, start=1)
+    )

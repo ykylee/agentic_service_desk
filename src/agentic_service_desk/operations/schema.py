@@ -380,6 +380,20 @@ CREATE TABLE IF NOT EXISTS content_draft (
     grounding    TEXT NOT NULL,   -- JSON — 근거로 쓴 지식 항목 id
     based_on     TEXT,            -- 직전 판본 `content_draft.id`. **살아있는 문서의 갱신**
                                   -- 이라야 diff 검수가 성립한다 (§5.5.5) — 없으면 첫 제작
+    -- 그때 무엇을 관찰했는가 (JSON, WBS-4.7.2 · §7.6.2 · FR-41).
+    -- **권고의 근거다.** 관찰을 생략하고 조언만 남기면 그 순간 의견이 되므로, 칼럼은
+    -- 무엇을 관찰했는지를 함께 밝힌다 — 그러려면 그 관찰이 **박혀 있어야** 한다.
+    -- 지금 다시 세면 숫자가 달라져 검수가 대조할 수 없고, 발행물은 회수할 수 없다.
+    --
+    -- **`grounding` 과 나눠 둔다.** 저쪽은 지식 항목 id 라 stale 판정과 지식베이스
+    -- 커밋 고정이 걸려 있는데, 관찰은 항목이 아니라 **그 시점의 사실**이라 갱신되지
+    -- 않는다. 한 열에 섞으면 stale 조회가 없는 항목을 찾는다.
+    observations TEXT,
+    -- 에이전트 검수의 소견 (JSON, §7.6.4). **NULL 은 '아직 안 봤다'이고 `[]` 는
+    -- '봤는데 없다'다** — 둘을 구분하지 않으면 의미 판정이 돌지 않은 초안이
+    -- 통과한 것처럼 보인다 (§5.6.1). P6·P7 은 의미 판정이라 여기 쌓이고,
+    -- 기계적인 것(P4·P1·P8·인용)은 화면이 볼 때마다 다시 센다.
+    agent_findings TEXT,
     state        TEXT NOT NULL,   -- pending | approved | rejected
     generated_by TEXT,            -- 생성 시점의 모델 (ADR-005)
     created_at   TEXT NOT NULL,

@@ -55,7 +55,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from agentic_service_desk.adapters.parent_system import ParentSystem
-from agentic_service_desk.content import store
+from agentic_service_desk.content import qna_stats, store
 from agentic_service_desk.content.registry import (
     ContentType,
     InvalidDeclaration,
@@ -113,6 +113,18 @@ def compose(ctype: ContentType, draft: store.ContentDraft) -> str:
     parts = [draft.body.strip(), "", "---", ATTRIBUTION]
     if draft.grounding:
         parts.append("근거: " + ", ".join(draft.grounding))
+    # **관찰도 근거다** (§7.6.2). 본문이 권고와 함께 밝히지만 근거 목록에도 남긴다 —
+    # 발행물은 회수할 수 없으므로 **그때 무엇을 세었는지**가 나간 글에 함께 있어야
+    # 한다. 지금 다시 세면 숫자가 다르다.
+    #
+    # **본문이 쓴 것만 싣는다.** 라이브에서 잡았다: 본 관찰을 전부 실었더니 글이
+    # 다루지도 않은 관찰이 근거로 붙었다. 읽는 사람은 그 조언이 그것에 기댄 줄로
+    # 읽고, 검수자도 밝혀진 줄로 본다 — 근거 목록을 부풀리는 것은 근거가 없는 것과
+    # 다른 종류의 거짓말이다.
+    for payload in draft.observations:
+        observation = qna_stats.Observation.of(payload)
+        if observation.cited:
+            parts.append(f"관찰: {observation.text}")
     return "\n".join(parts)
 
 

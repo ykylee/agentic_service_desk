@@ -8,8 +8,8 @@
 
 FR-42 는 새 타입 추가에 코드 변경이 없어야 한다고 한다. 그것이 성립하는 이유는
 읽개가 **셋뿐**이기 때문이다 — 지식베이스 · QnA 통계 · 둘 다. 타입이 넷에서 열이
-되어도 읽개는 늘지 않는다. 지금 있는 것은 **지식베이스와 QnA 통계 둘**이고, 나머지
-하나(`both`)는 칼럼·뉴스레터가 오는 WBS-4.7.2·4.7.3 이 붙인다.
+되어도 읽개는 늘지 않는다. **셋이 다 붙었다** — 지식베이스(가이드) · QnA 통계(FAQ) ·
+둘 다(칼럼·뉴스레터).
 
 ## 가이드가 FAQ 보다 먼저인 이유 (D50)
 
@@ -39,6 +39,31 @@ FAQ 는 갈린다.
 **반복되는데 근거가 없는 질문은 빼고, 뺐다고 말한다.** 그것은 FAQ 의 실패가 아니라
 **지식 공백**이다 (§6.2) — 가장 자주 묻는데 지식베이스가 답을 모르는 자리이므로
 ingest 우선순위로 되먹여야 할 것이지, 지어내서 채울 것이 아니다 (D3, FR-18).
+
+## 칼럼 — 읽는 것이 둘인 이유는 쓸 수 있는 것이 둘이기 때문이다 (WBS-4.7.2, FR-40·41)
+
+칼럼은 세 등급으로 갈린다 (§7.6.1) — **해설**은 허용, **권고**는 관찰을 함께 밝히는
+조건으로 허용, **의견**은 금지다. 그 둘이 읽개의 둘과 정확히 짝을 이룬다.
+
+| 쓸 수 있는 것 | 무엇에 기대는가 |
+|---|---|
+| **해설** — "이 기능은 이렇게 동작하고, 이런 배경에서 바뀌었다" | 지식베이스 |
+| **권고** — "이 문의가 N건 있었고, Y 로 설정하면 피할 수 있다" | **관찰** (QnA 통계) |
+
+`both` 가 반쪽으로 돌면 안 되는 이유가 여기서 드러난다. 관찰 없이 지식베이스만으로
+권고를 쓰면 **그 순간 의견이 된다** (§7.6.2) — 그래서 4.7.1 까지 `both` 를
+`UnsupportedInput` 으로 거부했다.
+
+**저장소 히스토리는 별도 읽개가 아니다.** §7.2 는 칼럼의 주 입력에 히스토리를 함께
+적었지만, 그것은 **이미 지식 항목 안에 있다** — §2.2.1 이 커밋 메시지를 원천에 넣은
+이유가 "왜 그렇게 바뀌었는가"였고 ingest 가 그것을 읽어 항목으로 만든다. 여기서 원문을
+따로 꺼내면 **ingest 를 우회한 글이 발행물에 실리고**, 그것은 검수 화면이 대조할 수
+없는 근거가 된다.
+
+**관찰은 초안에 박힌다.** 발행물은 회수할 수 없는데(§7.3) 지금 다시 세면 숫자가
+달라져 검수가 대조할 수 없다 — 답변의 근거 버전 고정(D20)과 같은 이유다. 다만
+`grounding` 과는 다른 열에 둔다: 저쪽은 지식 항목 id 라 stale 판정이 걸려 있고,
+관찰은 **갱신되는 항목이 아니라 그 시점의 사실**이다.
 
 ## 여기서 정한 것 넷
 
@@ -250,11 +275,24 @@ _RULES = """당신은 사내 시스템의 **{kind}**을 쓴다. 제목은 "{titl
 
 출력은 **JSON 하나만** 낸다. 설명이나 사고 과정을 붙이지 않는다.
 
-{
+{output_shape}"""
+
+_SHAPE = """{
   "title": "문서 제목",
   "body": "문서 본문 (Markdown)",
   "grounding": ["k-..."]
 }"""
+
+_SHAPE_WITH_OBSERVATIONS = """{
+  "title": "문서 제목",
+  "body": "문서 본문 (Markdown)",
+  "grounding": ["k-..."],
+  "observations": ["obs-..."]
+}
+
+`observations` 에는 **본문이 실제로 밝힌 관찰의 번호만** 넣는다. 아래 목록에 없는
+번호를 만들지 않고, 쓰지 않은 관찰을 넣지도 않는다 — 이 목록이 나가는 글에 **근거로
+함께 실리므로**, 쓰지 않은 것을 넣으면 읽는 사람은 그 조언이 그것에 기댄 줄로 읽는다."""
 
 _TYPE_RULES_FAQ = """이 문서는 **문답 모음**이다. 아래에 실제로 반복해서 들어온 질문과,
 각 질문에 대해 검색된 지식 항목이 있다. **자주 물은 것부터** 놓았고, 그 순서를 지킨다.
@@ -267,6 +305,27 @@ _TYPE_RULES_FAQ = """이 문서는 **문답 모음**이다. 아래에 실제로 
 아니다 — 근거 없이 채운 문답은 반복 질문이라 특히 널리 읽힌다.
 
 각 문항은 질문 한 줄과 그에 대한 답으로 쓴다."""
+
+_TYPE_RULES_COLUMN = """이 문서는 **칼럼**이다. 쓸 수 있는 것과 쓸 수 없는 것이 갈린다.
+
+- **해설** — "이 기능은 이렇게 동작하고, 이런 배경에서 바뀌었다". **쓴다.** 근거가
+  있는 사실의 재구성이고, 이 시스템이 가장 잘하는 종류다.
+- **권고** — "이 문의가 N건 있었고, 원인은 X 이며, Y 로 하면 피할 수 있다".
+  **관찰을 함께 밝히면 쓴다.**
+- **의견** — "이 방식이 더 낫습니다", "~하는 것이 옳습니다". **쓰지 않는다.**
+
+**관찰을 생략하고 조언만 남기면 그 순간 의견이 된다.** 권고를 쓸 때는 아래 관찰
+목록에 있는 것을 문장 안에서 밝힌다 — "지난 N일 동안 ...형태의 문의가 M건 있었다"처럼.
+목록에 없는 관찰을 지어내지 않는다. 밝힐 관찰이 없으면 **권고를 쓰지 않고 해설만 쓴다.**
+
+**관찰을 일반 법칙으로 늘리지 않는다.** "4건 있었다"는 사실이지만 "다들 그렇게
+씁니다"는 사실이 아니다. **센 것보다 넓게 말하지 않는다.**
+
+**조직의 방침처럼 쓰지 않는다.** 사내 채널로 나간 글의 "앞으로는 ~하십시오"는 정책
+공지로 읽히는데, 이 글은 그런 권위를 가지지 않는다.
+
+이번 회차가 다룰 주제를 근거 안에서 **골라서** 쓴다 — 가진 것을 전부 늘어놓는 것은
+칼럼이 아니라 목록이다."""
 
 _FIRST = """이번이 **첫 제작**이다. 근거가 다루는 범위 안에서 문서를 처음부터 쓴다."""
 
@@ -300,43 +359,83 @@ def _question_blocks(covered: tuple[tuple, ...]) -> list[str]:
     return blocks
 
 
+def _head(
+    ctype: ContentType, previous, type_rules: str, *, observations: bool = False
+) -> str:  # noqa: ANN001
+    return (
+        _RULES.replace("{kind}", "살아있는 문서" if ctype.living else "발행물")
+        .replace("{title}", ctype.title)
+        .replace("{language}", LANGUAGE)
+        .replace("{type_rules}", type_rules)
+        .replace("{update_rules}", _UPDATE if previous else _FIRST)
+        .replace(
+            "{output_shape}", _SHAPE_WITH_OBSERVATIONS if observations else _SHAPE
+        )
+    )
+
+
 def build_prompt(
     ctype: ContentType,
     items: list,
     previous: store.ContentDraft | None,
     *,
     covered: tuple[tuple, ...] = (),
+    observations: tuple = (),
 ) -> str:
     """모델에게 줄 것. **주 입력에 따라 재료의 모양이 다르다.**
 
     지식베이스 입력은 항목을 늘어놓고, QnA 통계 입력은 **질문마다 그 근거를 달아**
     준다 — FAQ 는 문답 모음이라 어느 근거가 어느 문항의 것인지가 재료에 이미 있어야
-    한다.
+    한다. `both` 는 항목과 **관찰**을 나란히 놓는다: 해설은 앞엣것에, 권고는 뒤엣것에
+    기댄다 (§7.6.1·§7.6.2).
     """
     if covered:
         parts = [
-            _RULES.replace("{kind}", "살아있는 문서" if ctype.living else "발행물")
-            .replace("{title}", ctype.title)
-            .replace("{language}", LANGUAGE)
-            .replace("{type_rules}", _TYPE_RULES_FAQ)
-            .replace("{update_rules}", _UPDATE if previous else _FIRST),
+            _head(ctype, previous, _TYPE_RULES_FAQ),
             "",
             "반복해서 들어온 질문과 그 근거:",
             *_question_blocks(covered),
         ]
         return _with_previous(parts, previous)
 
+    if ctype.input is Input.BOTH:
+        parts = [
+            _head(
+                ctype, previous, _TYPE_RULES_COLUMN, observations=bool(observations)
+            ),
+            "",
+            "근거로 쓸 수 있는 지식 항목:",
+            *[_item_block(i) for i in items],
+            "",
+            *_observation_block(observations),
+        ]
+        return _with_previous(parts, previous)
+
     parts = [
-        _RULES.replace("{kind}", "살아있는 문서" if ctype.living else "발행물")
-        .replace("{title}", ctype.title)
-        .replace("{language}", LANGUAGE)
-        .replace("{type_rules}", "")
-        .replace("{update_rules}", _UPDATE if previous else _FIRST),
+        _head(ctype, previous, ""),
         "",
         "근거로 쓸 수 있는 지식 항목:",
         *[_item_block(i) for i in items],
     ]
     return _with_previous(parts, previous)
+
+
+def _observation_block(observations: tuple) -> list[str]:
+    """관찰 목록. **비어 있으면 비어 있다고 말한다** (§7.6.2).
+
+    조용히 빼면 모델은 관찰이 있는지 없는지 모른 채 권고를 쓰고, 그 권고는 관찰을
+    밝히지 않았으므로 의견이 된다.
+    """
+    if not observations:
+        return [
+            "관찰된 것 (권고의 근거):",
+            "- **없다.** 이번 기간에 셀 만한 반복이 없었다 — **권고를 쓰지 않고 "
+            "해설만 쓴다.**",
+        ]
+    return [
+        "관찰된 것 (권고의 근거):",
+        *[f"- {o.text}" for o in observations],
+    ]
 
 
 def _with_previous(parts: list[str], previous: store.ContentDraft | None) -> str:
@@ -388,12 +487,30 @@ def churn(previous: str, current: str) -> float:
     return 1.0 - (same / total)
 
 
-def parse_document(text: str, allowed_ids: set[str]) -> tuple[str, str, tuple[str, ...]] | None:
-    """응답을 (제목, 본문, 근거)로. `None` 이면 쓸 것이 없다는 결정이다.
+@dataclass(frozen=True)
+class Document:
+    """모델이 낸 것 중 **받아들인 것**."""
+
+    title: str
+    body: str
+    grounding: tuple[str, ...]
+    cited: tuple[str, ...] = ()
+    """본문이 실제로 밝혔다고 신고한 관찰 (§7.6.2).
+
+    **박힌 관찰 전부와 다르다.** 검수는 전부를 봐야 지어낸 관찰을 가려낼 수 있지만,
+    나가는 글의 근거 목록에는 **쓴 것만** 실린다 — 쓰지 않은 관찰이 근거로 붙으면
+    읽는 사람은 그 조언이 그것에 기댄 줄로 읽고, 검수자도 밝혀진 줄로 본다 (§5.6.1).
+    """
+
+
+def parse_document(
+    text: str, allowed_ids: set[str], *, allowed_observations: set[str] = frozenset()
+) -> Document | None:
+    """응답을 문서로. `None` 이면 쓸 것이 없다는 결정이다.
 
     지어낸 근거 id 는 버린다 — 없는 것을 가리키는 근거는 Lint 의 끊어진 링크가 되고,
     그때는 이미 문서가 나간 뒤다. 하나도 남지 않으면 **근거에서 나온 글인지 알 수
-    없으므로** 초안으로 받지 않는다 (D3).
+    없으므로** 초안으로 받지 않는다 (D3). 관찰 번호도 같은 규칙으로 거른다.
     """
     payload = extract_json(text)
     title = str(payload.get("title") or "").strip()
@@ -407,7 +524,14 @@ def parse_document(text: str, allowed_ids: set[str]) -> tuple[str, str, tuple[st
     )
     if not grounding:
         return None
-    return title, body, grounding
+    cited = tuple(
+        dict.fromkeys(
+            str(o)
+            for o in (payload.get("observations") or [])
+            if str(o) in allowed_observations
+        )
+    )
+    return Document(title=title, body=body, grounding=grounding, cited=cited)
 
 
 def diff_of(previous: str, current: str) -> str:
@@ -459,6 +583,9 @@ class Material:
     deferred: int = 0
     """한도를 넘어 이번에 다루지 않은 반복 질문의 수."""
 
+    observations: tuple = ()
+    """관찰된 현상 (`both` 만). **권고의 근거이고 초안에 박힌다** (§7.6.2, FR-41)."""
+
 
 # --- 실행기 -------------------------------------------------------------------
 
@@ -498,7 +625,11 @@ class ContentProducer:
         # ② 임계를 재는 것은 트리거보다 먼저다. **재는 것은 싸고 조회는 비싸다** —
         #    반복 분포는 SQL 한 번이지만 근거 조회는 후보마다 지식베이스를 훑는다.
         #    그래서 싼 쪽만 트리거 앞에 두고 비싼 쪽은 트리거가 선 뒤에 돈다.
-        groups = qna_stats.detect(self._conn) if _needs_qna(ctype) else []
+        groups = (
+            qna_stats.detect(self._conn, since=_window_start(ctype))
+            if _needs_qna(ctype)
+            else []
+        )
         signals = {REPEAT_QUESTIONS: float(qna_stats.peak(groups))} if _needs_qna(ctype) else None
 
         trigger = evaluate_trigger(
@@ -551,13 +682,9 @@ class ContentProducer:
             return self._from_knowledge()
         if ctype.input is Input.QNA_STATS:
             return self._from_qna_stats(ctype, groups)
-        # **반쪽으로 만들지 않는다.** `both` 를 지식베이스만으로 돌리면 칼럼이
-        # 관찰(§7.6.2) 없이 나가는데, 관찰을 생략한 권고는 그 순간 의견이 된다.
-        raise UnsupportedInput(
-            f"{ctype.id}: 주 입력 {ctype.input} 의 읽개가 아직 없다 — 지식베이스와 "
-            "QnA 통계를 함께 읽는 것은 칼럼·뉴스레터가 오는 WBS-4.7.2·4.7.3 이 "
-            "붙인다. 선언은 있으나 아직 만들 수 없다"
-        )
+        if ctype.input is Input.BOTH:
+            return self._from_both(ctype, groups)
+        raise UnsupportedInput(f"{ctype.id}: 주 입력 {ctype.input} 의 읽개가 없다")
 
     def _from_knowledge(self) -> Material:
         stored, _broken = self._repo.scan()
@@ -566,6 +693,27 @@ class ContentProducer:
         items = [s.item for s in stored if any(p.commit for p in s.item.provenance)]
         stale = tuple(i.id for i in items if i.stale)
         return Material(items=[i for i in items if not i.stale], stale=stale)
+
+    def _from_both(self, ctype: ContentType, groups: list) -> Material:
+        """지식베이스와 관찰을 함께 읽는다 (§7.2, §7.6).
+
+        **가이드와 달리 QnA 승격 항목도 받는다.** 가이드는 소스코드 파생 지식이
+        중심이라 그것을 걸렀지만(§7.2), 칼럼의 해설은 "왜 그렇게 정해졌는가"를
+        다루므로 티켓 해결에서 올라온 항목이 그 자리의 재료다.
+
+        **관찰이 없어도 만든다.** 그때는 해설만 쓰는 회차이고, 프롬프트가 그렇게
+        말한다 — 관찰이 없다는 사실을 감추면 모델이 밝힐 것 없는 권고를 쓴다.
+        """
+        stored, _broken = self._repo.scan()
+        items = [s.item for s in stored]
+        stale = tuple(i.id for i in items if i.stale)
+        return Material(
+            items=[i for i in items if not i.stale],
+            stale=stale,
+            observations=qna_stats.observations(
+                groups, window_days=ctype.trigger.period_days or 0
+            ),
+        )
 
     def _from_qna_stats(self, ctype: ContentType, groups: list) -> Material:
         """반복 질문이 **무엇을 다룰지**를 정하고, 검색이 **무엇에 기대어 쓸지**를 정한다.
@@ -627,10 +775,21 @@ class ContentProducer:
                 material=material,
             )
 
-        prompt = build_prompt(ctype, material.items, previous, covered=material.covered)
+        prompt = build_prompt(
+            ctype,
+            material.items,
+            previous,
+            covered=material.covered,
+            observations=material.observations,
+        )
         allowed = {i.id for i in material.items}
+        observable = {o.id for o in material.observations}
         try:
-            parsed = parse_document(self._harness.run(prompt).text, allowed)
+            parsed = parse_document(
+                self._harness.run(prompt).text,
+                allowed,
+                allowed_observations=observable,
+            )
         except (AgentOutputError, RuntimeError) as exc:
             # **하네스 실패까지 여기서 받는다.** 콘텐츠 제작은 배치 주기의 한 걸음일
             # 뿐인데, 모델이 응답하지 않았다고 예외가 위로 올라가면 **그 tick 의
@@ -652,7 +811,7 @@ class ContentProducer:
                 material=material,
             )
 
-        title, body, grounding = parsed
+        title, body, grounding = parsed.title, parsed.body, parsed.grounding
         # **바뀐 것이 없으면 초안을 만들지 않는다.** 대기열이 빈 판정으로 채워지면
         # 실제로 볼 것이 그 사이에 묻힌다 (§8.6).
         if previous is not None and body.strip() == previous.body.strip():
@@ -679,12 +838,17 @@ class ContentProducer:
             based_on=previous.id if previous else None,
             generated_by=self._generated_by,
             ticket_id=ticket.id,
+            observations=tuple(
+                o.as_dict() | {"cited": o.id in parsed.cited}
+                for o in material.observations
+            ),
         )
         result = self._record(
             ctype,
             store.Outcome.PRODUCED,
             f"{trigger.reason} — 근거 {len(grounding)}건"
             + (f", 반복 질문 {len(material.covered)}건" if material.covered else "")
+            + (f", 관찰 {len(material.observations)}건" if material.observations else "")
             + (f", 낡은 항목 {len(stale)}건 제외" if stale else "")
             + (
                 f", 본문 {churn(previous.body, body) * 100:.0f}% 변경"
@@ -732,13 +896,28 @@ class ContentProducer:
         )
 
 
+def _window_start(ctype: ContentType) -> str | None:
+    """관찰을 셀 기간의 시작. **발행물만 창을 둔다.**
+
+    칼럼은 회차라 그 회차가 다루는 기간이 있고, "지난 30일 동안"이라는 말이 성립하려면
+    그 안에서 세야 한다 (§7.6.2). FAQ 는 살아있는 문서라 창이 없다 — 오래전부터
+    반복된 것도 지금 자주 묻히면 여전히 FAQ 다.
+    """
+    if ctype.input is not Input.BOTH or not ctype.trigger.period_days:
+        return None
+    return (datetime.now(UTC) - timedelta(days=ctype.trigger.period_days)).isoformat()
+
+
 def _needs_qna(ctype: ContentType) -> bool:
     """이 타입이 QnA 분포를 봐야 하는가.
 
     주 입력이 QnA 통계이거나, 임계가 그것을 재라고 선언했거나 — **둘은 같이 오는 것이
     보통이지만 하나만 선언될 수도 있다.** 주기로만 도는 FAQ 파생 타입이 그렇다.
     """
-    return ctype.input is Input.QNA_STATS or ctype.trigger.threshold == REPEAT_QUESTIONS
+    return (
+        ctype.input in (Input.QNA_STATS, Input.BOTH)
+        or ctype.trigger.threshold == REPEAT_QUESTIONS
+    )
 
 
 def _no_grounding_detail(ctype: ContentType, material: Material) -> str:

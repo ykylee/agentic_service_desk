@@ -22,6 +22,7 @@ from agentic_service_desk.content import production as content_production
 from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import store as content_store
 from agentic_service_desk.content import registry as content_registry
+from agentic_service_desk.content import review as content_review
 from agentic_service_desk.ingest.agent import IngestAgent
 from agentic_service_desk.ingest.harness_runner import HarnessError, PiHarness
 from agentic_service_desk.ingest.output_filter import (
@@ -98,6 +99,7 @@ class BatchRunner:
         self._lint()
         self._correct()
         self._produce_content()
+        self._inspect_content()
         self._publish_content()
         self._reindex()
 
@@ -588,6 +590,67 @@ class BatchRunner:
         finally:
             conn.close()
 
+    def _inspect_content(self) -> None:
+        """대기 중인 콘텐츠 초안에 의미 판정을 붙인다 (WBS-4.7.2, §7.6.4, FR-40·41).
+
+        **제작 다음이고 게재 앞이다.** 앞이면 판정할 초안이 없고, 뒤면 사람이 소견
+        없이 본 초안이 이미 나간 뒤다.
+
+        **선언이 정한 타입만 본다** (FR-42). P6·P7 을 들지 않은 타입에 붙이면
+        가이드의 사용 설명이 전부 걸려 소견이 소음이 된다 — 그 타입의 초안은
+        `agent_findings` 가 `NULL` 로 남고, 화면은 그것을 "아직 안 봤다"가 아니라
+        "의미 판정 대상이 아니다"로 읽는다(`needs_semantic`).
+        """
+        if self._cfg.stage not in content_production.CONTENT_STAGES:
+            return
+        if not self._cfg.operations_db.exists():
+            return
+        repo = KnowledgeRepository(self._cfg.knowledge_dir)
+        if not repo.root.exists():
+            return
+        harness = self._harness()
+        if harness is None:
+            # **조용히 통과시키지 않는다.** 소견 없이 두면 화면이 "아직 안 봤다"고
+            # 말하고, 그것이 사실이다 (§5.6.1).
+            return
+
+        try:
+            types = content_registry.load(self._cfg.content_types_path)
+        except content_registry.InvalidDeclaration as exc:
+            print(f"[worker] 콘텐츠 타입 선언이 잘못됐다 — {exc}")
+            return
+
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            for draft in content_store.awaiting_inspection(conn):
+                try:
+                    ctype = types.get(draft.type_id)
+                except content_registry.InvalidDeclaration:
+                    continue
+                if not content_review.needs_semantic(ctype):
+                    continue
+                findings = content_review.inspect_semantically(
+                    conn,
+                    ctype,
+                    draft,
+                    harness=harness,
+                    source_text=_source_text_of(repo, draft),
+                )
+                if findings is None:
+                    print(
+                        f"[worker] {ctype.title} 의미 판정을 못 했다 — 다음 주기에 "
+                        "다시 본다. **박지 않는다**: 빈 소견으로 박으면 돌지 않은 "
+                        "판정이 통과한 것처럼 보인다"
+                    )
+                    continue
+                print(
+                    f"[worker] {ctype.title} 의미 판정 — 소견 {len(findings)}건. "
+                    "**소견이 없다고 통과가 아니다** (FR-39)"
+                )
+        finally:
+            conn.close()
+
     def _publish_content(self) -> None:
         """승인됐는데 아직 나가지 않은 콘텐츠를 내보낸다 (WBS-4.6.3, XR-6).
 
@@ -684,6 +747,18 @@ def _has_pending_correction(conn, record_id: str) -> bool:  # noqa: ANN001
         ).fetchone()
         is not None
     )
+
+
+def _source_text_of(repo, draft) -> dict[str, str]:  # noqa: ANN001
+    """초안이 가리키는 지식 항목의 원문. **없으면 없는 대로** — 화면과 같은 규칙이다."""
+    wanted = set(draft.grounding)
+    if not wanted:
+        return {}
+    return {
+        s.item.id: f"{s.item.title}\n\n{s.item.body}"
+        for s in repo.scan()[0]
+        if s.item.id in wanted
+    }
 
 
 def _report_content(ctype, result) -> None:  # noqa: ANN001

@@ -166,6 +166,18 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=9,
+        name="content_draft.observations · agent_findings — 칼럼 (WBS-4.7.2, FR-40·41)",
+        statements=(
+            # **관찰은 근거와 다른 열에 둔다.** grounding 에는 stale 판정과 지식베이스
+            # 커밋 고정이 걸려 있는데 관찰은 갱신되는 항목이 아니라 그 시점의 사실이다.
+            "ALTER TABLE content_draft ADD COLUMN observations TEXT",
+            # NULL 은 "아직 안 봤다", '[]' 는 "봤는데 소견이 없다" — 기본값을 주지
+            # 않는 것이 그 구분의 집행이다.
+            "ALTER TABLE content_draft ADD COLUMN agent_findings TEXT",
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

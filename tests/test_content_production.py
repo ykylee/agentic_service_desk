@@ -394,18 +394,19 @@ class TestOneAtATime:
         conn.close()
 
 
-class TestUnsupportedInput:
+class TestReaders:
     """읽개는 주 입력 종류마다 하나다 — 타입마다가 아니다.
 
-    지식베이스와 QnA 통계는 붙었고(4.6.2 · 4.7.1), 둘을 함께 읽는 `both` 만 남았다.
+    셋이 다 붙었다 (4.6.2 지식베이스 · 4.7.1 QnA 통계 · 4.7.2 둘 다). **선언이
+    가리키는 읽개가 없으면 조용히 건너뛰지 않는다**는 규칙은 남는다 — 침묵은
+    "만들 것이 없다"와 구분되지 않기 때문이다.
     """
 
-    def test_둘을_함께_읽는_읽개가_없으면_조용히_건너뛰지_않는다(self, tmp_path) -> None:
-        # 침묵은 "만들 것이 없다"와 구분되지 않아, 선언은 있는데 아무것도 안 나오는
-        # 타입이 생긴다. **반쪽으로 만들지도 않는다** — 관찰 없는 칼럼은 의견이다.
+    def test_선언된_주_입력에는_모두_읽개가_있다(self, tmp_path) -> None:
         conn = _conn(tmp_path)
-        with pytest.raises(production.UnsupportedInput, match="4.7.2"):
-            _producer(tmp_path, conn, FakeHarness()).run(COLUMN)
+        producer = _producer(tmp_path, conn, FakeHarness())
+        for ctype in load_registry().all():
+            producer._read_input(ctype, [])  # UnsupportedInput 이 나면 실패다
         conn.close()
 
 

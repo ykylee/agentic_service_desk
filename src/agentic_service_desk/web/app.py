@@ -22,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 from agentic_service_desk import __version__
 from agentic_service_desk.config import Settings, load_settings
 from agentic_service_desk.content import registry as content_registry
+from agentic_service_desk.content import qna_stats as content_qna_stats
 from agentic_service_desk.content import production as content_production
 from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import review as content_review
@@ -856,6 +857,23 @@ class _ContentDetail:
     def diff_review(self) -> bool:
         """변경분 검수인가 (§5.5.5). **선언이 정한다** (FR-42)."""
         return self.ctype.review.scope is content_registry.Scope.DIFF
+
+    @property
+    def observations(self) -> list[tuple[bool, str]]:
+        """그때 무엇을 관찰했는가 — **(본문이 밝혔는가, 문장)** (§7.6.2, FR-41).
+
+        **초안에 박힌 것을 읽는다** — 지금 다시 세면 숫자가 달라져 검수자가 본문과
+        대조할 수 없다. 발행물은 회수할 수 없으므로 그 대조가 마지막 기회다.
+
+        **본 것을 전부 보여 주고 밝힌 것을 표시한다.** 전부를 봐야 지어낸 관찰을
+        가려낼 수 있고, 표시가 있어야 "이 권고가 무엇에 기댔는가"를 한눈에 본다.
+        """
+        return [
+            (o.cited, o.text)
+            for o in (
+                content_qna_stats.Observation.of(raw) for raw in self.draft.observations
+            )
+        ]
 
     @property
     def awaiting_final_check(self) -> bool:
