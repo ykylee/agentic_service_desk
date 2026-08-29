@@ -7,7 +7,7 @@
 - 범위: 프로젝트 개요, 문서 구조, 기본 명령, 검증 포인트, 예외 규칙
 - 대상 독자: 개발자, 운영자, AI agent, 프로젝트 온보딩 담당자
 - 상태: active
-- 최종 수정일: 2026-08-28
+- 최종 수정일: 2026-08-30
 - 관련 문서: [컨셉 허브](../ai-workflow/wiki/concepts/agentic-service-desk-concept.md) · [요구사항](./REQUIREMENTS.md) · [설계](./architecture/README.md) · [구현 로드맵](./IMPLEMENTATION_ROADMAP.md)
 
 ## 1. 프로젝트 개요
@@ -43,5 +43,5 @@
 - 기타: 컨셉 문서의 절 번호(§)는 8개 문서를 넘어 전역으로 유일하다. **재번호 금지** — 상호참조가 전부 § 기반이다
 
 ## 다음에 읽을 문서
-- [세션 인계 문서](../ai-workflow/memory/active/sessions)
-- [작업 백로그](../ai-workflow/memory/active/backlog)
+- [세션 인계 문서](../ai-workflow/memory/active/main/session_handoff.md)
+- [작업 백로그](../ai-workflow/memory/active/main/backlog/)
