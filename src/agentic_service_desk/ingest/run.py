@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 from agentic_service_desk.ingest.agent import (
@@ -83,6 +83,14 @@ class IngestResult:
     경로 필터를 지나온 것들이다 — 값이 **코드 상수나 커밋 메시지**에 실려 있었다.
     무엇이 왜 걸렸는지 그대로 남긴다: 배제가 조용하면 경계가 잘못 잡혔을 때
     아무도 알아채지 못한다.
+    """
+
+    dropped_dead_refs: list[str] = field(default_factory=list)
+    """무효화 조건에서 떨어낸 **나타날 수 없는 경로** (FR-8).
+
+    모델이 낸 경로가 옮겨졌거나 다른 저장소 것이거나 문서의 자리표시자면, 그것을
+    조건으로 두는 순간 **그 항목은 절대 stale 이 되지 않는다** — 조건이 붙어 있어
+    살아 보이는데 아무것도 가리키지 못한다. 만들지 않는 것이 고치는 것보다 싸다.
     """
 
     broken_items: list[str] = field(default_factory=list)
@@ -216,6 +224,7 @@ class IngestRun:
             return head
         # 읽을 것이 남아 있으면 아래에서 묶음마다 돈다.
 
+        live: dict[str, bool] = {}
         for chunk in _chunks(material, self._max_chars):
             try:
                 proposals = self._agent.from_source(chunk, index)
@@ -233,13 +242,57 @@ class IngestRun:
                     )
                     continue
                 self._apply(
-                    proposal,
+                    self._with_live_refs(proposal, mirror, result, live),
                     source_provenance(proposal, chunk),
                     by_id,
                     index,
                     result,
                 )
         return None if len(result.failures) > failures_before else head
+
+    def _with_live_refs(
+        self,
+        proposal: ProposedItem,
+        mirror: SourceMirror,
+        result: IngestResult,
+        live: dict[str, bool],
+    ) -> ProposedItem:
+        """무효화 조건에 **나타날 수 없는 경로를 남기지 않는다** (FR-8).
+
+        모델은 경로를 곧잘 어긋나게 짚는다 — 옮겨진 자리, 틀린 디렉터리 층, 다른
+        저장소의 경로, 문서에서 베낀 `<branch>` 자리표시자. 2026-08-30 실저장소
+        수집에서 ref 넷 중 하나가 그랬다.
+
+        그것을 조건으로 두면 `refs & 바뀐_경로` 가 영원히 비어 **그 항목은 절대
+        stale 이 되지 않는다.** 조건이 붙어 있어 살아 보이는 만큼 없는 것보다 나쁘다.
+
+        **떨어내기만 하고 지어내지 않는다.** 남는 것이 없으면 `_invalidation_for`
+        가 이미 가진 대비값으로 간다 — 근거로 쓴 경로에 묶고, 그것도 없으면
+        주기형이다. 설계가 예비해 둔 자리가 여기서 쓰인다.
+
+        **`used_paths` 도 함께 거른다.** 그 대비값이 쓰는 것이 이 목록이라, 여기를
+        거르지 않으면 지어낸 경로가 대비값을 통해 그대로 조건이 된다 — 출처 쪽
+        여과(`source_provenance`)는 이 항목에 닿지 않는다.
+
+        Lint 의 같은 검사는 **없어지지 않는다.** 여기서 막는 것은 새로 만드는 것이고,
+        Lint 가 잡는 것은 **저장소가 바뀌어 나중에 죽은 것**이다 — 만들 때 살아 있던
+        경로가 강제 푸시나 이력 재작성으로 사라질 수 있다.
+        """
+
+        def alive(path: str) -> bool:
+            if path not in live:
+                live[path] = mirror.can_appear_in_diff(path)
+            return live[path]
+
+        refs = tuple(p for p in proposal.refs if alive(p))
+        used = tuple(p for p in proposal.used_paths if alive(p))
+        dropped = [p for p in (*proposal.refs, *proposal.used_paths) if not alive(p)]
+        if not dropped:
+            return proposal
+        result.dropped_dead_refs.append(
+            f"{proposal.title} — {', '.join(sorted(set(dropped)))}"
+        )
+        return replace(proposal, refs=refs, used_paths=used)
 
     # --- QnA 원천 --------------------------------------------------------
 

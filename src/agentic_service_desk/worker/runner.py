@@ -1022,6 +1022,11 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
         )
     if result.dropped_config_paths:
         notes.append(f"설정 파일 {len(result.dropped_config_paths)}개를 원천에서 뺐다 (FR-9)")
+    for dropped in result.dropped_dead_refs:
+        # 무엇이 왜 떨어졌는지 보여야 경계가 잘못 잡혔을 때 알아챈다. 특히 이쪽은
+        # **조용히 대비값으로 바뀌는** 자리라, 안 보이면 모든 항목이 주기형이 돼도
+        # 그것이 정상인 줄 안다.
+        notes.append(f"무효화 조건에서 죽은 경로를 뺐다 (FR-8) — {dropped}")
     for dropped in result.dropped_config_values:
         # **한 줄씩 다 보인다.** 건수만 세면 경계가 잘못 잡혀 멀쩡한 항목이
         # 막히고 있어도 숫자가 하나 늘 뿐이라 아무도 알아채지 못한다.

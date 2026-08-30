@@ -203,6 +203,93 @@ class TestConfigValuesAreRejectedInTheRun:
         assert get_cursor(conn, source_key(mirrors[0].repo_url)) == mirrors[0].head()
 
 
+class TestDeadRefsAreDroppedAtIngest:
+    """죽은 무효화 조건을 **만들지 않는다** (FR-8, ingest 쪽 집행).
+
+    Lint 가 잡는 것보다 여기서 막는 것이 싸다 — 잡으면 사람이 판정할 것이 되고,
+    실데이터에서 그 규모가 항목의 37% 였다.
+
+    가장 중요한 시험은 **떨어낸 뒤 대비값으로 간다**는 것이다. 조건을 통째로 비우면
+    그 항목은 영영 재확인되지 않는다.
+    """
+
+    def _repo_with_files(self, tmp_path):  # noqa: ANN001, ANN202
+        origin = _origin(tmp_path, "svc", "grade.py", "def grade(): ...\n", "등급 규칙")
+        built = build_mirrors([str(origin)], tmp_path / "mirrors")
+        built[0].ensure_cloned()
+        return built
+
+    def _proposal(self, *, refs="", used="") -> str:
+        return (
+            '{"items": [{"id": null, "title": "등급 규칙", "body": "본문이다.",'
+            f' "used_paths": [{used}],'
+            f' "invalidation": {{"kind": "linked", "refs": [{refs}]}}}}]}}'
+        )
+
+    def _item_file(self, tmp_path):  # noqa: ANN001, ANN202
+        items = sorted((tmp_path / "knowledge" / "concepts").glob("*.md"))
+        return items[0].read_text(encoding="utf-8")
+
+    def test_지어낸_경로는_조건이_되지_않는다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(refs='"grade.py", "src/never.py"'))
+        result = _run(tmp_path, harness, mirrors, conn).run()
+
+        assert result.created == 1
+        body = self._item_file(tmp_path)
+        assert "grade.py" in body
+        assert "src/never.py" not in body
+
+    def test_무엇을_뺐는지_남긴다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(refs='"grade.py", "src/never.py"'))
+        result = _run(tmp_path, harness, mirrors, conn).run()
+
+        assert result.dropped_dead_refs
+        assert "src/never.py" in result.dropped_dead_refs[0]
+
+    def test_전부_죽었으면_대비값으로_간다(self, tmp_path) -> None:
+        # **조건을 비우지 않는다** — 비우면 그 항목은 영영 재확인되지 않는다.
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(refs='"src/never.py"', used='"grade.py"'))
+        _run(tmp_path, harness, mirrors, conn).run()
+
+        body = self._item_file(tmp_path)
+        assert "kind: linked" in body
+        assert "grade.py" in body  # used_paths 대비값에 묶였다
+
+    def test_근거_경로도_죽었으면_주기형으로_간다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(refs='"a/x.py"', used='"b/y.py"'))
+        _run(tmp_path, harness, mirrors, conn).run()
+
+        body = self._item_file(tmp_path)
+        assert "kind: periodic" in body
+
+    def test_지어낸_근거_경로가_대비값으로_새지_않는다(self, tmp_path) -> None:
+        # `source_provenance` 의 여과는 출처에만 걸린다 — 여기를 안 거르면
+        # 지어낸 used_path 가 대비값을 통해 그대로 조건이 된다.
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(used='"made/up.py"'))
+        _run(tmp_path, harness, mirrors, conn).run()
+
+        assert "made/up.py" not in self._item_file(tmp_path)
+
+    def test_살아_있는_경로만_있으면_그대로_둔다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = self._repo_with_files(tmp_path)
+        harness = FakeHarness(self._proposal(refs='"grade.py"'))
+        result = _run(tmp_path, harness, mirrors, conn).run()
+
+        assert not result.dropped_dead_refs
+        assert "grade.py" in self._item_file(tmp_path)
+
+
 class TestDeadInvalidationAsksTheOwningRepository:
     """죽은 무효화 검사가 **주인 저장소에게** 묻는가 (Lint).
 
