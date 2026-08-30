@@ -22,6 +22,12 @@ MOCK = DataExposure(adapter="mock", source_repo_url="")
 REAL_ADAPTER = DataExposure(adapter="http", source_repo_url="")
 REAL_REPO = DataExposure(adapter="mock", source_repo_url="git@internal:team/parent.git")
 BOTH_REAL = DataExposure(adapter="http", source_repo_url="git@internal:team/parent.git")
+SIMULATED_REPO = DataExposure(
+    adapter="mock", source_repo_url="/Users/me/repos/my-own", source_is_simulated=True
+)
+SIMULATED_BUT_REAL_QNA = DataExposure(
+    adapter="http", source_repo_url="/Users/me/repos/my-own", source_is_simulated=True
+)
 
 REMOTE = "https://api.minimax.io/v1"
 LOCAL = "http://gpu-box.local:8000/v1"
@@ -63,6 +69,17 @@ class TestExposure:
     def test_공백만_있는_저장소_설정은_없는_것으로_본다(self) -> None:
         assert DataExposure(adapter="mock", source_repo_url="   ").has_real_data is False
 
+    def test_선언하지_않은_저장소는_모_시스템으로_본다(self) -> None:
+        # 기본값이 거짓인 것이 요점이다 — 설정을 빠뜨린 실행이 조용히 열리면 안 된다.
+        assert DataExposure(adapter="mock", source_repo_url="/repo").has_real_data is True
+
+    def test_검증용이라고_선언된_저장소는_소스_위험이_없다(self) -> None:
+        assert SIMULATED_REPO.has_real_data is False
+
+    def test_저장소를_선언해도_실제_어댑터는_풀리지_않는다(self) -> None:
+        # 저장소가 우리 것이어도 QnA 는 질문자의 말이다. 조건 2 는 별개다.
+        assert SIMULATED_BUT_REAL_QNA.has_real_data is True
+
 
 class TestPolicy:
     def test_로컬은_언제나_통과한다(self) -> None:
@@ -83,6 +100,25 @@ class TestPolicy:
         # "실제 모 시스템 + 외부 LLM" 조합이 만들어진다.
         with pytest.raises(RemoteEndpointRejected, match="실제 데이터"):
             assert_endpoint_allowed(REMOTE, allow_remote=True, exposure=exposure)
+
+    def test_검증용_선언이_있으면_저장소가_붙어도_원격이_열린다(self) -> None:
+        assert_endpoint_allowed(REMOTE, allow_remote=True, exposure=SIMULATED_REPO)
+
+    def test_검증용_선언만으로는_열리지_않는다_플래그도_필요하다(self) -> None:
+        # 두 선언은 서로 다른 사실이다 — 하나가 다른 하나를 대신하지 않는다.
+        with pytest.raises(RemoteEndpointRejected, match="명시적으로 허용"):
+            assert_endpoint_allowed(REMOTE, allow_remote=False, exposure=SIMULATED_REPO)
+
+    def test_검증용_선언이_실제_어댑터를_풀지_않는다(self) -> None:
+        with pytest.raises(RemoteEndpointRejected, match="실제 데이터"):
+            assert_endpoint_allowed(
+                REMOTE, allow_remote=True, exposure=SIMULATED_BUT_REAL_QNA
+            )
+
+    def test_거부_사유가_선언하는_법을_알려준다(self) -> None:
+        with pytest.raises(RemoteEndpointRejected) as exc:
+            assert_endpoint_allowed(REMOTE, allow_remote=True, exposure=REAL_REPO)
+        assert "ASD_SIMULATED_SOURCE" in str(exc.value)
 
     def test_거부_사유가_무엇을_고쳐야_하는지_알려준다(self) -> None:
         with pytest.raises(RemoteEndpointRejected) as exc:
@@ -118,3 +154,38 @@ class TestGatewayConstruction:
         )
         with pytest.raises(RemoteEndpointRejected):
             build_gateway(cfg, YieldSignal(tmp_path / "m"))
+
+    def test_임베딩_엔드포인트도_판정을_받는다(self, tmp_path) -> None:
+        # 채팅이 로컬이어도 임베딩이 따로 원격을 가리킬 수 있다. 나가는 것은
+        # 지식 본문 그 자체라 오히려 더 직접적인 반출 경로다.
+        from agentic_service_desk.config import Settings
+        from agentic_service_desk.llm.arbiter import YieldSignal
+        from agentic_service_desk.llm.local import build_gateway
+
+        cfg = Settings(
+            _env_file=None,  # type: ignore[arg-type]
+            llm_base_url=LOCAL,
+            llm_model="m",
+            llm_allow_remote=True,
+            embedding_base_url=REMOTE,
+            parent_repo_url="git@internal:team/parent.git",
+        )
+        with pytest.raises(RemoteEndpointRejected):
+            build_gateway(cfg, YieldSignal(tmp_path / "m"))
+
+    def test_검증용_선언이면_임베딩도_원격이_열린다(self, tmp_path) -> None:
+        from agentic_service_desk.config import Settings
+        from agentic_service_desk.llm.arbiter import YieldSignal
+        from agentic_service_desk.llm.local import build_gateway
+
+        cfg = Settings(
+            _env_file=None,  # type: ignore[arg-type]
+            llm_base_url=REMOTE,
+            llm_model="m",
+            llm_allow_remote=True,
+            embedding_base_url=REMOTE,
+            parent_adapter="mock",
+            parent_repo_url="/Users/me/repos/my-own",
+            simulated_source=True,
+        )
+        build_gateway(cfg, YieldSignal(tmp_path / "m"))

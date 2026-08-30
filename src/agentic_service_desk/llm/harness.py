@@ -34,6 +34,7 @@ def render_models_json(settings: Settings) -> dict:
         exposure=DataExposure(
             adapter=settings.parent_adapter,
             source_repo_url=settings.parent_repo_url,
+            source_is_simulated=settings.simulated_source,
         ),
     )
     if not settings.llm_base_url or not settings.llm_model:

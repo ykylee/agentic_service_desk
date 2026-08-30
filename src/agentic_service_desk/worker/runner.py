@@ -32,7 +32,7 @@ from agentic_service_desk.ingest.output_filter import (
 )
 from agentic_service_desk.ingest.qna import QnaCollector
 from agentic_service_desk.ingest.run import IngestRun
-from agentic_service_desk.ingest.source import MirrorNotReady, SourceMirror
+from agentic_service_desk.ingest.source import MirrorNotReady, MirrorSet, build_mirrors
 from agentic_service_desk.knowledge.lint import Lint
 from agentic_service_desk.knowledge.search import Search, rebuild_embedding_index
 from agentic_service_desk.pipeline import correction as correction_domain
@@ -50,7 +50,7 @@ from agentic_service_desk.operations import retention as retention_domain
 from agentic_service_desk.operations import ticket as ticket_domain
 from agentic_service_desk.operations import tracking as tracking_domain
 from agentic_service_desk.operations.drafter import Drafter
-from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
+from agentic_service_desk.operations.checkpoint import get_cursor, source_key
 from agentic_service_desk.operations.schema import connect, initialize
 
 
@@ -65,6 +65,33 @@ class BatchRunner:
         self._cfg = settings
         self._stopping = False
         self._filter: OutputFilter | None = None
+
+    def _mirrors(self):  # noqa: ANN201
+        """붙은 저장소마다 자기 칸을 가진 미러.
+
+        **설정에서 매번 만든다** — 들고 있지 않는 이유는 저장소 목록이 배치가
+        도는 중에도 바뀔 수 있고, 그때 옛 목록을 쓰면 방금 뗀 저장소를 계속
+        읽거나 방금 붙인 저장소를 영영 읽지 않기 때문이다.
+        """
+        return build_mirrors(self._cfg.parent_repo_urls, self._cfg.source_mirror_dir)
+
+    def _content_source_commit(self, conn) -> str | None:  # noqa: ANN001
+        """콘텐츠에 박을 소스 커밋 (WBS-4.6~4.7).
+
+        이 값은 **출처가 된다** — 제작 트리거이면서 만들어진 글의 provenance 다.
+
+        저장소가 여럿이면 **어느 것을 골라도 틀린 출처**다. 틀린 출처는 붙어 있다는
+        사실 때문에 오히려 그럴듯해지므로(§2.2.3) 그럴 때는 **박지 않는다.** 대가는
+        소스 변경을 트리거로 쓰는 콘텐츠 타입이 그 신호를 잃는 것이고, 그것은
+        조용하지 않다 — 제작기가 "만들 것이 없다"로 말한다.
+
+        여러 저장소에 걸친 콘텐츠 출처는 아직 답이 없다. S4 의 물음이고, 지금은
+        S0 이라 여기서 정하지 않는다.
+        """
+        urls = self._cfg.parent_repo_urls
+        if len(urls) != 1:
+            return None
+        return get_cursor(conn, source_key(urls[0]))
 
     def request_stop(self, signum: int, frame: FrameType | None) -> None:
         print(f"[worker] 중단 요청 (signal={signum}). 현재 청크를 마치고 멈춘다.")
@@ -178,27 +205,35 @@ class BatchRunner:
         중단됐을 때 그 구간을 건너뛰고, 그러면 **지식에 구멍이 생기는데 아무도
         알아채지 못한다.**
         """
-        if not self._cfg.parent_repo_url:
-            return
-        mirror = SourceMirror(self._cfg.parent_repo_url, self._cfg.source_mirror_dir)
-        try:
-            mirror.ensure_cloned()
-            mirror.fetch()
-        except (MirrorNotReady, RuntimeError) as exc:
-            print(f"[worker] 소스 동기화 실패: {exc}")
+        mirrors = self._mirrors()
+        if not mirrors:
             return
 
         conn = connect(self._cfg.operations_db)
         initialize(conn)
-        cursor = get_cursor(conn, SOURCE)
-        changed = mirror.changed_paths_since(cursor)
-        commits = mirror.commits_since(cursor)
-        conn.close()
+        try:
+            for mirror in mirrors:
+                # **저장소 하나가 죽어도 나머지는 간다.** 붙은 것이 여럿일 때 하나의
+                # 접속 실패로 전부를 멈추면, 멀쩡한 저장소의 변경분까지 밀린다.
+                try:
+                    mirror.ensure_cloned()
+                    mirror.fetch()
+                except (MirrorNotReady, RuntimeError) as exc:
+                    print(f"[worker] 소스 동기화 실패 ({mirror.repo_url}): {exc}")
+                    continue
 
-        if not changed and not commits:
-            return
-        scope = "전체(최초)" if cursor is None else f"{cursor[:8]}..HEAD"
-        print(f"[worker] 소스 변경 {scope} — 커밋 {len(commits)}건, 경로 {len(changed)}개")
+                cursor = get_cursor(conn, source_key(mirror.repo_url))
+                changed = mirror.changed_paths_since(cursor)
+                commits = mirror.commits_since(cursor)
+                if not changed and not commits:
+                    continue
+                scope = "전체(최초)" if cursor is None else f"{cursor[:8]}..HEAD"
+                print(
+                    f"[worker] 소스 변경 {scope} ({mirror.repo_url}) — "
+                    f"커밋 {len(commits)}건, 경로 {len(changed)}개"
+                )
+        finally:
+            conn.close()
 
     def _sync_qna(self) -> None:
         """QnA 이력을 Raw Layer 로 가져온다 (WBS-4.2.2, FR-52).
@@ -594,11 +629,6 @@ class BatchRunner:
 
         harness = PiHarness(self._cfg.llm_model, self._cfg.llm_api_key)
         repo = KnowledgeRepository(self._cfg.knowledge_dir)
-        mirror = (
-            SourceMirror(self._cfg.parent_repo_url, self._cfg.source_mirror_dir)
-            if self._cfg.parent_repo_url
-            else None
-        )
 
         conn = connect(self._cfg.operations_db)
         initialize(conn)
@@ -608,7 +638,7 @@ class BatchRunner:
                 agent=IngestAgent(harness),
                 conn=conn,
                 output_filter=output_filter,
-                mirror=mirror,
+                mirrors=self._mirrors(),
             ).run()
         except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] ingest 실패: {exc}")
@@ -632,15 +662,13 @@ class BatchRunner:
         repo = KnowledgeRepository(self._cfg.knowledge_dir)
         if not repo.root.exists():
             return
-        mirror = (
-            SourceMirror(self._cfg.parent_repo_url, self._cfg.source_mirror_dir)
-            if self._cfg.parent_repo_url
-            else None
-        )
+        mirrors = self._mirrors()
         conn = connect(self._cfg.operations_db)
         initialize(conn)
         try:
-            report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+            report = Lint(
+                repo=repo, conn=conn, mirror=MirrorSet(mirrors) if mirrors else None
+            ).run()
         except (KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] lint 실패: {exc}")
             return
@@ -739,7 +767,7 @@ class BatchRunner:
                 harness=self._harness(),
                 generated_by=self._cfg.llm_model,
             )
-            commit = get_cursor(conn, SOURCE)
+            commit = self._content_source_commit(conn)
             for ctype in types.all():
                 try:
                     result = producer.run(ctype, source_commit=commit)
@@ -994,6 +1022,10 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
         )
     if result.dropped_config_paths:
         notes.append(f"설정 파일 {len(result.dropped_config_paths)}개를 원천에서 뺐다 (FR-9)")
+    for dropped in result.dropped_config_values:
+        # **한 줄씩 다 보인다.** 건수만 세면 경계가 잘못 잡혀 멀쩡한 항목이
+        # 막히고 있어도 숫자가 하나 늘 뿐이라 아무도 알아채지 못한다.
+        notes.append(f"설정값을 옮겨 적어 받지 않았다 (FR-9) — {dropped}")
     if result.omitted_messages:
         notes.append(
             f"커밋 메시지 {result.omitted_messages}건이 한도를 넘어 실리지 않았다 "

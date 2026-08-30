@@ -12,7 +12,19 @@ import sqlite3
 from datetime import UTC, datetime
 
 SOURCE = "source"
-"""소스 저장소 커서 — 마지막으로 ingest 한 커밋 해시."""
+"""소스 저장소 커서의 앞말. 실제 열쇠는 `source_key()` 가 만든다."""
+
+
+def source_key(repo_url: str) -> str:
+    """저장소 하나의 커서 열쇠.
+
+    **저장소마다 따로 든다.** 커서는 커밋 해시인데(ADR-006) 해시는 저장소 안에서만
+    뜻이 있다 — 하나로 합치면 A 의 해시를 기준으로 B 의 변경분을 물어보게 되고,
+    그 물음에는 답이 없다. 원천이 하나뿐이던 때의 열쇠(`source`)는 읽지 않는다.
+    """
+    from agentic_service_desk.ingest.source import mirror_slug
+
+    return f"{SOURCE}:{mirror_slug(repo_url)}"
 
 QNA = "qna"
 """QnA 커서 — 마지막으로 수집한 시각."""

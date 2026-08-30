@@ -21,7 +21,7 @@ from agentic_service_desk.ingest.run import IngestRun, _chunks
 from agentic_service_desk.ingest.agent import SourceMaterial
 from agentic_service_desk.ingest.source import SourceMirror
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
-from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor
+from agentic_service_desk.operations.checkpoint import get_cursor, source_key
 from agentic_service_desk.operations.schema import connect, initialize
 
 from conftest import FakeHarness
@@ -47,7 +47,7 @@ def _run(tmp_path, harness, *, mirror=None, conn=None):  # noqa: ANN001, ANN202
         agent=IngestAgent(harness),
         conn=conn if conn is not None else _conn(tmp_path),
         output_filter=OutputFilter(frozenset({BOT_ACCOUNT})),
-        mirror=mirror,
+        mirrors=[mirror] if mirror else [],
     )
 
 
@@ -159,7 +159,7 @@ class TestProgressIsMarkedEvenWhenNothingIsLearned:
         result = _run(tmp_path, FakeHarness('{"items": []}'), mirror=mirror, conn=conn).run()
 
         assert not result.changed
-        assert get_cursor(conn, SOURCE) == mirror.head()
+        assert get_cursor(conn, source_key(mirror.repo_url)) == mirror.head()
 
     def test_실패한_답변은_다시_읽는다(self, tmp_path) -> None:
         # 진행 표시는 성공한 호출에만 붙는다.
@@ -234,23 +234,22 @@ class TestSourceIngest:
 
     def test_커서는_커밋이_끝난_뒤에_옮겨진다(self, tmp_path) -> None:
         conn = _conn(tmp_path)
-        assert get_cursor(conn, SOURCE) is None
-
         mirror = self._mirror(tmp_path)
+        assert get_cursor(conn, source_key(mirror.repo_url)) is None
+
         result = _run(tmp_path, FakeHarness(_item_json("한도 규칙")), mirror=mirror, conn=conn).run()
 
         assert result.commit
-        assert get_cursor(conn, SOURCE) == mirror.head()
+        assert get_cursor(conn, source_key(mirror.repo_url)) == mirror.head()
 
     def test_에이전트가_터지면_커서를_옮기지_않는다(self, tmp_path) -> None:
         # 옮기면 그 구간을 영영 건너뛰고, 지식에 구멍이 생기는데 아무도 모른다.
         conn = _conn(tmp_path)
-        result = _run(
-            tmp_path, FakeHarness("JSON 이 아닌 응답"), mirror=self._mirror(tmp_path), conn=conn
-        ).run()
+        mirror = self._mirror(tmp_path)
+        result = _run(tmp_path, FakeHarness("JSON 이 아닌 응답"), mirror=mirror, conn=conn).run()
 
         assert result.failures
-        assert get_cursor(conn, SOURCE) is None
+        assert get_cursor(conn, source_key(mirror.repo_url)) is None
 
     def test_두_번째_실행은_할_일이_없다(self, tmp_path) -> None:
         conn = _conn(tmp_path)

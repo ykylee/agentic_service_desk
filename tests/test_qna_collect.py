@@ -318,6 +318,10 @@ class TestWorkerWiring:
             parent_adapter="mock",
             operations_db=tmp_path / "ops.sqlite3",
             parent_repo_url="",
+            # **작업 디렉터리에 기대지 않는다.** 기본 `knowledge_dir` 은 상대 경로라,
+            # 개발자가 실제로 배치를 한 번 돌려 `var/knowledge` 가 생기면 Lint 가
+            # 그것을 보고 돌아 이 시험의 "아무것도 하지 않는다"가 무너진다.
+            knowledge_dir=tmp_path / "knowledge",
         )
         base.update(over)
         return Settings(_env_file=None, **base)  # type: ignore[arg-type]

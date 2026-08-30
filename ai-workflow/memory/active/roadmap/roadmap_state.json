@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "workflow_kit.common.state.roadmap.generate_roadmap_state",
-  "generated_at": "2026-08-29",
+  "generated_at": "2026-08-30",
   "milestones": [
     {
       "id": "M-001",
@@ -667,6 +667,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS 리프가 아니다 — 저장소 산출물이 아니라 워크플로우 메타 층(ai-workflow 킷 진입점)의 유지보수다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-30-main-001.md"
+    },
+    {
+      "task_id": "TASK-2026-08-30-main-002",
+      "task_status": "in_progress",
+      "wbs_ref": "exempt",
+      "exempt_reason": "M-001~M-004 모두 done 이라 열린 마일스톤이 없다. 다음 마일스톤 선언 전의 실데이터 검증 실행이며, 결과가 M-005 범위를 정하는 입력이 된다.",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-30-main-002.md"
     }
   ],
   "issues": []

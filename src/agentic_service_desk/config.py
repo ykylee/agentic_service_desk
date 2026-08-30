@@ -38,7 +38,28 @@ class Settings(BaseSettings):
         default="",
         description="모 시스템 내부 API. 비어 있으면 어댑터가 동작을 거부한다.",
     )
-    parent_repo_url: str = Field(default="", description="모 시스템 소스 저장소 (읽기 전용).")
+    parent_repo_url: str = Field(
+        default="",
+        description=(
+            "모 시스템 소스 저장소 (읽기 전용). **쉼표로 여럿** — 모 시스템이 저장소 "
+            "하나라는 보장이 없다. 저장소마다 자기 미러 칸과 자기 커서를 갖는다: 커서는 "
+            "커밋 해시라 저장소 안에서만 뜻이 있고, 합치면 A 의 해시로 B 의 변경분을 "
+            "묻게 된다. **지식베이스는 하나다** — 나누는 것은 원천을 읽는 진행 지점뿐이고, "
+            "개념은 한 자리에 모여야 저장소를 넘는 모순이 드러난다."
+        ),
+    )
+    simulated_source: bool = Field(
+        default=False,
+        description=(
+            "`parent_repo_url` 이 가리키는 것이 **모 시스템이 아니라는 선언** (검증 실행). "
+            "파이프라인을 실제 저장소로 검증하려면 코드가 로컬에 있어야 하는데, 그 저장소가 "
+            "우리 것이면 NFR-1 이 지키려던 반출 위험 자체가 없다. **`llm_allow_remote` 와 "
+            "합치지 않은 것이 요점이다** — 하나로 두면 개발 편의로 켠 플래그가 모 시스템이 "
+            "붙는 날 소스 조건까지 함께 푼다. **어댑터 조건은 이것으로 풀리지 않는다**: "
+            "저장소가 우리 것이어도 QnA 는 질문자의 말이다. 기본이 거짓인 이유는 "
+            "**선언하지 않은 저장소를 모 시스템으로 보기** 위해서다."
+        ),
+    )
     parent_adapter: str = Field(
         default="http",
         description=(
@@ -245,6 +266,15 @@ class Settings(BaseSettings):
             "있다는 전제**(§8.6.3)에서 나왔고, 실데이터로 다시 정할 값이다."
         ),
     )
+
+    @property
+    def parent_repo_urls(self) -> tuple[str, ...]:
+        """붙은 소스 저장소들. 쉼표로 나뉘고 빈 칸은 버린다.
+
+        `parent_repo_url` 은 **정책이 보는 값**으로 그대로 남는다 — 비었는가만
+        묻기 때문이다(NFR-1). 목록이 필요한 것은 수집 쪽이다.
+        """
+        return tuple(u.strip() for u in self.parent_repo_url.split(",") if u.strip())
 
 
 def load_settings() -> Settings:

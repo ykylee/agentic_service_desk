@@ -118,8 +118,21 @@ class ChatLlmGateway:
 
 
 def build_gateway(settings, arbiter: YieldSignal) -> ChatLlmGateway:  # noqa: ANN001
-    """설정에서 게이트웨이를 만든다. 허용 판정이 여기서 한 번에 일어난다."""
+    """설정에서 게이트웨이를 만든다. 허용 판정이 여기서 한 번에 일어난다.
+
+    **임베딩 엔드포인트도 판정을 받는다.** 채팅과 다른 주소를 가리킬 수 있는데
+    (`ASD_EMBEDDING_BASE_URL`), 나가는 것은 지식 본문 그 자체다 — 오히려 더
+    직접적인 반출 경로다. 채팅만 검문하면 그 문은 열린 채로 남는다.
+    """
+    exposure = DataExposure(
+        adapter=settings.parent_adapter,
+        source_repo_url=settings.parent_repo_url,
+        source_is_simulated=settings.simulated_source,
+    )
     embed_url = settings.embedding_base_url or settings.llm_base_url
+    assert_endpoint_allowed(
+        embed_url, allow_remote=settings.llm_allow_remote, exposure=exposure
+    )
     return ChatLlmGateway(
         base_url=settings.llm_base_url,
         model=settings.llm_model,
@@ -132,8 +145,5 @@ def build_gateway(settings, arbiter: YieldSignal) -> ChatLlmGateway:  # noqa: AN
         api_key=settings.llm_api_key,
         arbiter=arbiter,
         allow_remote=settings.llm_allow_remote,
-        exposure=DataExposure(
-            adapter=settings.parent_adapter,
-            source_repo_url=settings.parent_repo_url,
-        ),
+        exposure=exposure,
     )

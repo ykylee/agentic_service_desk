@@ -111,6 +111,10 @@ class TestCli:
         from agentic_service_desk import cli
 
         monkeypatch.setenv("ASD_PARENT_ADAPTER", "mock")
+        # **개발자의 `.env` 에 기대지 않는다.** `load_settings()` 는 그 파일을 읽으므로,
+        # 검증 실행 등으로 저장소가 채워져 있으면 이 시험이 그 설정을 따라 흔들린다.
+        monkeypatch.setenv("ASD_PARENT_REPO_URL", "")
+        monkeypatch.setenv("ASD_SIMULATED_SOURCE", "false")
         monkeypatch.setenv("ASD_LLM_ALLOW_REMOTE", "true")
         monkeypatch.setenv("ASD_LLM_BASE_URL", REMOTE)
         monkeypatch.setenv("ASD_LLM_MODEL", "MiniMax-M3")
@@ -122,6 +126,8 @@ class TestCli:
         from agentic_service_desk import cli
 
         monkeypatch.setenv("ASD_PARENT_ADAPTER", "http")
+        monkeypatch.setenv("ASD_PARENT_REPO_URL", "")
+        monkeypatch.setenv("ASD_SIMULATED_SOURCE", "false")
         monkeypatch.setenv("ASD_LLM_ALLOW_REMOTE", "true")
         monkeypatch.setenv("ASD_LLM_BASE_URL", REMOTE)
         monkeypatch.setenv("ASD_LLM_MODEL", "M")

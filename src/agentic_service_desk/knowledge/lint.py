@@ -37,7 +37,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from agentic_service_desk.ingest.source import SourceMirror
+from agentic_service_desk.ingest.source import MirrorSet, SourceMirror
 from agentic_service_desk.knowledge import contradiction
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind, KnowledgeItem
 from agentic_service_desk.operations import resolution as resolution_domain
@@ -131,10 +131,13 @@ class Lint:
         *,
         repo: KnowledgeRepository,
         conn: sqlite3.Connection,
-        mirror: SourceMirror | None = None,
+        mirror: SourceMirror | MirrorSet | None = None,
     ) -> None:
         self._repo = repo
         self._conn = conn
+        # **저장소가 여럿이어도 Lint 가 묻는 것은 같다** — 이 커밋이 실재하는가,
+        # 그 뒤에 무엇이 바뀌었는가. 커밋은 저장소 하나에만 속하므로 `MirrorSet`
+        # 이 주인을 찾아 넘긴다. 여기 코드는 미러가 하나이던 때와 다르지 않다.
         self._mirror = mirror
 
     def run(self) -> LintReport:

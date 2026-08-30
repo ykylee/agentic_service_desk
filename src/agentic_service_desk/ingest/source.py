@@ -14,7 +14,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,6 +65,11 @@ class SourceMirror:
         # 상대 경로를 그대로 넘기면 그 cwd 기준으로 다시 풀려 `var/var/...` 가 된다.
         # 설정 기본값이 상대 경로(`var/source-mirror`)라 실제로 밟는 함정이다.
         self._dir = Path(mirror_dir).resolve()
+
+    @property
+    def repo_url(self) -> str:
+        """이 미러가 어느 저장소의 사본인가. **커서 열쇠가 여기서 나온다.**"""
+        return self._repo_url
 
     # --- git 호출 --------------------------------------------------------
 
@@ -172,3 +180,68 @@ class SourceMirror:
     def read_file(self, path: str, at: str = "HEAD") -> str:
         """파일 내용. bare 클론이라 작업 트리가 아니라 객체에서 읽는다."""
         return self._git("show", f"{at}:{path}")
+
+
+def mirror_slug(repo_url: str) -> str:
+    """저장소 주소를 디렉터리 한 칸 이름으로 줄인다.
+
+    **읽을 수 있는 이름 + 짧은 해시**다. 이름만 쓰면 `.../a/parent` 와
+    `.../b/parent` 가 같은 칸을 가리켜 **한 저장소의 클론에 다른 저장소를 fetch**
+    하게 되고, 해시만 쓰면 사람이 `var/` 를 열었을 때 어느 것이 무엇인지 모른다.
+    """
+    name = repo_url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+    name = re.sub(r"[^0-9A-Za-z._-]", "-", name).strip("-") or "repo"
+    digest = hashlib.sha256(repo_url.encode("utf-8")).hexdigest()[:8]
+    return f"{name}-{digest}"
+
+
+def build_mirrors(repo_urls: Sequence[str], base_dir: Path) -> list[SourceMirror]:
+    """저장소마다 **자기 칸을 가진** 미러를 만든다.
+
+    한 칸을 나눠 쓸 수 없다 — bare 클론은 저장소 하나의 사본이고, 두 저장소를
+    같은 칸에 넣으면 커밋 이력이 뒤섞여 **어느 항목이 어느 저장소에서 왔는지**를
+    되찾을 수 없다.
+    """
+    return [SourceMirror(url, Path(base_dir) / mirror_slug(url)) for url in repo_urls]
+
+
+class MirrorSet:
+    """미러 여럿을 **하나처럼** 보이게 한다 (Lint 용).
+
+    Lint 가 묻는 것은 "이 출처 커밋이 실재하는가"와 "그 뒤에 무엇이 바뀌었는가"다.
+    커밋은 **저장소 하나에만 속하므로** 물음마다 주인을 찾아 그쪽에 넘기면 된다.
+    미러가 하나뿐이던 때와 답이 같아야 하고, 그래서 인터페이스를 맞췄다.
+    """
+
+    def __init__(self, mirrors: Sequence[SourceMirror]) -> None:
+        self._mirrors = [m for m in mirrors]
+
+    @property
+    def is_cloned(self) -> bool:
+        """**하나라도** 클론돼 있는가.
+
+        전부를 요구하지 않는 이유가 있다 — 새 저장소를 붙인 첫 주기에는 그것만
+        아직 클론 전일 수 있는데, 그때 검사를 통째로 끄면 **이미 쌓인 지식의
+        참조 부재가 조용히 넘어간다.**
+        """
+        return any(m.is_cloned for m in self._mirrors)
+
+    def owner(self, sha: str) -> SourceMirror | None:
+        """이 커밋을 가진 미러. 없으면 `None` — 참조 부재다."""
+        for mirror in self._mirrors:
+            if mirror.is_cloned and mirror.has_commit(sha):
+                return mirror
+        return None
+
+    def has_commit(self, sha: str) -> bool:
+        return self.owner(sha) is not None
+
+    def changed_paths_since(self, cursor: str) -> list[str]:
+        """그 커밋을 가진 저장소에서 이후 바뀐 경로.
+
+        주인이 없으면 **빈 목록이다** — 없는 커밋을 기준으로 "전부 바뀌었다"고
+        답하면 그 항목이 영원히 stale 이 된다. 커밋이 사라진 것은 참조 부재
+        검사가 따로 말한다.
+        """
+        mirror = self.owner(cursor)
+        return mirror.changed_paths_since(cursor) if mirror else []

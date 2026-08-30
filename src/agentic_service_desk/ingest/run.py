@@ -16,6 +16,7 @@ llm-wiki 의 운영 모델을 그대로 따른다 (§4).
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -30,11 +31,16 @@ from agentic_service_desk.ingest.agent import (
     source_provenance,
     to_knowledge_item,
 )
+from agentic_service_desk.ingest.config_values import (
+    declared_values,
+    leaked_pairs,
+    merge_declared,
+)
 from agentic_service_desk.ingest.output_filter import OutputFilter
 from agentic_service_desk.ingest.source import SourceMirror
 from agentic_service_desk.knowledge import contradiction
 from agentic_service_desk.knowledge.repository import KnowledgeRepository, StoredItem
-from agentic_service_desk.operations.checkpoint import SOURCE, get_cursor, set_cursor
+from agentic_service_desk.operations.checkpoint import get_cursor, set_cursor, source_key
 
 MAX_CHARS_PER_CALL = 24_000
 """한 번의 에이전트 호출에 넣을 원천 크기. 넘으면 묶음을 나눈다.
@@ -71,6 +77,14 @@ class IngestResult:
     """이번에 새로 연 모순. 같은 항목에 이미 열려 있으면 세지 않는다."""
 
     dropped_config_paths: list[str] = field(default_factory=list)
+    dropped_config_values: list[str] = field(default_factory=list)
+    """설정값을 옮겨 적어 받지 않은 제안 (FR-9, §2.2.2).
+
+    경로 필터를 지나온 것들이다 — 값이 **코드 상수나 커밋 메시지**에 실려 있었다.
+    무엇이 왜 걸렸는지 그대로 남긴다: 배제가 조용하면 경계가 잘못 잡혔을 때
+    아무도 알아채지 못한다.
+    """
+
     broken_items: list[str] = field(default_factory=list)
     omitted_messages: int = 0
     failures: list[str] = field(default_factory=list)
@@ -94,14 +108,14 @@ class IngestRun:
         agent: IngestAgent,
         conn: sqlite3.Connection,
         output_filter: OutputFilter,
-        mirror: SourceMirror | None = None,
+        mirrors: Sequence[SourceMirror] = (),
         max_chars: int = MAX_CHARS_PER_CALL,
     ) -> None:
         self._repo = repo
         self._agent = agent
         self._conn = conn
         self._filter = output_filter
-        self._mirror = mirror
+        self._mirrors = list(mirrors)
         self._max_chars = max_chars
 
     def run(self) -> IngestResult:
@@ -112,12 +126,12 @@ class IngestRun:
         by_id = {s.item.id: s for s in stored}
         index = [(s.item.id, s.item.title) for s in stored]
 
-        head = self._ingest_source(result, by_id, index)
+        heads = self._ingest_source(result, by_id, index)
         answer_ids = self._ingest_qna(result, by_id, index)
 
         if result.changed:
             self._repo.append_log(
-                f"{result.summary()} — {self._origin_note(head, answer_ids)}"
+                f"{result.summary()} — {self._origin_note(heads, answer_ids)}"
             )
             result.commit = self._repo.commit(f"ingest: {result.summary()}")
 
@@ -128,10 +142,13 @@ class IngestRun:
         # 같은 원천을 매 주기 LLM 에 다시 태운다. 실제로 그런 원천이 있다
         # (내용 없는 봇 답변 등).
         #
-        # 옮기지 않는 경우는 **실패했을 때뿐이다.** `head` 는 소스 단계가 무사히
-        # 끝났을 때만 오고, 답변 id 는 그 호출이 성공했을 때만 담긴다.
-        if head:
-            set_cursor(self._conn, SOURCE, head)
+        # 옮기지 않는 경우는 **실패했을 때뿐이다.** `heads` 에는 무사히 끝난
+        # 저장소만 담기고, 답변 id 는 그 호출이 성공했을 때만 담긴다.
+        #
+        # **저장소마다 따로 옮긴다.** 하나가 실패했다고 다른 저장소까지 되감으면
+        # 멀쩡히 읽은 구간을 다음 주기에 통째로 다시 태우게 된다.
+        for repo_url, head in heads.items():
+            set_cursor(self._conn, source_key(repo_url), head)
         self._mark_ingested(answer_ids, result.commit)
         return result
 
@@ -142,34 +159,53 @@ class IngestRun:
         result: IngestResult,
         by_id: dict[str, StoredItem],
         index: list[tuple[str, str]],
-    ) -> str | None:
-        """소스 저장소의 변경분을 읽는다.
+    ) -> dict[str, str]:
+        """붙은 저장소들의 변경분을 읽는다.
 
-        돌려주는 것은 **이번 구간을 무사히 읽었을 때의 HEAD** 다. 한 묶음이라도
-        실패하면 `None` 을 돌려준다 — 그래야 커서가 그 자리에 남고 다음 주기가
-        같은 구간을 다시 읽는다. 옮겨 버리면 **그 구간의 개념이 영영 지식이 되지
+        돌려주는 것은 **무사히 읽은 저장소의 `주소 → HEAD`** 다. 저장소 하나가
+        실패하면 그 저장소만 빠진다 — 커서가 그 자리에 남아 다음 주기가 같은
+        구간을 다시 읽는다. 옮겨 버리면 **그 구간의 개념이 영영 지식이 되지
         않는데 아무도 알아채지 못한다.**
+
+        **지식베이스는 하나다.** `by_id` 와 `index` 를 저장소마다 새로 만들지 않고
+        그대로 넘기는 것이 그 뜻이다 — 두 저장소가 같은 개념을 말하면 뒤엣것이
+        앞엣것을 *갱신*해야지 항목을 하나 더 만들어서는 안 된다.
         """
-        if self._mirror is None or not self._mirror.is_cloned:
+        heads: dict[str, str] = {}
+        for mirror in self._mirrors:
+            head = self._ingest_one_source(mirror, result, by_id, index)
+            if head:
+                heads[mirror.repo_url] = head
+        return heads
+
+    def _ingest_one_source(
+        self,
+        mirror: SourceMirror,
+        result: IngestResult,
+        by_id: dict[str, StoredItem],
+        index: list[tuple[str, str]],
+    ) -> str | None:
+        """저장소 하나. 무사히 끝났을 때만 HEAD 를 돌려준다."""
+        if not mirror.is_cloned:
             return None
         failures_before = len(result.failures)
 
-        cursor = get_cursor(self._conn, SOURCE)
-        head = self._mirror.head()
+        cursor = get_cursor(self._conn, source_key(mirror.repo_url))
+        head = mirror.head()
         if cursor == head:
             return None
 
-        changed = self._mirror.changed_paths_since(cursor)
-        commits = self._mirror.commits_since(cursor)
+        changed = mirror.changed_paths_since(cursor)
+        commits = mirror.commits_since(cursor)
         messages = [c.full_message for c in commits]
         if len(messages) > MAX_COMMIT_MESSAGES:
-            result.omitted_messages = len(messages) - MAX_COMMIT_MESSAGES
+            result.omitted_messages += len(messages) - MAX_COMMIT_MESSAGES
             messages = messages[:MAX_COMMIT_MESSAGES]
 
         files: list[tuple[str, str]] = []
         for path in changed:
             try:
-                files.append((path, self._mirror.read_file(path, at=head)))
+                files.append((path, mirror.read_file(path, at=head)))
             except RuntimeError:
                 # 삭제된 경로다. 커밋 메시지에는 남아 있으므로 "왜 지웠는가"는 살아 있다.
                 continue
@@ -186,7 +222,16 @@ class IngestRun:
             except (AgentOutputError, RuntimeError) as exc:
                 result.failures.append(f"소스 {chunk.commit[:8]}: {exc}")
                 continue
+            declared = _declared_in(chunk)
             for proposal in proposals:
+                leaks = leaked_pairs(proposal.body, declared)
+                if leaks:
+                    # **설정값은 지식이 아니라 현재 상태다** (FR-9, §2.2.2). 경로
+                    # 필터를 지나온 값이라 여기가 마지막 자리다.
+                    result.dropped_config_values.append(
+                        f"{proposal.title} — {', '.join(leaks)}"
+                    )
+                    continue
                 self._apply(
                     proposal,
                     source_provenance(proposal, chunk),
@@ -288,13 +333,25 @@ class IngestRun:
         self._conn.commit()
 
     @staticmethod
-    def _origin_note(head: str | None, answer_ids: list[str]) -> str:
-        parts = []
-        if head:
-            parts.append(f"소스 {head[:8]}")
+    def _origin_note(heads: dict[str, str], answer_ids: list[str]) -> str:
+        parts = [f"소스 {head[:8]}" for head in heads.values()]
         if answer_ids:
             parts.append(f"QnA 답변 {len(answer_ids)}건")
         return ", ".join(parts) or "원천 없음"
+
+
+def _declared_in(chunk: SourceMaterial) -> dict[str, set[str]]:
+    """이 묶음의 원천이 선언한 설정값 (FR-9).
+
+    **커밋 메시지도 본다.** 값이 코드에서만 오는 것이 아니다 — "한도를 5_000 으로
+    올렸다"는 메시지가 그대로 지식 본문이 되는 길이 실저장소에서 관측됐다.
+    """
+    declared: dict[str, set[str]] = {}
+    for _, content in chunk.files:
+        merge_declared(declared_values(content), declared)
+    for message in chunk.messages:
+        merge_declared(declared_values(message), declared)
+    return declared
 
 
 def _chunks(material: SourceMaterial, max_chars: int) -> list[SourceMaterial]:
