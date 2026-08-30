@@ -16,7 +16,7 @@ llm-wiki 의 운영 모델을 그대로 따른다 (§4).
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
@@ -98,6 +98,17 @@ class IngestResult:
     failures: list[str] = field(default_factory=list)
     """에이전트 호출이 실패한 묶음. 하나가 터져도 나머지는 간다."""
 
+    stopped: bool = False
+    """중단 신호를 받고 **다 읽지 못한 채** 나왔는가.
+
+    실패와 다르다 — 터진 것이 아니라 그만두라는 말을 들은 것이다. 그런데 커서
+    처리는 같다: **읽다 만 저장소의 커서는 옮기지 않는다.** 옮기면 남은 구간을
+    영영 건너뛰고 지식에 구멍이 생기는데 아무도 알아채지 못한다.
+
+    보고에 반드시 실린다. 조용히 나가면 **다 읽은 것과 구분되지 않아**, 사람이
+    "부트스트랩이 끝났다"고 읽고 Lint 결과로 완주를 판정하게 된다.
+    """
+
     @property
     def changed(self) -> bool:
         return bool(self.created or self.updated)
@@ -118,11 +129,13 @@ class IngestRun:
         output_filter: OutputFilter,
         mirrors: Sequence[SourceMirror] = (),
         max_chars: int = MAX_CHARS_PER_CALL,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         self._repo = repo
         self._agent = agent
         self._conn = conn
         self._filter = output_filter
+        self._should_stop = should_stop or (lambda: False)
         self._mirrors = list(mirrors)
         self._max_chars = max_chars
 
@@ -181,6 +194,11 @@ class IngestRun:
         """
         heads: dict[str, str] = {}
         for mirror in self._mirrors:
+            if self._should_stop():
+                # **아직 손대지 않은 저장소다.** 커서가 없으니 다음 주기가 처음부터
+                # 읽고, 그것이 맞다.
+                result.stopped = True
+                break
             head = self._ingest_one_source(mirror, result, by_id, index)
             if head:
                 heads[mirror.repo_url] = head
@@ -226,6 +244,16 @@ class IngestRun:
 
         live: dict[str, bool] = {}
         for chunk in _chunks(material, self._max_chars):
+            if self._should_stop():
+                # **묶음 경계에서 나간다.** 여기가 나갈 수 있는 유일한 자리다 —
+                # 한 묶음 안에서 끊기면 항목이 반만 쓰인 채 남는다.
+                #
+                # **`None` 을 돌려주는 것이 요점이다.** 여기까지 읽은 것을 근거로
+                # 커서를 옮기면 나머지 구간이 영영 건너뛰어지고, 그 구간의 개념이
+                # 지식이 되지 않는데 아무도 알아채지 못한다. 다시 읽는 값은
+                # 치르지만 구멍은 만들지 않는다.
+                result.stopped = True
+                return None
             try:
                 proposals = self._agent.from_source(chunk, index)
             except (AgentOutputError, RuntimeError) as exc:
@@ -309,6 +337,11 @@ class IngestRun:
         }
         ingested: list[str] = []
         for answer in self._filter.ingestible_answers(self._conn):
+            if self._should_stop():
+                # 여기서 나가도 **읽은 답변의 표시는 남는다** — 소스 커서와 달리
+                # 답변은 하나씩 표시되므로 건너뛸 구간이라는 것이 없다.
+                result.stopped = True
+                break
             if answer.id in done:
                 continue
             material = QnaMaterial(

@@ -94,7 +94,17 @@ class BatchRunner:
         return get_cursor(conn, source_key(urls[0]))
 
     def request_stop(self, signum: int, frame: FrameType | None) -> None:
-        print(f"[worker] 중단 요청 (signal={signum}). 현재 청크를 마치고 멈춘다.")
+        """멈추라는 말을 **닿는 곳까지** 전한다.
+
+        플래그를 세우는 것만으로는 부족하다는 것이 2026-08-30 에 드러났다 —
+        `_ingest` 한 번이 묶음 수백 개를 도는데 플래그를 바깥 루프에서만 보고
+        있어, SIGTERM 을 받고도 반나절을 더 돌았다. `pkill` 이 통하지 않아
+        **워커 다섯이 같은 지식베이스에 동시에 쓰고 있었다.**
+
+        나머지 tick 단계(콘텐츠 제작 등)는 아직 이 신호를 보지 않는다 — 그것들은
+        한 번이 짧아 급하지 않다. 급한 것은 ingest 하나다.
+        """
+        print(f"[worker] 중단 요청 (signal={signum}). 묶음 경계에서 멈춘다.")
         self._stopping = True
 
     def run(self) -> None:
@@ -639,6 +649,11 @@ class BatchRunner:
                 conn=conn,
                 output_filter=output_filter,
                 mirrors=self._mirrors(),
+                # **여기를 잇지 않으면 중단 신호가 ingest 에 닿지 않는다.**
+                # 최초 부트스트랩은 묶음이 수백이라 한 tick 이 반나절인데, 정지
+                # 플래그를 바깥 루프에서만 보면 그 반나절이 다 지나야 신호를
+                # 쳐다본다 — 2026-08-30 에 워커 다섯이 동시에 도는 것으로 드러났다.
+                should_stop=lambda: self._stopping,
             ).run()
         except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] ingest 실패: {exc}")
@@ -1015,6 +1030,14 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
     notes = []
     if result.changed:
         notes.append(f"ingest — {result.summary()} (커밋 {(result.commit or '없음')[:8]})")
+    if result.stopped:
+        # **맨 앞줄이어야 할 만큼 중요하지만 맨 뒤가 아니면 된다.** 이것이 없으면
+        # 중단된 실행과 완주한 실행이 화면에서 같아 보이고, 사람이 "부트스트랩이
+        # 끝났다"고 읽고 Lint 결과로 완주를 판정한다.
+        notes.append(
+            "ingest 를 **다 읽지 못하고 멈췄다** (중단 신호) — 읽다 만 저장소의 "
+            "커서는 그대로 두었다. 다시 띄우면 그 구간부터 이어서 읽는다"
+        )
     if result.held_for_human:
         notes.append(
             f"사람이 고친 항목 {len(result.held_for_human)}건은 덮어쓰지 않았다 "

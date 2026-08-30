@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -38,6 +39,56 @@ class TestOutputCleaning:
         r = PiHarness("M", "key").run("x")
         assert r.text == "답변만"
         assert r.had_thinking is False
+
+
+class TestCalledAsGeneratorNotAgent:
+    """pi 를 **생성기로** 부르는가 (2026-08-30 실운영에서 밟았다).
+
+    pi 는 read·bash·edit 도구를 들고 `AGENTS.md`/`CLAUDE.md` 를 찾아 읽는 코딩
+    에이전트다. 그대로 부르면 **프롬프트로 준 원천 대신 작업 디렉터리를 뒤진다** —
+    실제로 이 앱 자신의 커밋과 파일을 읽고 그것을 지식으로 내놓았고, 도구를 쓰느라
+    턴을 소진해 빈 응답과 잘린 JSON 이 왔다.
+
+    지식 구축 에이전트가 **우리를 읽는 것**은 §5.3 이 QnA 쪽에서 막는 되먹임과
+    같은 고장이 소스 쪽으로 난 것이다.
+    """
+
+    def _cmd_and_cwd(self, monkeypatch, **run_kw):  # noqa: ANN001, ANN202
+        seen: dict = {}
+
+        def fake(cmd, **kw):  # noqa: ANN001, ANN202
+            seen["cmd"] = cmd
+            seen["cwd"] = kw.get("cwd")
+            return _Proc("ok")
+
+        monkeypatch.setattr(subprocess, "run", fake)
+        PiHarness("M", "key").run("프롬프트", **run_kw)
+        return seen
+
+    @pytest.mark.parametrize(
+        "flag",
+        [
+            "--no-tools",
+            "--no-context-files",
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-session",
+        ],
+    )
+    def test_능력을_끈다(self, monkeypatch, flag: str) -> None:
+        assert flag in self._cmd_and_cwd(monkeypatch)["cmd"]
+
+    def test_빈_디렉터리에서_돈다(self, monkeypatch) -> None:
+        # **기본값이 호출자의 디렉터리면 그것이 이 앱의 저장소다.**
+        seen = self._cmd_and_cwd(monkeypatch)
+        cwd = Path(seen["cwd"])
+        assert cwd != Path.cwd()
+        assert "asd-ingest-" in cwd.name
+
+    def test_준_디렉터리가_있으면_그것을_쓴다(self, monkeypatch, tmp_path) -> None:
+        seen = self._cmd_and_cwd(monkeypatch, cwd=str(tmp_path))
+        assert seen["cwd"] == str(tmp_path)
 
 
 class TestKeyHandling:

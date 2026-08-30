@@ -203,6 +203,86 @@ class TestConfigValuesAreRejectedInTheRun:
         assert get_cursor(conn, source_key(mirrors[0].repo_url)) == mirrors[0].head()
 
 
+class TestStopSignalReachesIngest:
+    """중단 신호가 ingest 안까지 닿는가 (2026-08-30 실운영에서 드러난 결함).
+
+    플래그를 바깥 루프에서만 보면, 묶음 수백 개를 도는 최초 부트스트랩에서
+    **SIGTERM 을 받고도 반나절을 더 돈다.** 실제로 `pkill` 이 통하지 않아 워커
+    다섯이 같은 지식베이스에 동시에 쓰고 있었다.
+
+    가장 중요한 시험은 **읽다 만 저장소의 커서를 옮기지 않는다**는 것이다.
+    옮기면 남은 구간을 영영 건너뛰고 지식에 구멍이 생기는데 아무도 모른다.
+    """
+
+    def _many_chunks(self, tmp_path):  # noqa: ANN001, ANN202
+        origin = tmp_path / "big"
+        origin.mkdir()
+        for args in (
+            ["git", "init", "--quiet"],
+            ["git", "config", "user.name", "t"],
+            ["git", "config", "user.email", "t@t"],
+        ):
+            subprocess.run(args, cwd=origin, check=True)
+        for i in range(4):
+            (origin / f"m{i}.py").write_text("X = 1\n" + ("# 채운다\n" * 400))
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "여러 묶음"], cwd=origin, check=True)
+        built = build_mirrors([str(origin)], tmp_path / "mirrors")
+        built[0].ensure_cloned()
+        return built
+
+    def _run_with_stop(self, tmp_path, mirrors, conn, stop_after: int):  # noqa: ANN001, ANN202
+        calls = {"n": 0}
+
+        def should_stop() -> bool:
+            calls["n"] += 1
+            return calls["n"] > stop_after
+
+        return IngestRun(
+            repo=KnowledgeRepository(tmp_path / "knowledge"),
+            agent=IngestAgent(FakeHarness()),
+            conn=conn,
+            output_filter=OutputFilter(frozenset({BOT_ACCOUNT})),
+            mirrors=mirrors,
+            max_chars=2_000,  # 파일마다 묶음 하나
+            should_stop=should_stop,
+        ).run()
+
+    def test_묶음_경계에서_멈춘다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        result = self._run_with_stop(tmp_path, self._many_chunks(tmp_path), conn, 2)
+        assert result.stopped
+
+    def test_읽다_만_저장소의_커서를_옮기지_않는다(self, tmp_path) -> None:
+        # **이것이 요점이다.** 옮기면 남은 구간이 영영 건너뛰어진다.
+        conn = _conn(tmp_path)
+        mirrors = self._many_chunks(tmp_path)
+        self._run_with_stop(tmp_path, mirrors, conn, 2)
+        assert get_cursor(conn, source_key(mirrors[0].repo_url)) is None
+
+    def test_멈추지_않으면_커서가_옮겨진다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = self._many_chunks(tmp_path)
+        result = self._run_with_stop(tmp_path, mirrors, conn, 10_000)
+        assert not result.stopped
+        assert get_cursor(conn, source_key(mirrors[0].repo_url)) == mirrors[0].head()
+
+    def test_손대지_않은_저장소는_그대로_남는다(self, tmp_path) -> None:
+        conn = _conn(tmp_path)
+        mirrors = _mirrors(tmp_path)
+        result = self._run_with_stop(tmp_path, mirrors, conn, 0)
+        assert result.stopped
+        for mirror in mirrors:
+            assert get_cursor(conn, source_key(mirror.repo_url)) is None
+
+    def test_기본값은_멈추지_않는_것이다(self, tmp_path) -> None:
+        # `should_stop` 을 넘기지 않는 호출부가 있어도 동작이 달라지지 않아야 한다.
+        conn = _conn(tmp_path)
+        mirrors = _mirrors(tmp_path)
+        result = _run(tmp_path, FakeHarness(), mirrors, conn).run()
+        assert not result.stopped
+
+
 class TestDeadRefsAreDroppedAtIngest:
     """죽은 무효화 조건을 **만들지 않는다** (FR-8, ingest 쪽 집행).
 
