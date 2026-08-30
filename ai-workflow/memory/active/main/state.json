@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-08-30",
+  "generated_at": "2026-08-31",
   "purpose_digest": "모 시스템의 **소스 저장소(코드 + 히스토리)**와 **QnA·답변 이력** 두 원천을 **모 시스템 내부 API**로 지속 수집해 하나의 지식베이스로 구축한다 — 히스토리는 \"왜 그렇게 정했는가\"의 1차 출처이며, API 표면이 곧 이 시스템이 알 수 있는 것의 상한이다",
   "purpose_digest_rev": "2026-08-27",
   "source_of_truth": {
@@ -10,7 +10,7 @@
     "daily_backlog_dir": "ai-workflow/memory/active/main/backlog",
     "tasks_dir": "ai-workflow/memory/active/main/backlog/tasks",
     "sessions_dir": "ai-workflow/memory/active/main/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-30.md",
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-31.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -51,20 +51,18 @@
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-30.md",
-    "task_count": 2,
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-31.md",
+    "task_count": 1,
     "in_progress_items": [
       "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축"
     ],
     "blocked_items": [],
-    "done_items": [
-      "TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용"
-    ]
+    "done_items": []
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/main/session_handoff.md",
-    "ai-workflow/memory/active/main/backlog/2026-08-30.md",
+    "ai-workflow/memory/active/main/backlog/2026-08-31.md",
     "ai-workflow/memory/active/main/work_backlog.md"
   ],
   "repository_assessment": {
