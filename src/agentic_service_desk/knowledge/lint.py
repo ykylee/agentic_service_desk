@@ -1,7 +1,7 @@
 """Lint — 지식베이스 정합성 검사 (FR-7·8, §4).
 
 llm-wiki 의 3연산 중 셋째다. Ingest 가 지식을 짓고 Query 가 꺼내 쓴다면, Lint 는
-**쌓인 것이 아직 말이 되는지** 본다. 주기적으로 돌며 다섯 가지를 본다.
+**쌓인 것이 아직 말이 되는지** 본다. 주기적으로 돌며 여섯 가지를 본다.
 
 | 검사 | 무엇이 잘못됐는가 | 어디로 |
 |---|---|---|
@@ -10,6 +10,12 @@ llm-wiki 의 3연산 중 셋째다. Ingest 가 지식을 짓고 Query 가 꺼내
 | 고아 | 번들 목록에 등재되지 않아 **소비자에게 보이지 않는다** | 목록 재생성 |
 | 끊어진 링크 | 답변이 가리키는 지식 항목이 없다 | Q5 |
 | 참조 부재 | 지식 항목의 출처 커밋이 저장소에 없다 | Q5 |
+| **죽은 무효화** | 무효화 조건이 **나타날 수 없는 경로**를 가리킨다 | Q5 |
+
+**마지막 둘은 짝이다.** 지식 항목이 드는 것이 둘이기 때문이다 — *어디서 왔는가*
+(출처)와 *언제 낡는가*(무효화). 출처는 코드가 정하고 무효화 refs 는 **모델이
+정하는데**, 오랫동안 앞의 것만 검사했다. 뒤엣것이 죽으면 항목은 조건을 달고
+있으면서 **절대 낡지 않는다** — 없는 것보다 나쁘다.
 
 **stale 은 대기열로 가지 않는다.** Q5 는 "근거가 낡은 **게재 답변·살아있는 문서**"의
 정정 후보이지 지식 항목 자체가 아니다(§8.2). 지식 항목의 stale 은 §8.3 의 **현황
@@ -59,6 +65,17 @@ class Kind(enum.StrEnum):
 
     BROKEN_LINK = "broken_link"
     MISSING_REFERENCE = "missing_reference"
+    DEAD_INVALIDATION = "dead_invalidation"
+    """무효화 조건이 **나타날 수 없는 경로**를 가리킨다 (2026-08-30 실데이터).
+
+    출처는 코드가 정하고 이 검사의 형제(`MISSING_REFERENCE`)가 실재를 본다. 그런데
+    **무효화 refs 는 모델이 정하는데 아무도 보지 않았다** — 실저장소 첫 수집에서
+    101개 중 23개가 죽은 경로였다(옮겨진 경로 · 틀린 디렉터리 층 · 다른 저장소 ·
+    문서의 `<branch>` 자리표시자).
+
+    죽은 ref 는 **없는 것보다 나쁘다.** 조건이 붙어 있으니 살아 있어 보이는데
+    교집합이 영원히 비어 그 항목은 절대 stale 이 되지 않는다.
+    """
 
     # Q5 에는 **세 번째 출처**가 있다 — 근거가 낡은 채로 나가 있는 게재 답변
     # (`pipeline.correction`, WBS-4.5.7). Lint 가 만드는 것이 아니므로 여기 없고,
@@ -148,6 +165,7 @@ class Lint:
         report.open_contradictions = len(contradiction.list_open(self._conn))
 
         report.findings.extend(self._check_references(stored))
+        report.findings.extend(self._check_invalidation_refs(stored))
         self._check_stale(stored, report)
         report.findings.extend(self._check_broken_links(stored))
         report.indexed, report.index_rewritten = self._rebuild_index(stored)
@@ -188,6 +206,74 @@ class Lint:
                     )
                 )
         return findings
+
+    # --- 죽은 무효화 조건 --------------------------------------------------
+
+    def _check_invalidation_refs(self, stored: list[StoredItem]) -> list[Finding]:
+        """`linked` 무효화가 **나타날 수 있는 경로**를 가리키는가 (FR-8).
+
+        `_check_stale` 이 실제로 묻는 것과 **같은 물음을 미리 묻는다** — 그 경로가
+        변경분 목록에 나타날 수 있는가. 나타날 수 없으면 교집합이 영원히 비고,
+        그 항목은 조건을 달고 있으면서도 절대 낡지 않는다.
+
+        **주인 저장소에게 묻는다.** 무효화는 그 항목의 출처 커밋을 가진 저장소 안에서
+        성립한다 — 경로가 *다른* 저장소에 있어도 stale 판정에는 닿지 않으므로,
+        "어딘가에 있다"는 답은 여기서 틀린 답이다.
+
+        **고칠 수 있는 것이 아니라 판정할 것이라 대기열로 간다** (§8.6). 올바른
+        경로가 무엇인지는 코드가 모른다 — 옮겨진 것인지, 다른 저장소 것인지,
+        아예 주기형으로 바꿔야 하는지는 사람이 정한다.
+
+        미러가 없으면 **검사하지 않는다** — `_check_references` 와 같은 이유로,
+        구분하지 못한 채 전부 올리면 대기열이 거짓 소견으로 찬다.
+        """
+        if self._mirror is None or not self._mirror.is_cloned:
+            return []
+        findings: list[Finding] = []
+        seen: dict[tuple[str, str], bool] = {}
+        for s in stored:
+            inv = s.item.invalidation
+            if inv.kind is not InvalidationKind.LINKED or not inv.refs:
+                continue
+            owner = self._owner_of(s.item)
+            if owner is None:
+                # 출처 커밋 자체가 없다 — `MISSING_REFERENCE` 가 이미 말한다.
+                # 여기서 또 올리면 한 고장이 두 소견이 되어 대기열이 부풀려진다.
+                continue
+            dead = [
+                ref
+                for ref in inv.refs
+                if not seen.setdefault(
+                    (owner.repo_url, ref), owner.can_appear_in_diff(ref)
+                )
+            ]
+            if dead:
+                findings.append(
+                    Finding(
+                        kind=Kind.DEAD_INVALIDATION,
+                        subject=s.item.id,
+                        detail=(
+                            f"무효화 조건이 나타날 수 없는 경로를 가리킨다: "
+                            f"{', '.join(sorted(dead))}. 이 항목은 근거가 바뀌어도 "
+                            f"stale 이 되지 않는다"
+                        ),
+                    )
+                )
+        return findings
+
+    def _owner_of(self, item: KnowledgeItem):  # noqa: ANN201
+        """이 항목의 **가장 최근 출처 커밋**을 가진 저장소.
+
+        `_linked_stale_reason` 이 고르는 커밋과 같아야 한다 — 다르면 여기서 살아
+        있다고 한 조건이 저기서는 닿지 않는다.
+        """
+        for p in reversed(item.provenance):
+            if not p.commit:
+                continue
+            owner = self._mirror.owner(p.commit)
+            if owner is not None:
+                return owner
+        return None
 
     # --- stale ------------------------------------------------------------
 

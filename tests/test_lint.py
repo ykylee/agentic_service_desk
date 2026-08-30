@@ -117,6 +117,120 @@ class TestMissingReference:
         assert report.findings == []
 
 
+class TestDeadInvalidation:
+    """죽은 무효화 — 조건이 **나타날 수 없는 경로**를 가리킨다 (2026-08-30 실데이터).
+
+    출처는 코드가 정하고 `MISSING_REFERENCE` 가 본다. 무효화 refs 는 **모델이
+    정하는데** 오랫동안 아무도 보지 않았다 — 실저장소 첫 수집에서 101개 중 23개가
+    죽은 경로였다.
+
+    죽은 ref 는 **없는 것보다 나쁘다**: 조건이 붙어 있어 살아 보이는데 교집합이
+    영원히 비어 그 항목은 절대 stale 이 되지 않는다.
+
+    가장 중요한 시험은 **지워진 파일을 죽었다고 부르지 않는다**는 것이다. 그것까지
+    올리면 대기열이 거짓 소견으로 차고, 그러면 이 검사는 꺼지게 된다.
+    """
+
+    def _linked(self, repo, mirror, refs):  # noqa: ANN001, ANN202
+        return _item(
+            repo,
+            provenance=[Provenance(commit=mirror.head(), path="limit.py")],
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=list(refs)),
+        )
+
+    def test_지어낸_경로를_잡는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        item = self._linked(repo, mirror, ["src/never/existed.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        found = [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+        assert len(found) == 1
+        assert found[0].subject == item.id
+        assert "src/never/existed.py" in found[0].detail
+
+    def test_실재하는_경로는_잡지_않는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        self._linked(repo, mirror, ["limit.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert not [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+
+    def test_지워진_파일은_죽은_것이_아니다(self, tmp_path) -> None:
+        # **`git diff` 는 삭제도 낸다** — 오히려 그 삭제가 이 지식을 의심할 이유다.
+        origin, mirror = _origin(tmp_path)
+        (origin / "gone.py").write_text("X = 1\n")
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "추가"], cwd=origin, check=True)
+        (origin / "gone.py").unlink()
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "삭제"], cwd=origin, check=True)
+        mirror.fetch()
+
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        self._linked(repo, mirror, ["gone.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert not [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+
+    def test_디렉터리는_나타날_수_없다(self, tmp_path) -> None:
+        # 변경분은 **파일 경로**로 나오므로 디렉터리 이름은 교집합에 걸리지 않는다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        origin, mirror = _origin(tmp_path)
+        (origin / "pkg").mkdir()
+        (origin / "pkg" / "a.py").write_text("A = 1\n")
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "디렉터리"], cwd=origin, check=True)
+        mirror.fetch()
+        self._linked(repo, mirror, ["pkg/"])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+
+    def test_주기형은_보지_않는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        _item(repo, provenance=[Provenance(commit=mirror.head(), path="limit.py")])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert not [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+
+    def test_출처가_없으면_한_고장을_두_번_올리지_않는다(self, tmp_path) -> None:
+        # 출처 커밋 자체가 없으면 `MISSING_REFERENCE` 가 이미 말한다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        _item(
+            repo,
+            provenance=[Provenance(commit="a" * 40, path="limit.py")],
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=["nope.py"]),
+        )
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        kinds = [f.kind for f in report.findings]
+        assert Kind.MISSING_REFERENCE in kinds
+        assert Kind.DEAD_INVALIDATION not in kinds
+
+    def test_미러가_없으면_검사하지_않는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _item(
+            repo,
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=["nope.py"]),
+        )
+        report = Lint(repo=repo, conn=conn, mirror=None).run()
+        assert report.findings == []
+
+    def test_같은_소견을_다시_열지_않는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        self._linked(repo, mirror, ["src/never/existed.py"])
+
+        first = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        second = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert first.newly_opened == 1
+        assert second.newly_opened == 0
+
+
 class TestStale:
     """FR-8 — 출처 커밋이 낡으면 표시한다. **삭제하지 않는다.**"""
 

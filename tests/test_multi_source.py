@@ -203,6 +203,48 @@ class TestConfigValuesAreRejectedInTheRun:
         assert get_cursor(conn, source_key(mirrors[0].repo_url)) == mirrors[0].head()
 
 
+class TestDeadInvalidationAsksTheOwningRepository:
+    """죽은 무효화 검사가 **주인 저장소에게** 묻는가 (Lint).
+
+    경로가 *다른* 저장소에 있어도 stale 판정에는 닿지 않는다 — `_check_stale` 은
+    출처 커밋을 가진 저장소의 변경분만 보기 때문이다. "어딘가에 있다"를 살아 있다고
+    답하면 검사가 조용히 무력해진다.
+    """
+
+    def _lint(self, tmp_path, mirrors, refs, provenance_commit):  # noqa: ANN001, ANN202
+        from agentic_service_desk.knowledge.item import (
+            Invalidation,
+            InvalidationKind,
+            KnowledgeItem,
+            Provenance,
+        )
+        from agentic_service_desk.knowledge.lint import Lint
+
+        repo = KnowledgeRepository(tmp_path / "knowledge")
+        repo.ensure_initialized()
+        repo.save(
+            KnowledgeItem(
+                title="규칙",
+                body="본문이다.",
+                provenance=[Provenance(commit=provenance_commit, path="grade.py")],
+                invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=list(refs)),
+            )
+        )
+        return Lint(repo=repo, conn=_conn(tmp_path), mirror=MirrorSet(mirrors)).run()
+
+    def test_주인_저장소에_있으면_살아_있다(self, tmp_path) -> None:
+        mirrors = _mirrors(tmp_path)
+        report = self._lint(tmp_path, mirrors, ["grade.py"], mirrors[0].head())
+        assert not [f for f in report.findings if f.kind.value == "dead_invalidation"]
+
+    def test_다른_저장소에만_있으면_죽은_것이다(self, tmp_path) -> None:
+        # `route.py` 는 beta 에 있지만 출처는 alpha 다 — stale 판정에 영영 닿지 않는다.
+        mirrors = _mirrors(tmp_path)
+        report = self._lint(tmp_path, mirrors, ["route.py"], mirrors[0].head())
+        found = [f for f in report.findings if f.kind.value == "dead_invalidation"]
+        assert found and "route.py" in found[0].detail
+
+
 class TestMirrorSet:
     def test_어느_저장소의_커밋이든_실재를_안다(self, tmp_path) -> None:
         mirrors = _mirrors(tmp_path)

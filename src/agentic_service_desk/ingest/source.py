@@ -181,6 +181,44 @@ class SourceMirror:
         """파일 내용. bare 클론이라 작업 트리가 아니라 객체에서 읽는다."""
         return self._git("show", f"{at}:{path}")
 
+    def owner(self, sha: str) -> SourceMirror | None:
+        """이 커밋을 가진 미러 — 저장소가 하나면 자기 자신이거나 없다.
+
+        `MirrorSet` 과 같은 물음에 같은 모양으로 답하기 위한 것이다.
+        """
+        return self if self.is_cloned and self.has_commit(sha) else None
+
+    def can_appear_in_diff(self, path: str) -> bool:
+        """이 경로가 `changed_paths_since` 의 **출력에 나타날 수 있는가.**
+
+        무효화 조건(`linked`)은 `refs & 바뀐_경로` 로 stale 을 판정하므로, 나타날 수
+        없는 경로는 **교집합이 영원히 비어 그 항목이 절대 낡지 않는다.** 조건이
+        붙어 있는데 아무것도 가리키지 못하는 상태이고, 그것은 조용하다.
+
+        묻는 것을 정확히 맞춘다 — "지금 있는가"가 아니라 "나타날 수 있는가"다.
+        지워진 파일은 **여전히 나타난다**(`git diff` 는 삭제도 낸다) — 오히려 그
+        삭제야말로 그 지식을 의심할 이유이므로, 지워졌다고 죽은 참조로 부르면
+        살아 있는 조건을 잘못 지목하게 된다.
+
+        - 디렉터리는 나타날 수 없다. 변경분은 **파일 경로**로 나온다
+        - 역사에 한 번도 없던 경로도 나타날 수 없다 — 지어낸 경로가 여기 걸린다
+        """
+        if not path or path.endswith("/"):
+            return False
+        try:
+            kind = self._git("cat-file", "-t", f"HEAD:{path}").strip()
+        except RuntimeError:
+            kind = ""
+        if kind == "blob":
+            return True
+        if kind:
+            return False  # 트리다 — 변경분 목록에 그 이름으로는 나오지 않는다
+        # 지금은 없다. 지워졌을 뿐인지, 애초에 없던 경로인지를 가른다.
+        seen = self._git(
+            "log", "--all", "--pretty=format:", "--name-only", "--", path
+        )
+        return any(line.strip() == path for line in seen.splitlines())
+
 
 def mirror_slug(repo_url: str) -> str:
     """저장소 주소를 디렉터리 한 칸 이름으로 줄인다.
@@ -245,3 +283,12 @@ class MirrorSet:
         """
         mirror = self.owner(cursor)
         return mirror.changed_paths_since(cursor) if mirror else []
+
+    def can_appear_in_diff(self, path: str) -> bool:
+        """어느 저장소에서든 나타날 수 있는가.
+
+        **호출부는 대개 주인을 먼저 찾아 그쪽에 묻는다** — 무효화 조건은 그 항목의
+        출처 저장소 안에서만 성립하기 때문이다. 이 메서드는 주인을 모를 때의 답이고,
+        하나라도 낼 수 있으면 참이라고 본다.
+        """
+        return any(m.is_cloned and m.can_appear_in_diff(path) for m in self._mirrors)
