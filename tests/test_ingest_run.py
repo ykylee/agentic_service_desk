@@ -218,6 +218,39 @@ class TestSourceIngest:
         mirror.ensure_cloned()
         return mirror
 
+    def _mirror_with_binary(self, tmp_path) -> SourceMirror:
+        origin = tmp_path / "origin-bin"
+        origin.mkdir()
+        subprocess.run(["git", "init", "--quiet"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=origin, check=True)
+        (origin / "limit.py").write_text("LIMIT_BY_GRADE = True\n")
+        # 실제 저장소에 있던 모양 — 테스트 픽스처로 커밋된 zip.
+        (origin / "bundle.zip").write_bytes(b"PK\x03\x04\x98\xff\x00binary")
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "번들을 픽스처로 넣음"],
+            cwd=origin,
+            check=True,
+        )
+        mirror = SourceMirror(str(origin), tmp_path / "mirror-bin")
+        mirror.ensure_cloned()
+        return mirror
+
+    def test_글자가_아닌_파일은_워커를_죽이지_않는다(self, tmp_path) -> None:
+        # UnicodeDecodeError 는 ValueError 라 RuntimeError 핸들러를 지나쳐
+        # 워커 프로세스까지 올라간다. 죽는 자리가 커밋 앞이라 그 런의 수집분이
+        # 통째로 사라지고, 커서가 그대로라 다시 띄워도 같은 자리에서 또 죽는다.
+        conn = _conn(tmp_path)
+        mirror = self._mirror_with_binary(tmp_path)
+        result = _run(
+            tmp_path, FakeHarness(_item_json("한도 규칙")), mirror=mirror, conn=conn
+        ).run()
+
+        assert result.unreadable_paths == ["bundle.zip"]
+        assert result.created == 1  # 나머지 원천은 그대로 읽혔다
+        assert get_cursor(conn, source_key(mirror.repo_url)) == mirror.head()
+
     def test_설정_파일이_원천에서_빠진다(self, tmp_path) -> None:
         # FR-9 — 설정값은 굳는 순간 stale 이 된다.
         harness = FakeHarness(_item_json("한도 규칙"))

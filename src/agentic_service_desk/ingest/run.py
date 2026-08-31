@@ -100,6 +100,14 @@ class IngestResult:
     """
 
     broken_items: list[str] = field(default_factory=list)
+
+    unreadable_paths: list[str] = field(default_factory=list)
+    """글자로 읽히지 않아 원천에서 뺀 경로 (zip·이미지 등).
+
+    건수만 세지 않고 경로를 남긴다 — **여기 텍스트 파일이 섞여 들어오면 인코딩
+    처리가 틀린 것**이고, 숫자만으로는 그것이 드러나지 않는다.
+    """
+
     omitted_messages: int = 0
     failures: list[str] = field(default_factory=list)
     """에이전트 호출이 실패한 묶음. 하나가 터져도 나머지는 간다."""
@@ -240,6 +248,21 @@ class IngestRun:
                 files.append((path, mirror.read_file(path, at=head)))
             except RuntimeError:
                 # 삭제된 경로다. 커밋 메시지에는 남아 있으므로 "왜 지웠는가"는 살아 있다.
+                continue
+            except UnicodeDecodeError:
+                # **글자가 아닌 파일이다** (zip·이미지·바이너리). 개념을 뽑을
+                # 것이 없으므로 건너뛴다.
+                #
+                # 따로 잡는 이유는 계보 때문이다 — `UnicodeDecodeError` 는
+                # `ValueError` 라 위의 `RuntimeError` 에 걸리지 않고, `run()` 과
+                # 워커 tick 의 `except (HarnessError, KnowledgeRepoError,
+                # RuntimeError)` 도 지나쳐 **워커 프로세스를 죽인다.**
+                # 죽는 자리가 커밋 앞이라 그 런의 수집분이 통째로 사라지고,
+                # 커서는 그대로라 다시 띄워도 같은 자리에서 또 죽는다 —
+                # 부트스트랩이 영영 완주하지 못한다. 2026-08-31 실측:
+                # `standard_ai_workflow` 의 `tests/devhub_temp_source/*.zip`
+                # 하나가 이 경로를 밟는다.
+                result.unreadable_paths.append(path)
                 continue
 
         material, dropped = prepare_source_material(head, messages, files)

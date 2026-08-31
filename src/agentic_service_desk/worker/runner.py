@@ -1045,6 +1045,8 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
         )
     if result.dropped_config_paths:
         notes.append(f"설정 파일 {len(result.dropped_config_paths)}개를 원천에서 뺐다 (FR-9)")
+    for path in result.unreadable_paths:
+        notes.append(f"글자로 읽히지 않아 원천에서 뺐다 — {path}")
     for dropped in result.dropped_dead_refs:
         # 무엇이 왜 떨어졌는지 보여야 경계가 잘못 잡혔을 때 알아챈다. 특히 이쪽은
         # **조용히 대비값으로 바뀌는** 자리라, 안 보이면 모든 항목이 주기형이 돼도
