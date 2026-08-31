@@ -353,14 +353,30 @@ class IngestAgent:
         """
         last: AgentOutputError | None = None
         for attempt in range(1, self._attempts + 1):
+            result = self._harness.run(prompt)
             try:
-                return parse_proposals(self._harness.run(prompt).text)
+                return parse_proposals(result.text)
             except AgentOutputError as exc:
-                last = exc
+                last = _with_stderr(exc, result)
                 if attempt < self._attempts and self._on_retry is not None:
-                    self._on_retry(attempt, exc)
+                    self._on_retry(attempt, last)
         assert last is not None
         raise last
+
+
+def _with_stderr(exc: AgentOutputError, result: object) -> AgentOutputError:
+    """실패 메시지에 하네스의 stderr 를 붙인다.
+
+    **`rc=0` 인데 본문이 비어 오는 일이 있다.** 그 이유가 적히는 자리는 stderr
+    뿐인데, 본문만 보고 있으면 로그에 `받은 것: ` 뒤가 비어 있는 줄만 쌓인다 —
+    레이트리밋인지, 모델이 정말 아무 말도 안 한 것인지 가릴 수가 없다.
+
+    `Harness` 규약은 `.text` 만 요구하므로 `err` 는 있을 때만 읽는다.
+    """
+    err = str(getattr(result, "err", "") or "").strip()
+    if not err:
+        return exc
+    return AgentOutputError(f"{exc} | stderr: {_snippet(err, 200)}")
 
 
 # --- 제안 → 지식 항목 (출처는 여기서 붙는다) --------------------------------

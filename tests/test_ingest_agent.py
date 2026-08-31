@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pytest
 
 from agentic_service_desk.ingest.agent import (
@@ -283,6 +285,13 @@ class TestRetry:
             IngestAgent(harness, attempts=3).from_source(SourceMaterial(commit="a"), [])
         assert harness.calls == 1
 
+    def test_빈_응답이면_stderr_를_실패에_싣는다(self) -> None:
+        # rc=0 인데 본문이 비어 오는 일이 있다. 이유가 적히는 자리는 stderr 뿐이라,
+        # 본문만 보면 "받은 것: " 뒤가 빈 줄만 쌓이고 원인을 가릴 수 없다.
+        harness = _EmptyWithStderr("rate limit exceeded(RPM)")
+        with pytest.raises(AgentOutputError, match="rate limit exceeded"):
+            IngestAgent(harness, attempts=1).from_source(SourceMaterial(commit="a"), [])
+
     def test_다시_부르기_전에_알린다(self) -> None:
         seen: list[int] = []
         harness = FakeHarness("", ONE_ITEM)
@@ -304,6 +313,21 @@ class _AlwaysEmpty:
 class _Empty:
     text = ""
     raw = ""
+
+
+class _EmptyWithStderr:
+    def __init__(self, err: str) -> None:
+        self._err = err
+
+    def run(self, prompt: str, *, cwd: str | None = None):  # noqa: ANN201
+        return _Result(text="", raw="", err=self._err)
+
+
+@dataclass
+class _Result:
+    text: str
+    raw: str
+    err: str = ""
 
 
 class _AlwaysRaises:

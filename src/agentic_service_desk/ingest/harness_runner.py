@@ -49,6 +49,14 @@ class HarnessResult:
     raw: str
     """원본. 무엇이 걷혔는지 추적해야 할 때를 위해 남긴다."""
 
+    err: str = ""
+    """pi 의 stderr.
+
+    **`rc=0` 인데 본문이 비어 오는 일이 있다.** 그때 이유가 적히는 자리가
+    여기뿐인데, 예전에는 `returncode != 0` 일 때만 읽고 버렸다 — 빈 응답을
+    로그에서 보고도 레이트리밋인지 다른 것인지 알 방법이 없었다.
+    """
+
     @property
     def had_thinking(self) -> bool:
         return self.text != self.raw.strip()
@@ -158,4 +166,4 @@ class PiHarness:
             raise HarnessError(f"pi 실패 (code={proc.returncode}): {proc.stderr.strip()[:400]}")
 
         raw = proc.stdout
-        return HarnessResult(text=strip_thinking(raw), raw=raw)
+        return HarnessResult(text=strip_thinking(raw), raw=raw, err=proc.stderr.strip())
