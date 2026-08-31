@@ -43,3 +43,6 @@ scratch/
 # 런타임 산출물 (지식베이스·DB·소스 미러)
 var/
 .venv/
+
+# 워커 로그 백업 — *.log 규칙을 비껴간다
+var-worker.log*
