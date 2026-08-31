@@ -144,6 +144,7 @@ class IngestRun:
         mirrors: Sequence[SourceMirror] = (),
         max_chars: int = MAX_CHARS_PER_CALL,
         should_stop: Callable[[], bool] | None = None,
+        on_chunk: Callable[[str, int, int], None] | None = None,
     ) -> None:
         self._repo = repo
         self._agent = agent
@@ -152,6 +153,7 @@ class IngestRun:
         self._should_stop = should_stop or (lambda: False)
         self._mirrors = list(mirrors)
         self._max_chars = max_chars
+        self._on_chunk = on_chunk or (lambda *_: None)
 
     def run(self) -> IngestResult:
         self._repo.ensure_initialized()
@@ -272,7 +274,12 @@ class IngestRun:
         # 읽을 것이 남아 있으면 아래에서 묶음마다 돈다.
 
         live: dict[str, bool] = {}
-        for chunk in _chunks(material, self._max_chars):
+        # **묶음 수를 미리 안다.** 최초 부트스트랩은 한 런이 하루를 넘기는데,
+        # 진행을 남기지 않으면 "얼마나 남았는가"에 답할 방법이 항목 수를 세는
+        # 것뿐이다 — 개념이 없는 묶음은 항목을 내지 않으므로 그것은 진행이
+        # 아니다. 남은 시간을 알아야 기다릴지 끊을지 정할 수 있다.
+        chunks = _chunks(material, self._max_chars)
+        for done, chunk in enumerate(chunks, start=1):
             if self._should_stop():
                 # **묶음 경계에서 나간다.** 여기가 나갈 수 있는 유일한 자리다 —
                 # 한 묶음 안에서 끊기면 항목이 반만 쓰인 채 남는다.
@@ -283,6 +290,7 @@ class IngestRun:
                 # 치르지만 구멍은 만들지 않는다.
                 result.stopped = True
                 return None
+            self._on_chunk(mirror.repo_url, done, len(chunks))
             try:
                 proposals = self._agent.from_source(chunk, index)
             except (AgentOutputError, RuntimeError) as exc:

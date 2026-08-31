@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import signal
 import time
+from datetime import UTC, datetime
 from types import FrameType
 
 from agentic_service_desk.adapters.factory import build_parent_system
@@ -654,6 +655,7 @@ class BatchRunner:
                 # 플래그를 바깥 루프에서만 보면 그 반나절이 다 지나야 신호를
                 # 쳐다본다 — 2026-08-30 에 워커 다섯이 동시에 도는 것으로 드러났다.
                 should_stop=lambda: self._stopping,
+                on_chunk=_note_chunk,
             ).run()
         except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] ingest 실패: {exc}")
@@ -1076,3 +1078,17 @@ def _note_ingest_retry(attempt: int, exc: Exception) -> None:
     먼저 나타난다.
     """
     print(f"[worker] ingest 출력이 형식을 어겼다 — 다시 부른다 ({attempt}회차): {exc}")
+
+
+def _note_chunk(repo_url: str, done: int, total: int) -> None:
+    """묶음 하나를 시작할 때마다 남긴다.
+
+    **최초 부트스트랩은 한 런이 하루를 넘긴다.** 그동안 남는 것이 끝의 커밋
+    하나뿐이면 "얼마나 남았는가"에 답할 수가 없다 — 항목 수는 진행이 아니다.
+    개념이 없는 묶음은 아무것도 내지 않으면서 시간은 똑같이 쓴다.
+
+    시각을 함께 찍는다. 줄 사이의 간격이 곧 묶음당 소요이고, 그것이 남은
+    시간을 재는 유일한 실측이다.
+    """
+    stamp = datetime.now(UTC).astimezone().strftime("%H:%M:%S")
+    print(f"[worker] {stamp} 묶음 {done}/{total} — {repo_url}")
