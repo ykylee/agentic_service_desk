@@ -249,3 +249,67 @@ class TestAgent:
         m = QnaMaterial(answer_id="A-1", question_id="Q-2", question="가", answer="나")
         assert IngestAgent(harness).from_qna(m, [])
         assert "질문: 가" in harness.prompts[0]
+
+
+class TestRetry:
+    """형식을 어긴 출력은 다시 부른다.
+
+    2026-08-30 부트스트랩에서 묶음의 48%가 형식 위반으로 버려졌고 그중 대부분이
+    **빈 응답**이었다 — 원천이 아니라 그 호출이 문제였다는 뜻이다.
+    """
+
+    def test_빈_응답이_오면_다시_부른다(self) -> None:
+        harness = FakeHarness("", ONE_ITEM)
+        proposals = IngestAgent(harness).from_source(SourceMaterial(commit="a"), [])
+        assert len(proposals) == 1
+        assert len(harness.prompts) == 2
+
+    def test_잘린_JSON_도_다시_부른다(self) -> None:
+        harness = FakeHarness('{"items": [{"id": null, "title": "잘렸다", "body": "중괄호가', ONE_ITEM)
+        assert IngestAgent(harness).from_source(SourceMaterial(commit="a"), [])
+        assert len(harness.prompts) == 2
+
+    def test_한도까지_어기면_마지막_오류를_올린다(self) -> None:
+        harness = _AlwaysEmpty()
+        with pytest.raises(AgentOutputError):
+            IngestAgent(harness, attempts=3).from_source(SourceMaterial(commit="a"), [])
+        assert harness.calls == 3
+
+    def test_하네스_실패는_다시_부르지_않는다(self) -> None:
+        # 중단 신호(code=143)와 타임아웃이 이 길로 온다. 다시 부르면 종료를
+        # 방해하거나 같은 시간을 한 번 더 태운다.
+        harness = _AlwaysRaises()
+        with pytest.raises(RuntimeError):
+            IngestAgent(harness, attempts=3).from_source(SourceMaterial(commit="a"), [])
+        assert harness.calls == 1
+
+    def test_다시_부르기_전에_알린다(self) -> None:
+        seen: list[int] = []
+        harness = FakeHarness("", ONE_ITEM)
+        IngestAgent(harness, on_retry=lambda n, exc: seen.append(n)).from_source(
+            SourceMaterial(commit="a"), []
+        )
+        assert seen == [1]
+
+
+class _AlwaysEmpty:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def run(self, prompt: str, *, cwd: str | None = None):  # noqa: ANN201
+        self.calls += 1
+        return _Empty()
+
+
+class _Empty:
+    text = ""
+    raw = ""
+
+
+class _AlwaysRaises:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def run(self, prompt: str, *, cwd: str | None = None):  # noqa: ANN201
+        self.calls += 1
+        raise RuntimeError("pi 실패 (code=143): ")

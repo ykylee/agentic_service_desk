@@ -79,6 +79,24 @@ NON_AGENTIC = (
 )
 
 
+DEFAULT_TIMEOUT = 600.0
+"""한 번의 pi 호출을 기다리는 한도(초).
+
+**2026-08-31 실측** (stdin 을 고친 뒤, auto-trading 미러의 실제 파일로):
+24,000자 묶음 하나가 **56초**, 12,000자가 48초, 6,000자가 52초. 셋 다 완결된
+JSON 이 왔다. 소요는 **입력 크기가 아니라 생성량이 지배한다** — 묶음을 줄여도
+호출당 시간은 그대로고 호출 수만 는다.
+
+그러니 300초도 정상 호출에는 넉넉했다. 그런데도 올리는 이유는 한 가지다:
+한도를 넘긴 파일 하나가 통째로 한 묶음이 되는 경우(`MAX_CHARS_PER_CALL`
+주석)가 있고, 그때의 생성량은 위 실측 범위 밖이다. 여유는 성공한 호출에
+아무 값도 물리지 않는다 — 한도는 **실패했을 때만** 시간을 쓴다.
+
+중단 신호는 이 한도와 무관하다: SIGTERM 은 pi 를 함께 죽여 `code=143` 으로
+즉시 돌아온다.
+"""
+
+
 class PiHarness:
     """pi 를 헤드리스로 부른다. **에이전트가 아니라 생성기로 쓴다.**"""
 
@@ -89,7 +107,7 @@ class PiHarness:
         *,
         provider: str = PROVIDER_NAME,
         executable: str = "pi",
-        timeout: float = 300.0,
+        timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self._model = model
         self._api_key = api_key
@@ -122,6 +140,14 @@ class PiHarness:
                 env=env,
                 cwd=cwd,
                 check=False,
+                # **표준입력을 닫는다.** 물려주면 pi 가 거기서 더 올 것을
+                # 기다린다 — 프롬프트는 이미 인자로 다 줬는데도. 워커의 stdin 이
+                # 열린 채 비어 있는 파이프면(백그라운드 기동에서 흔하다) 호출이
+                # **영영 돌아오지 않고**, 한도가 다 찰 때까지 그 묶음이 멈춘다.
+                # 2026-08-31 실측: 물려주면 90초 한도를 그대로 태웠고 닫으면
+                # 같은 프롬프트가 1.2초에 왔다. EOF 인 stdin 은 문제가 없어
+                # 앞선 실행에서 드러나지 않았다.
+                stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError as exc:
             raise HarnessError(f"pi 를 찾을 수 없다: {self._exe}") from exc

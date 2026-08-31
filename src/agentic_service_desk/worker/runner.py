@@ -645,7 +645,7 @@ class BatchRunner:
         try:
             result = IngestRun(
                 repo=repo,
-                agent=IngestAgent(harness),
+                agent=IngestAgent(harness, on_retry=_note_ingest_retry),
                 conn=conn,
                 output_filter=output_filter,
                 mirrors=self._mirrors(),
@@ -1064,3 +1064,13 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
     for failure in result.failures:
         notes.append(f"ingest 실패 — {failure}")
     return notes
+
+
+def _note_ingest_retry(attempt: int, exc: Exception) -> None:
+    """형식을 어긴 출력을 다시 부르기 직전에 남긴다.
+
+    **조용히 다시 부르면 재시도가 무엇을 덮고 있는지 안 보인다.** 실패율이
+    올라가는 것은 성공 건수만 봐서는 드러나지 않고, 이 줄이 늘어나는 것으로
+    먼저 나타난다.
+    """
+    print(f"[worker] ingest 출력이 형식을 어겼다 — 다시 부른다 ({attempt}회차): {exc}")

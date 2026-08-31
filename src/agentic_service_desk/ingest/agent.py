@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Protocol
 
 from agentic_service_desk.ingest.config_paths import exclude_config_paths
@@ -303,23 +304,63 @@ DEFAULT_PERIOD_DAYS = 180
 """
 
 
+DEFAULT_ATTEMPTS = 3
+"""출력이 형식을 어겼을 때 같은 묶음을 다시 부르는 횟수 (첫 호출 포함).
+
+**모델 출력은 비결정적이라, 같은 프롬프트가 두 번째에 성공한다.** 2026-08-30
+부트스트랩에서 묶음의 48%(62/128)가 형식 위반으로 버려졌는데 그중 48건이
+**빈 응답**이었다 — 원천에 문제가 있어서가 아니라 그 호출이 아무것도 내지
+않아서다. 한 번 더 부르는 값은 초 단위지만, 버린 묶음은 그 실행에서 영영
+지식이 되지 못한다.
+
+커서가 실행 중에는 움직이지 않으므로 버려진 묶음도 다음 실행에서 다시 읽히긴
+한다. 그러나 실패율이 그대로면 **다음 실행에서도 같은 비율로 떨어진다** —
+다시 읽는 것은 구제책이 아니다.
+"""
+
+
 class IngestAgent:
     """원천 하나를 에이전트에 넣고 제안을 받는다."""
 
-    def __init__(self, harness: Harness) -> None:
+    def __init__(
+        self,
+        harness: Harness,
+        *,
+        attempts: int = DEFAULT_ATTEMPTS,
+        on_retry: Callable[[int, Exception], None] | None = None,
+    ) -> None:
         self._harness = harness
+        self._attempts = max(1, attempts)
+        self._on_retry = on_retry
 
     def from_source(
         self, material: SourceMaterial, index: list[tuple[str, str]]
     ) -> list[ProposedItem]:
-        result = self._harness.run(build_source_prompt(material, index))
-        return parse_proposals(result.text)
+        return self._call(build_source_prompt(material, index))
 
     def from_qna(
         self, material: QnaMaterial, index: list[tuple[str, str]]
     ) -> list[ProposedItem]:
-        result = self._harness.run(build_qna_prompt(material, index))
-        return parse_proposals(result.text)
+        return self._call(build_qna_prompt(material, index))
+
+    def _call(self, prompt: str) -> list[ProposedItem]:
+        """부르고 읽는다. **형식 위반만 다시 부른다.**
+
+        `AgentOutputError` 는 "이번 출력이 어긋났다"는 뜻이라 다시 부르면 달라질
+        수 있다. `HarnessError` 는 다르다 — 중단 신호(code=143)나 타임아웃이고,
+        **다시 부르면 종료를 방해하거나 같은 시간을 한 번 더 태운다.** 그래서
+        여기서 걸러 잡지 않고 그대로 올린다.
+        """
+        last: AgentOutputError | None = None
+        for attempt in range(1, self._attempts + 1):
+            try:
+                return parse_proposals(self._harness.run(prompt).text)
+            except AgentOutputError as exc:
+                last = exc
+                if attempt < self._attempts and self._on_retry is not None:
+                    self._on_retry(attempt, exc)
+        assert last is not None
+        raise last
 
 
 # --- 제안 → 지식 항목 (출처는 여기서 붙는다) --------------------------------

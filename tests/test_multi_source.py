@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import subprocess
 
-from conftest import FakeHarness
+from conftest import FakeHarness, failing
 
 from agentic_service_desk.adapters.mock import BOT_ACCOUNT
 from agentic_service_desk.ingest.agent import IngestAgent
@@ -123,7 +123,7 @@ class TestOneRepositoryFailingDoesNotRewindOthers:
         conn = _conn(tmp_path)
         mirrors = _mirrors(tmp_path)
         result = _run(
-            tmp_path, FakeHarness("JSON 이 아니다", _item("라우팅")), mirrors, conn
+            tmp_path, FakeHarness(*failing(), _item("라우팅")), mirrors, conn
         ).run()
 
         assert result.failures

@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 
 import pytest
+from agentic_service_desk.ingest.agent import DEFAULT_ATTEMPTS
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +29,17 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 class _Result:
     text: str
     raw: str
+
+
+def failing(text: str = "JSON 이 아니다") -> tuple[str, ...]:
+    """**한 호출이 끝내 실패한다**를 나타내는 응답 묶음.
+
+    `IngestAgent` 는 형식을 어긴 출력을 다시 부르므로(`DEFAULT_ATTEMPTS`),
+    실패를 응답 하나로 쓰면 두 번째 시도가 `FakeHarness` 의 기본 응답을 받아
+    **성공해 버린다.** 횟수를 상수에서 끌어와 재시도 횟수가 바뀌어도 시험의
+    뜻이 그대로이게 한다.
+    """
+    return (text,) * DEFAULT_ATTEMPTS
 
 
 class FakeHarness:

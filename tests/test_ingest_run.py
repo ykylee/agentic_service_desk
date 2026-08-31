@@ -24,7 +24,7 @@ from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.operations.checkpoint import get_cursor, source_key
 from agentic_service_desk.operations.schema import connect, initialize
 
-from conftest import FakeHarness
+from conftest import FakeHarness, failing
 
 
 def _item_json(title: str, item_id: str | None = None, body: str = "본문이다.") -> str:
@@ -164,7 +164,7 @@ class TestProgressIsMarkedEvenWhenNothingIsLearned:
     def test_실패한_답변은_다시_읽는다(self, tmp_path) -> None:
         # 진행 표시는 성공한 호출에만 붙는다.
         conn = _collected(tmp_path)
-        first = FakeHarness("JSON 이 아니다", '{"items": []}')
+        first = FakeHarness(*failing(), '{"items": []}')
         result = _run(tmp_path, first, conn=conn).run()
         assert len(result.failures) == 1
 
@@ -246,7 +246,7 @@ class TestSourceIngest:
         # 옮기면 그 구간을 영영 건너뛰고, 지식에 구멍이 생기는데 아무도 모른다.
         conn = _conn(tmp_path)
         mirror = self._mirror(tmp_path)
-        result = _run(tmp_path, FakeHarness("JSON 이 아닌 응답"), mirror=mirror, conn=conn).run()
+        result = _run(tmp_path, FakeHarness(*failing("JSON 이 아닌 응답")), mirror=mirror, conn=conn).run()
 
         assert result.failures
         assert get_cursor(conn, source_key(mirror.repo_url)) is None
