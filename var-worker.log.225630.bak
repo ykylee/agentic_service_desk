@@ -1,0 +1,19 @@
+/Users/yklee/repos/agentic_service_desk/src/agentic_service_desk/worker/runner.py:265: RuntimeWarning: 모 시스템 어댑터가 **mock** 이다. 실제 데이터가 아니며 게재도 나가지 않는다. 프로덕션이라면 ASD_PARENT_ADAPTER 를 확인하라.
+  parent = build_parent_system(self._cfg)
+/Users/yklee/repos/agentic_service_desk/src/agentic_service_desk/worker/runner.py:348: RuntimeWarning: 모 시스템 어댑터가 **mock** 이다. 실제 데이터가 아니며 게재도 나가지 않는다. 프로덕션이라면 ASD_PARENT_ADAPTER 를 확인하라.
+  parent = build_parent_system(self._cfg)
+[worker] stage=S0 interval=60s — 배치 경로
+[worker] 소스 변경 전체(최초) (/Users/yklee/repos/auto-trading) — 커밋 176건, 경로 759개
+[worker] 소스 변경 전체(최초) (/Users/yklee/repos/standard_ai_workflow) — 커밋 1108건, 경로 1984개
+[worker] 후속 재실행 1건
+[worker] 중단 요청 (signal=15). 묶음 경계에서 멈춘다.
+[worker] ingest 출력이 형식을 어겼다 — 다시 부른다 (1회차): 응답에서 JSON 객체를 찾지 못했다 — 받은 것: 
+[worker] ingest 출력이 형식을 어겼다 — 다시 부른다 (2회차): 응답에서 JSON 객체를 찾지 못했다 — 받은 것: 
+[worker] ingest 를 **다 읽지 못하고 멈췄다** (중단 신호) — 읽다 만 저장소의 커서는 그대로 두었다. 다시 띄우면 그 구간부터 이어서 읽는다
+[worker] 설정 파일 67개를 원천에서 뺐다 (FR-9)
+[worker] 커밋 메시지 126건이 한도를 넘어 실리지 않았다 — 그만큼 '왜'가 빠졌다
+[worker] ingest 실패 — 소스 4df5e1ee: 응답에서 JSON 객체를 찾지 못했다 — 받은 것: 
+[worker] 번들 목록에 52건을 새로 등재했다
+[worker] 임베딩 인덱스 실패: MiniMax 임베딩 실패 (status_code=1002): rate limit exceeded(RPM)
+[worker]   검색은 키워드·표현 사전으로 계속 돈다 (ADR-004)
+[worker] 멈췄다.
