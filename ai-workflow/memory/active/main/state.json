@@ -10,7 +10,7 @@
     "daily_backlog_dir": "ai-workflow/memory/active/main/backlog",
     "tasks_dir": "ai-workflow/memory/active/main/backlog/tasks",
     "sessions_dir": "ai-workflow/memory/active/main/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-31.md",
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-01.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -34,7 +34,9 @@
       "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축"
     ],
     "blocked_items": [],
-    "planned_items": [],
+    "planned_items": [
+      "TASK-2026-09-01-main-001"
+    ],
     "recent_done_items": [
       "TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용",
       "TASK-2026-08-29-main-007 — WBS-4.8.3 보존 만료",
@@ -51,18 +53,16 @@
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-31.md",
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-01.md",
     "task_count": 1,
-    "in_progress_items": [
-      "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축"
-    ],
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": []
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/main/session_handoff.md",
-    "ai-workflow/memory/active/main/backlog/2026-08-31.md",
+    "ai-workflow/memory/active/main/backlog/2026-09-01.md",
     "ai-workflow/memory/active/main/work_backlog.md"
   ],
   "repository_assessment": {
