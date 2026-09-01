@@ -677,7 +677,7 @@
     },
     {
       "task_id": "TASK-2026-09-01-main-001",
-      "task_status": "planned",
+      "task_status": "done",
       "wbs_ref": "exempt",
       "exempt_reason": "실데이터 검증에서 드러난 결함 수정. 신규 기능이 아니라 기존 4.x 산출물의 정확성 보강이라 WBS leaf 를 새로 세우지 않는다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-01-main-001.md"

@@ -64,12 +64,12 @@ def _repo(tmp_path, *, stale: bool = False, commit: bool = True):  # noqa: ANN00
     return repo
 
 
-def _draft() -> Draft:
+def _draft(grounding: tuple[str, ...] = ("k-1",)) -> Draft:
     return Draft(
         statements=(
             Statement("결재 한도는 부서 등급으로 정해집니다.", Confidence.CONFIRMED, ("k-1",)),
         ),
-        grounding=("k-1",),
+        grounding=grounding,
     )
 
 
@@ -171,6 +171,60 @@ class TestUnpinnable:
         # 기록도 남기지 않는다 — 시도조차 하지 않았다.
         assert conn.execute("SELECT count(*) c FROM answer_record").fetchone()["c"] == 0
         conn.close()
+
+    def test_커밋에_아직_없는_항목은_고정하지_못한다(self, tmp_path) -> None:
+        """**디스크에 있다는 것과 그 커밋에 있다는 것은 다르다.**
+
+        본문은 디스크에서 읽고 해시는 `head()` 에서 가져오므로, 긴 ingest 런
+        도중에는 그 둘이 어긋난다 — 항목은 이미 파일로 쓰였지만 커밋은 런 끝에
+        한 번 생긴다. 2026-09-01 실측: 디스크 항목 204개 중 그 시점 HEAD 에
+        실재하는 것은 71개였다. 그대로 고정하면 **없는 자리를 가리키는 해시가
+        박힌 채 답변이 나간다.**
+        """
+        conn = _conn(tmp_path)
+        repo = _repo(tmp_path)  # k-1 은 커밋돼 있다
+        # 런 도중처럼, 커밋하지 않은 항목을 하나 더 쓴다.
+        repo.save(
+            KnowledgeItem(
+                id="k-2",
+                title="아직 커밋되지 않은 규칙",
+                body="디스크에는 있고 HEAD 에는 없다.",
+                provenance=[Provenance(commit=SOURCE_COMMIT, path="approval/new.py")],
+                invalidation=Invalidation(
+                    kind=InvalidationKind.LINKED, refs=("approval/new.py",)
+                ),
+            )
+        )
+        assert repo.find("k-2") is not None  # 디스크에는 있다
+        assert not repo.exists_at(repo.find("k-2").path, repo.head())  # 커밋에는 없다
+
+        parent = MockParentSystem()
+        before = len(parent.list_answers("Q-1"))
+        draft_id = draft_store.save(
+            conn,
+            question="질문",
+            draft=_draft(grounding=("k-1", "k-2")),
+            qna_item_id="qna-1",
+        )
+        draft_store.decide(conn, draft_id, approved=True)
+        result = publication.publish(
+            conn, parent, draft_id, bot_accounts=ACCOUNTS, repo=repo
+        )
+
+        assert isinstance(result, publication.Refused)
+        assert result.reason is publication.Refusal.UNPINNABLE
+        assert len(parent.list_answers("Q-1")) == before
+        # 하나가 고정되지 않으면 **전체를 거부한다** — 일부만 빼면 남은 것으로
+        # 답이 나가 버리고, 그 근거 목록은 이미 신뢰할 수 없다.
+        assert conn.execute("SELECT count(*) c FROM answer_record").fetchone()["c"] == 0
+        conn.close()
+
+    def test_커밋된_항목만_근거면_고정된다(self, tmp_path) -> None:
+        # 검사가 너무 넓게 잡아 멀쩡한 게재까지 막지 않는지 본다.
+        repo = _repo(tmp_path)
+        pinned = publication.pin(repo, ["k-1"])
+        assert pinned is not None
+        assert pinned[0].pinned_commit == repo.head()
 
     def test_지식베이스가_아예_없어도_터지지_않는다(self, tmp_path) -> None:
         """"고정할 수 없다"가 "게재 중 사고"로 둔갑하면 사람이 헛걸음한다."""

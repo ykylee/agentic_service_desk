@@ -283,6 +283,30 @@ class KnowledgeRepository:
         except (KnowledgeRepoError, OSError):
             return None
 
+    def exists_at(self, path: Path, commit: str) -> bool:
+        """이 파일이 **그 커밋에** 들어 있는가.
+
+        `head()` 만으로는 부족해서 생겼다. 근거를 고정할 때 본문은 디스크에서
+        읽고 해시는 `head()` 에서 가져오는데, **긴 ingest 런 도중에는 그 둘이
+        어긋난다** — 항목은 이미 파일로 쓰였지만 커밋은 런 끝에 한 번 생기기
+        때문이다. 2026-09-01 실측: 디스크 항목 204개 중 그 시점 HEAD 에 실재하는
+        것은 71개였다.
+
+        그 상태로 고정하면 **없는 자리를 가리키는 해시가 박힌 채 답변이 나간다.**
+        거짓은 나중에 재현을 시도할 때에야 드러나고, 그때는 이미 늦다.
+        """
+        if not self._root.exists() or not commit:
+            return False
+        try:
+            rel = path.resolve().relative_to(self._root).as_posix()
+        except ValueError:
+            return False
+        try:
+            self._git("cat-file", "-e", f"{commit}:{rel}")
+        except (KnowledgeRepoError, OSError):
+            return False
+        return True
+
     def last_commit_date(self, path: Path) -> str | None:
         """이 파일이 마지막으로 커밋된 시각 (ISO).
 
