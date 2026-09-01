@@ -437,3 +437,66 @@ class TestMirrorSet:
         mirrors = _mirrors(tmp_path)
         mirrors.append(SourceMirror("git@x:team/not-yet.git", tmp_path / "none"))
         assert MirrorSet(mirrors).is_cloned
+
+
+class TestRetiredRepositoriesStayVerifiable:
+    """원천에서 물러난 저장소의 출처는 계속 되짚을 수 있어야 한다.
+
+    저장소를 `parent_repo_url` 에서 빼면 거기서 만든 지식이 통째로 근거를 잃는다 —
+    Lint 가 "출처 커밋이 저장소에 없다"로 그 항목 전부를 Q5 로 올린다. 그러나
+    **커밋은 여전히 실재하고 미러도 디스크에 남아 있다.** 달라진 것은 "앞으로 더
+    읽을 것인가"뿐이다. 읽기를 멈추는 것과 근거를 버리는 것은 다른 결정이다.
+
+    2026-09-01 실측: standard_ai_workflow 를 원천에서 빼자 그 저장소에서 온 항목
+    58개가 한꺼번에 `missing_reference` 가 되어 `LintReport.clean` 이 무너졌다.
+    """
+
+    def test_물러난_저장소가_확인_목록에_들어간다(self) -> None:
+        from agentic_service_desk.config import Settings
+
+        cfg = Settings(parent_repo_url="/a", retired_repo_url="/b,/c")
+        assert cfg.parent_repo_urls == ("/a",)
+        assert cfg.retired_repo_urls == ("/b", "/c")
+        assert cfg.verifiable_repo_urls == ("/a", "/b", "/c")
+
+    def test_같은_저장소가_양쪽에_있어도_한_번만_센다(self) -> None:
+        from agentic_service_desk.config import Settings
+
+        cfg = Settings(parent_repo_url="/a,/b", retired_repo_url="/b")
+        assert cfg.verifiable_repo_urls == ("/a", "/b")
+
+    def test_물러난_저장소의_출처는_소견이_되지_않는다(self, tmp_path) -> None:
+        from agentic_service_desk.knowledge.item import (
+            Invalidation,
+            InvalidationKind,
+            KnowledgeItem,
+            Provenance,
+        )
+        from agentic_service_desk.knowledge.lint import Lint
+
+        alpha, beta = _mirrors(tmp_path)
+        repo = KnowledgeRepository(tmp_path / "knowledge")
+        repo.ensure_initialized()
+        repo.save(
+            KnowledgeItem(
+                title="물러난 저장소에서 온 지식",
+                body="본문이다.",
+                provenance=[Provenance(commit=beta.head(), path="route.py")],
+                invalidation=Invalidation(
+                    kind=InvalidationKind.PERIODIC, period_days=180
+                ),
+            )
+        )
+        conn = _conn(tmp_path)
+
+        # 원천이 alpha 뿐이면 beta 의 출처를 확인할 수 없다 — 이것이 결함이었다.
+        only_current = Lint(repo=repo, conn=conn, mirror=MirrorSet([alpha])).run()
+        assert [f for f in only_current.findings if f.kind.value == "missing_reference"]
+
+        # 물러난 저장소를 확인 목록에 넣으면 소견이 서지 않는다.
+        with_retired = Lint(
+            repo=repo, conn=_conn(tmp_path / "second"), mirror=MirrorSet([alpha, beta])
+        ).run()
+        assert not [
+            f for f in with_retired.findings if f.kind.value == "missing_reference"
+        ]

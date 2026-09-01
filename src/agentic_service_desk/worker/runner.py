@@ -77,6 +77,18 @@ class BatchRunner:
         """
         return build_mirrors(self._cfg.parent_repo_urls, self._cfg.source_mirror_dir)
 
+    def _verify_mirrors(self):  # noqa: ANN201
+        """**출처를 되짚기 위한** 미러 — 현행 원천 + 물러난 저장소.
+
+        `_mirrors()` 와 나뉘어 있는 것이 요점이다. 그쪽은 *무엇을 읽을 것인가*,
+        이쪽은 *무엇을 확인할 수 있어야 하는가*다. 하나로 두면 원천을 줄이는
+        순간 과거의 지식이 조용히 근거를 잃는다 — 커밋은 그대로 실재하는데도
+        Lint 가 "출처 커밋이 저장소에 없다"로 그 항목 전부를 Q5 로 올린다.
+
+        읽기를 멈추는 것과 근거를 버리는 것은 **다른 결정**이다.
+        """
+        return build_mirrors(self._cfg.verifiable_repo_urls, self._cfg.source_mirror_dir)
+
     def _content_source_commit(self, conn) -> str | None:  # noqa: ANN001
         """콘텐츠에 박을 소스 커밋 (WBS-4.6~4.7).
 
@@ -681,7 +693,7 @@ class BatchRunner:
         repo = KnowledgeRepository(self._cfg.knowledge_dir)
         if not repo.root.exists():
             return
-        mirrors = self._mirrors()
+        mirrors = self._verify_mirrors()
         conn = connect(self._cfg.operations_db)
         initialize(conn)
         try:

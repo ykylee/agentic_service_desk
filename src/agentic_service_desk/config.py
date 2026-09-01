@@ -48,6 +48,21 @@ class Settings(BaseSettings):
             "개념은 한 자리에 모여야 저장소를 넘는 모순이 드러난다."
         ),
     )
+    retired_repo_url: str = Field(
+        default="",
+        description=(
+            "**한때 원천이었으나 더는 읽지 않는 저장소** (쉼표로 여럿). 수집은 하지 "
+            "않고 **출처 확인에만 쓴다.**\n\n"
+            "저장소를 `parent_repo_url` 에서 빼면 거기서 만든 지식이 통째로 근거를 "
+            "잃는다 — Lint 가 '출처 커밋이 저장소에 없다'로 그 항목 전부를 Q5 로 "
+            "올리고, 그것은 오탐이 아니라 **사실**이다(ADR-002 결정 4). 그런데 "
+            "**지식을 지울 이유는 되지 않는다**: 그 커밋은 여전히 실재하고 미러도 "
+            "디스크에 남아 있으며, 달라진 것은 '앞으로 더 읽을 것인가'뿐이다.\n\n"
+            "그래서 *읽을 목록*과 *되짚을 목록*을 나눈다. 읽기를 멈추는 것과 "
+            "근거를 버리는 것은 다른 결정이고, 하나로 묶으면 **원천을 줄이는 순간 "
+            "과거의 지식이 조용히 근거를 잃는다.**"
+        ),
+    )
     source_exclude: str = Field(
         default="",
         description=(
@@ -287,6 +302,23 @@ class Settings(BaseSettings):
         묻기 때문이다(NFR-1). 목록이 필요한 것은 수집 쪽이다.
         """
         return tuple(u.strip() for u in self.parent_repo_url.split(",") if u.strip())
+
+    @property
+    def retired_repo_urls(self) -> tuple[str, ...]:
+        """더는 읽지 않지만 출처를 되짚을 수 있어야 하는 저장소들."""
+        return tuple(u.strip() for u in self.retired_repo_url.split(",") if u.strip())
+
+    @property
+    def verifiable_repo_urls(self) -> tuple[str, ...]:
+        """출처를 확인할 수 있어야 하는 저장소 전체 — 현행 원천 + 물러난 것.
+
+        **순서를 지킨다.** 현행 원천이 앞이라 같은 커밋이 양쪽에 있으면 현행
+        쪽으로 풀린다. 중복은 뒤엣것을 버린다.
+        """
+        seen: dict[str, None] = {}
+        for url in (*self.parent_repo_urls, *self.retired_repo_urls):
+            seen.setdefault(url, None)
+        return tuple(seen)
 
     @property
     def source_exclude_patterns(self) -> tuple[str, ...]:
