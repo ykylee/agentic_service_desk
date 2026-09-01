@@ -670,7 +670,7 @@
     },
     {
       "task_id": "TASK-2026-08-30-main-002",
-      "task_status": "in_progress",
+      "task_status": "done",
       "wbs_ref": "exempt",
       "exempt_reason": "M-001~M-004 모두 done 이라 열린 마일스톤이 없다. 다음 마일스톤 선언 전의 실데이터 검증 실행이며, 결과가 M-005 범위를 정하는 입력이 된다.",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-30-main-002.md"

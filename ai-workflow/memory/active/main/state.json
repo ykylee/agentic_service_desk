@@ -29,10 +29,8 @@
   "session": {
     "current_baseline": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
     "current_axis": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
-    "current_focus": "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축",
-    "in_progress_items": [
-      "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축"
-    ],
+    "current_focus": "TASK-2026-09-01-main-001 — pin() 이 커밋에 없는 항목을 고정하지 못하게 한다",
+    "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [
       "TASK-2026-09-01-main-001",
@@ -40,6 +38,7 @@
       "TASK-2026-09-01-main-003"
     ],
     "recent_done_items": [
+      "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축",
       "TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용",
       "TASK-2026-08-29-main-007 — WBS-4.8.3 보존 만료",
       "TASK-2026-08-29-main-006 — WBS-4.8.2 알림 웹훅",
@@ -48,8 +47,7 @@
       "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터",
       "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼",
       "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ",
-      "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재",
-      "TASK-2026-08-28-main-043 — WBS-4.6.4 콘텐츠 검수"
+      "TASK-2026-08-28-main-044 — WBS-4.6.3 문서 면 게재"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
