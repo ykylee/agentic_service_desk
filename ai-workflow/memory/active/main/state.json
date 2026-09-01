@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-09-01",
+  "generated_at": "2026-09-02",
   "purpose_digest": "모 시스템의 **소스 저장소(코드 + 히스토리)**와 **QnA·답변 이력** 두 원천을 **모 시스템 내부 API**로 지속 수집해 하나의 지식베이스로 구축한다 — 히스토리는 \"왜 그렇게 정했는가\"의 1차 출처이며, API 표면이 곧 이 시스템이 알 수 있는 것의 상한이다",
   "purpose_digest_rev": "2026-08-27",
   "source_of_truth": {
@@ -29,14 +29,14 @@
   "session": {
     "current_baseline": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
     "current_axis": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
-    "current_focus": "TASK-2026-09-01-main-002 — 두 미러가 같은 kit 을 두 번 지식으로 만드는지 판정한다",
+    "current_focus": "TASK-2026-09-01-main-003 — ingest 묶음당 소요를 줄인다 — 재시도·사고블록·색인",
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [
-      "TASK-2026-09-01-main-002",
       "TASK-2026-09-01-main-003"
     ],
     "recent_done_items": [
+      "TASK-2026-09-01-main-002 — kit 출처 지식을 어떻게 할 것인가 (원래 제목: 두 미러가 같은 kit 을 두 번 지식으로 만드는지 판정한다)",
       "TASK-2026-09-01-main-001 — pin() 이 커밋에 없는 항목을 고정하지 못하게 한다",
       "TASK-2026-08-30-main-002 — 시뮬레이션 검증 — 실저장소 지식베이스 구축",
       "TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용",
@@ -45,8 +45,7 @@
       "TASK-2026-08-29-main-005 — WBS-4.8.4 표본 재검증",
       "TASK-2026-08-29-main-004 — WBS-4.8.1 국면 판정과 전환",
       "TASK-2026-08-29-main-003 — WBS-4.7.3 뉴스레터",
-      "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼",
-      "TASK-2026-08-29-main-001 — WBS-4.7.1 FAQ"
+      "TASK-2026-08-29-main-002 — WBS-4.7.2 칼럼"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
@@ -57,7 +56,8 @@
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
-      "TASK-2026-09-01-main-001 — pin() 이 커밋에 없는 항목을 고정하지 못하게 한다"
+      "TASK-2026-09-01-main-001 — pin() 이 커밋에 없는 항목을 고정하지 못하게 한다",
+      "TASK-2026-09-01-main-002 — kit 출처 지식을 어떻게 할 것인가 (원래 제목: 두 미러가 같은 kit 을 두 번 지식으로 만드는지 판정한다)"
     ]
   },
   "next_documents": [

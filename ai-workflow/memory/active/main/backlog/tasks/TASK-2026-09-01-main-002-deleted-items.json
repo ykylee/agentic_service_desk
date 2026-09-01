@@ -1,0 +1,1403 @@
+[
+ {
+  "id": "k-4da448a62625",
+  "title": "ADR-011 OKF spec 버전 호환 정책",
+  "path": "adr-011-okf-spec-버전-호환-정책.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/okf_import.py"
+   }
+  ]
+ },
+ {
+  "id": "k-fcb2ccfdff59",
+  "title": "AI harness capability 분류 매트릭스 — MultiAgentStrategy + 3 boolean + 미지정은 Codex 제약으로 fallback",
+  "path": "ai-harness-capability-분류-매트릭스-multiagentstrategy-3-boolean-미지정은-codex-제약으로-fallb.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/harness/capability_matrix.py"
+   }
+  ]
+ },
+ {
+  "id": "k-590a3d6098f9",
+  "title": "Antigravity Multi-Agent delegation helper",
+  "path": "antigravity-multi-agent-delegation-helper.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/harness/antigravity_helper.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9f00b8530656",
+  "title": "antigravity 채널 — 글로벌 정본 경로 + 플러그인 채널 실측 계약",
+  "path": "antigravity-채널-글로벌-정본-경로-플러그인-채널-실측-계약.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/mcp_installation_by_harness.md"
+   },
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": null
+   }
+  ]
+ },
+ {
+  "id": "k-203ccfebc007",
+  "title": "backlog-update apply 보고 무결성 (v1.0.2) — 쓴 파일은 전부 보고",
+  "path": "backlog-update-apply-보고-무결성-v1-0-2-쓴-파일은-전부-보고.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/backlog-update/scripts/run_backlog_update.py"
+   }
+  ]
+ },
+ {
+  "id": "k-e5ebb6347f9a",
+  "title": "backlog-update의 append-only task layout (v0.14.0) — tasks/<id>.md SSOT + dated 백로그는 링크 집합",
+  "path": "backlog-update의-append-only-task-layout-v0-14-0-tasks-id-md-ssot-dated-백로그는-링크-집.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/backlog-update/SKILL.md"
+   }
+  ]
+ },
+ {
+  "id": "k-586039d43210",
+  "title": "Bootstrap copied_core_docs 검증 계약 — DEFAULT_CORE_DOCS 단일 출처 + target-root 상대경로",
+  "path": "bootstrap-copied_core_docs-검증-계약-default_core_docs-단일-출처-target-root-상대경로.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/tests/check_bootstrap.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9331edcce879",
+  "title": "Bootstrap multi-stack 감지 — 3+ 언어 인디케이터 시 stack_labels 전부 + multi_stack=True",
+  "path": "bootstrap-multi-stack-감지-3-언어-인디케이터-시-stack_labels-전부-multi_stack-true.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/tests/check_bootstrap.py"
+   }
+  ]
+ },
+ {
+  "id": "k-53e2cab5d5a1",
+  "title": "Broken link 검사 경로 정규화 — .absolute() + os.path.normpath()",
+  "path": "broken-link-검사-경로-정규화-absolute-os-path-normpath.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/linter.py"
+   }
+  ]
+ },
+ {
+  "id": "k-8d07f460901f",
+  "title": "code-index-update skill — 색인·허브 문서 stale 후보 추천 (v1.7.0, ai-workflow/ 메타 제외)",
+  "path": "code-index-update-skill-색인-허브-문서-stale-후보-추천-v1-7-0-ai-workflow-메타-제외.md",
+  "provenance": [
+   {
+    "commit": "5b9c976edecbbead61968c213a46308b2f3dfaa4",
+    "path": "ai-workflow/core/code_index_update_skill_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-28c57301b1ea",
+  "title": "CodeWhale Constitution-additive 통합 패턴",
+  "path": "codewhale-constitution-additive-통합-패턴.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_harness_distribution.md"
+   }
+  ]
+ },
+ {
+  "id": "k-2edf885327c1",
+  "title": "Delegator fan-out delegation_id 형식 (`{parent}-st-{N}`)",
+  "path": "delegator-fan-out-delegation_id-형식-parent-st-n.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/contract_v1/delegator.py"
+   }
+  ]
+ },
+ {
+  "id": "k-31d95333f744",
+  "title": "Delegator MUST_NOT_DELEGATE_MARKERS (9 마커 집합)",
+  "path": "delegator-must_not_delegate_markers-9-마커-집합.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/contract_v1/delegator.py"
+   }
+  ]
+ },
+ {
+  "id": "k-1166bb9b55f5",
+  "title": "Delegator 자동 모델 티어 추천 (`recommend_model_tier` + MAIN_TIER_KEYWORDS)",
+  "path": "delegator-자동-모델-티어-추천-recommend_model_tier-main_tier_keywords.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/contract_v1/delegator.py"
+   }
+  ]
+ },
+ {
+  "id": "k-d0bd00791d34",
+  "title": "deploy_doctor 휘발 경유지 판정 — 사본과 경유지는 따로 깨진다",
+  "path": "deploy_doctor-휘발-경유지-판정-사본과-경유지는-따로-깨진다.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-08-31-main-004.md"
+   }
+  ]
+ },
+ {
+  "id": "k-807478bfd4c9",
+  "title": "doc-sync skill — 변경 파일 기반 영향 문서·허브 추천 (v0.9.5 part 2 PURPOSE.md directional intent 통합)",
+  "path": "doc-sync-skill-변경-파일-기반-영향-문서-허브-추천-v0-9-5-part-2-purpose-md-directional-intent-.md",
+  "provenance": [
+   {
+    "commit": "5b9c976edecbbead61968c213a46308b2f3dfaa4",
+    "path": "ai-workflow/core/doc_sync_skill_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-2410ba3e1e51",
+  "title": "doctor kit_provenance — 자기 사본 측정의 6-verdict 판정",
+  "path": "doctor-kit_provenance-자기-사본-측정의-6-verdict-판정.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": null
+   },
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/mcp_installation_by_harness.md"
+   }
+  ]
+ },
+ {
+  "id": "k-dad352f22d30",
+  "title": "Harness release spec — 2-레이어 패키지 구조 + manifest 최소 필드",
+  "path": "harness-release-spec-2-레이어-패키지-구조-manifest-최소-필드.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_release_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-94b26ed97bad",
+  "title": "high-value 툴 output 계약 — success key + OutputFieldShape 매핑 (workflow_kit.common.contracts.high_value)",
+  "path": "high-value-툴-output-계약-success-key-outputfieldshape-매핑-workflow_kit-common-contr.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/high_value.py"
+   }
+  ]
+ },
+ {
+  "id": "k-75315d55bb76",
+  "title": "Kit atomic multi-file session ingest (T3) — ingest_session_atomic + .ingest_lock",
+  "path": "kit-atomic-multi-file-session-ingest-t3-ingest_session_atomic-ingest_lock.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/ingest.py"
+   }
+  ]
+ },
+ {
+  "id": "k-58c2b19cd418",
+  "title": "Kit doctor 7-절 inspection model + 3 계약 (report-only / 기본 rc 0 / 존재는 적용이 아니다)",
+  "path": "kit-doctor-7-절-inspection-model-3-계약-report-only-기본-rc-0-존재는-적용이-아니다.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_deployment_idempotency.md"
+   }
+  ]
+ },
+ {
+  "id": "k-5731dead2f1d",
+  "title": "Kit doctor 설정 출처 가시화 — silent default 차단",
+  "path": "kit-doctor-설정-출처-가시화-silent-default-차단.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/cli/doctor.py"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/metadata.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/cli/doctor.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/metadata.py"
+   }
+  ]
+ },
+ {
+  "id": "k-36b93d35e656",
+  "title": "Kit .gitignore marker-based block management",
+  "path": "kit-gitignore-marker-based-block-management.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/gitignore.py"
+   }
+  ]
+ },
+ {
+  "id": "k-948753f92edc",
+  "title": "Kit harness export tempfile 위생 — SAW_EXPORT_MODE + EXCLUDED_TREE_DIRS + 누수 tempdir 청소",
+  "path": "kit-harness-export-tempfile-위생-saw_export_mode-excluded_tree_dirs-누수-tempdir-청소.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/scripts/export_harness_package.py"
+   }
+  ]
+ },
+ {
+  "id": "k-b0b32f7a327a",
+  "title": "Kit read-only MCP 번들",
+  "path": "kit-read-only-mcp-번들.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/read_only_bundle.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/read_only_bundle.py"
+   }
+  ]
+ },
+ {
+  "id": "k-090fde841340",
+  "title": "Kit smart upgrade 7-rule precedence — VERSION marker + hash 비교",
+  "path": "kit-smart-upgrade-7-rule-precedence-version-marker-hash-비교.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/upgrade_diff.py"
+   }
+  ]
+ },
+ {
+  "id": "k-6f4585f27c51",
+  "title": "Kit SSOT atomic 쓰기 — interrupted-write 보호",
+  "path": "kit-ssot-atomic-쓰기-interrupted-write-보호.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/atomic_write.py"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/__init__.py"
+   }
+  ]
+ },
+ {
+  "id": "k-4b6dd27a4c4a",
+  "title": "Kit state.json 의 branch-scoped writer/reader 정합",
+  "path": "kit-state-json-의-branch-scoped-writer-reader-정합.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/state/cache.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/state/cache.py"
+   }
+  ]
+ },
+ {
+  "id": "k-ac21d641a048",
+  "title": "Kit 상태 정합 비교 헬퍼",
+  "path": "kit-상태-정합-비교-헬퍼.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/reconcile.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/reconcile.py"
+   }
+  ]
+ },
+ {
+  "id": "k-41310ecb87a6",
+  "title": "Kit 세션 요약 빌더 (workflow_kit.common.session_outputs) — 3-소스 통합 + 모드 자동 감지 fallback",
+  "path": "kit-세션-요약-빌더-workflow_kit-common-session_outputs-3-소스-통합-모드-자동-감지-fallback.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/session_outputs.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9b70ffb26262",
+  "title": "Kit 워크플로 엔트리포인트",
+  "path": "kit-워크플로-엔트리포인트.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": null
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/core/workflow_deployment_idempotency.md"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/core/workflow_design_principles.md"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/core/workflow_global_injection_policy.md"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/scripts/run_existing_project_onboarding.py"
+   }
+  ]
+ },
+ {
+  "id": "k-f4cfc0eec74a",
+  "title": "Kit 작업 모드 레지스트리",
+  "path": "kit-작업-모드-레지스트리.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/modes/registry.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/modes/registry.py"
+   }
+  ]
+ },
+ {
+  "id": "k-535a401aa835",
+  "title": "Kit 표준 규칙 스냅샷 — wheel 설치 호환",
+  "path": "kit-표준-규칙-스냅샷-wheel-설치-호환.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/_standard_rules_snapshot.py"
+   }
+  ]
+ },
+ {
+  "id": "k-2ea902de08d7",
+  "title": "legacy_memory flag 의 2-cycle deprecation 진행 규칙",
+  "path": "legacy_memory-flag-의-2-cycle-deprecation-진행-규칙.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/state/cache.py"
+   }
+  ]
+ },
+ {
+  "id": "k-96bd839819dc",
+  "title": "LFU decay cache direct integration — wrap vs full refactor 패턴 (ADR-021)",
+  "path": "lfu-decay-cache-direct-integration-wrap-vs-full-refactor-패턴-adr-021.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/cache_lfu_decay.py"
+   }
+  ]
+ },
+ {
+  "id": "k-d19e39342044",
+  "title": "maturity_matrix.json 의 last_updated in-place 갱신 패턴",
+  "path": "maturity_matrix-json-의-last_updated-in-place-갱신-패턴.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/state/cache.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/state/cache.py"
+   }
+  ]
+ },
+ {
+  "id": "k-1fb2ad6dbbbc",
+  "title": "mavis 데스크탑 글로벌 mcp.json cwd 부재 함정",
+  "path": "mavis-데스크탑-글로벌-mcp-json-cwd-부재-함정.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/mcp_installation_by_harness.md"
+   }
+  ]
+ },
+ {
+  "id": "k-ea5e95150f2e",
+  "title": "MCP Python SDK 1.x↔2.x 호환 — Server handler 등록 분기와 CallToolResult isError 시맨틱",
+  "path": "mcp-python-sdk-1-x-2-x-호환-server-handler-등록-분기와-calltoolresult-iserror-시맨틱.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/server/read_only_mcp_sdk.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9e26372b2e43",
+  "title": "mcp SDK 버전 matrix 정책 — declare/install/exercise 분리",
+  "path": "mcp-sdk-버전-matrix-정책-declare-install-exercise-분리.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/sdk_matrix.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/sdk_matrix.py"
+   }
+  ]
+ },
+ {
+  "id": "k-59f42b22501e",
+  "title": "Memory Update §11 — 도구 사용 계약 + 파싱 규칙 (빈 자리=`-`, state.json=생성물)",
+  "path": "memory-update-11-도구-사용-계약-파싱-규칙-빈-자리-state-json-생성물.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-794c061fb100",
+  "title": "MemoryEntry merge lifecycle — MergeState enum + dry-run/apply (ADR-005 §4)",
+  "path": "memoryentry-merge-lifecycle-mergestate-enum-dry-run-apply-adr-005-4.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/schemas/memory_index.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9d9f1c9ad3b4",
+  "title": "MemoryIndex retrieval telemetry sidecar (v0.13.1+, Phase 13 AC2)",
+  "path": "memoryindex-retrieval-telemetry-sidecar-v0-13-1-phase-13-ac2.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/schemas/memory_index.py"
+   }
+  ]
+ },
+ {
+  "id": "k-728499c9f3c1",
+  "title": "merge-doc-reconcile skill — 병합 후 상태 문서 보수적 재정리 초안 + stage_completion v0.6.5",
+  "path": "merge-doc-reconcile-skill-병합-후-상태-문서-보수적-재정리-초안-stage_completion-v0-6-5.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/merge_doc_reconcile_skill_spec.md"
+   },
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-65cf4b62fa73",
+  "title": "OKF §4.1 hard 3 rule + 우리 wiki lint 양립",
+  "path": "okf-4-1-hard-3-rule-우리-wiki-lint-양립.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/okf_import.py"
+   }
+  ]
+ },
+ {
+  "id": "k-cef4b70378f0",
+  "title": "OKF bundle import 흐름 — staging 과 promote",
+  "path": "okf-bundle-import-흐름-staging-과-promote.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/okf_import.py"
+   }
+  ]
+ },
+ {
+  "id": "k-e46c36125c3e",
+  "title": "OKF v0.1 import 모드 정책 — strict vs loose",
+  "path": "okf-v0-1-import-모드-정책-strict-vs-loose.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/okf_import.py"
+   }
+  ]
+ },
+ {
+  "id": "k-eec2f7b1bdc9",
+  "title": "Optional dependency 의 import target 구분",
+  "path": "optional-dependency-의-import-target-구분.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/optional_deps.py"
+   }
+  ]
+ },
+ {
+  "id": "k-7c6fe3476f26",
+  "title": "Orchestrator 컨텍스트 절약 원칙 §1.2 — 위임 + ask 좁힘 + ai-workflow/ 범위 제외",
+  "path": "orchestrator-컨텍스트-절약-원칙-1-2-위임-ask-좁힘-ai-workflow-범위-제외.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-84981384be49",
+  "title": "Output contract base schema types (workflow_kit.common.contracts.base)",
+  "path": "output-contract-base-schema-types-workflow_kit-common-contracts-base.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/base.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/__init__.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bcb56f7c66db",
+  "title": "PBT-WF 6-rule 컴플라이언스 평가기 (workflow_kit.common.testing)",
+  "path": "pbt-wf-6-rule-컴플라이언스-평가기-workflow_kit-common-testing.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/testing.py"
+   }
+  ]
+ },
+ {
+  "id": "k-6510592bddf5",
+  "title": "Per-strategy cache file operational layer (ADR-024 follow-up)",
+  "path": "per-strategy-cache-file-operational-layer-adr-024-follow-up.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/cache_migration.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/cache_size_compare.py"
+   }
+  ]
+ },
+ {
+  "id": "k-ab6175962cfe",
+  "title": "Per-URL LFU decay score persistence + temporal decay (ADR-021)",
+  "path": "per-url-lfu-decay-score-persistence-temporal-decay-adr-021.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/cache_lfu_decay_persist.py"
+   }
+  ]
+ },
+ {
+  "id": "k-014e8d77d1e3",
+  "title": "Phishing 외부 피드 연합 (PhishTank + OpenPhish, free tier)",
+  "path": "phishing-외부-피드-연합-phishtank-openphish-free-tier.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/phishing_keywords.py"
+   }
+  ]
+ },
+ {
+  "id": "k-9b1f100cdec3",
+  "title": "Phishing 키워드 로드 폴백 체인 (custom → external JSONL → bundled)",
+  "path": "phishing-키워드-로드-폴백-체인-custom-external-jsonl-bundled.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/phishing_keywords.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bbc8f4502603",
+  "title": "plugin update 의 stale registry 갱신 부재 + §7.0.2 uninstall→install 계약",
+  "path": "plugin-update-의-stale-registry-갱신-부재-7-0-2-uninstall-install-계약.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/memory/active/main/session_handoff.md"
+   }
+  ]
+ },
+ {
+  "id": "k-ee22224dbe68",
+  "title": "PURPOSE.md context load helper — v0.9.5 R-A part 2 (workflow_kit.common.purpose_context)",
+  "path": "purpose-md-context-load-helper-v0-9-5-r-a-part-2-workflow_kit-common-purpose_con.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/purpose_context.py"
+   }
+  ]
+ },
+ {
+  "id": "k-71a7f066ff34",
+  "title": "PURPOSE.md ↔ deliverable 정합 자동 검증 (목표 매핑 그래프)",
+  "path": "purpose-md-deliverable-정합-자동-검증-목표-매핑-그래프.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/purpose_graph.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bf58cb8b626a",
+  "title": "PURPOSE.md two-step CoT ingest 패턴 (R-A follow-up cycle 3)",
+  "path": "purpose-md-two-step-cot-ingest-패턴-r-a-follow-up-cycle-3.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/memory/release/v0.11.0/backlog/2026-06-26.md"
+   }
+  ]
+ },
+ {
+  "id": "k-cb9d921d6133",
+  "title": "python_launcher 모듈 — win32→python, 그 외→python3 + payload 해시 안정",
+  "path": "python_launcher-모듈-win32-python-그-외-python3-payload-해시-안정.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/memory/active/main/session_handoff.md"
+   }
+  ]
+ },
+ {
+  "id": "k-ca989284a824",
+  "title": "R-A Trigger v0.9.6 — workflow_kit refresh-purpose dry-run/apply + 30일 window",
+  "path": "r-a-trigger-v0-9-6-workflow_kit-refresh-purpose-dry-run-apply-30일-window.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_skill_catalog.md"
+   }
+  ]
+ },
+ {
+  "id": "k-4411e417d83d",
+  "title": "read-only MCP draft fixture 진입층 — entrypoint + JSON-RPC bridge",
+  "path": "read-only-mcp-draft-fixture-진입층-entrypoint-json-rpc-bridge.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/server/read_only_entrypoint.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/server/read_only_jsonrpc.py"
+   }
+  ]
+ },
+ {
+  "id": "k-7db15b41722c",
+  "title": "Read-Only MCP Transport — paper only / primary role only 적용",
+  "path": "read-only-mcp-transport-paper-only-primary-role-only-적용.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/read_only_mcp_transport_promotion.md"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": null
+   }
+  ]
+ },
+ {
+  "id": "k-91701bd466fb",
+  "title": "Read-only MCP 도구 직접 호출 adapter — invoke_read_only_tool dispatcher",
+  "path": "read-only-mcp-도구-직접-호출-adapter-invoke_read_only_tool-dispatcher.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/server/read_only_tools.py"
+   }
+  ]
+ },
+ {
+  "id": "k-020bbddfd5cb",
+  "title": "RECENT_DONE_ITEMS_CAP 단일 출처 — 린터 재정의 금지",
+  "path": "recent_done_items_cap-단일-출처-린터-재정의-금지.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/linter.py"
+   }
+  ]
+ },
+ {
+  "id": "k-cf6345fb38e8",
+  "title": "Release pipeline status aggregator (workflow_kit.release_status.py) — 6-field 판정 + auto-bump post-step + tag suffix 명시 매칭",
+  "path": "release-pipeline-status-aggregator-workflow_kit-release_status-py-6-field-판정-aut.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/release_status.py"
+   }
+  ]
+ },
+ {
+  "id": "k-965f5b5844b3",
+  "title": "Roadmap → Milestone → WBS 진척 관리 흐름 — SDLC 단계 어휘 + 3게이트 + roadmap_state.json",
+  "path": "roadmap-milestone-wbs-진척-관리-흐름-sdlc-단계-어휘-3게이트-roadmap_state-json.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/roadmap_milestone_wbs_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-79dcaf24fe0b",
+  "title": "Roadmap 정합 검사 — '언급'과 '모순 없음'을 분리",
+  "path": "roadmap-정합-검사-언급-과-모순-없음-을-분리.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/maturity.py"
+   },
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/linter.py"
+   }
+  ]
+ },
+ {
+  "id": "k-4ff40b9fb400",
+  "title": "SEC-AUTH-01~06 auth compliance baseline (workflow_kit.common.auth)",
+  "path": "sec-auth-01-06-auth-compliance-baseline-workflow_kit-common-auth.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/auth.py"
+   }
+  ]
+ },
+ {
+  "id": "k-0c9abbd800f0",
+  "title": "session-start 종료 브랜치 메모리 역방향 점검",
+  "path": "session-start-종료-브랜치-메모리-역방향-점검.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/session-start/scripts/run_session_start.py"
+   }
+  ]
+ },
+ {
+  "id": "k-a0ccf6f6058a",
+  "title": "session_handoff 의 '최근 완료 작업' 섹션 회전 정책 — rotate_handoff_tasks",
+  "path": "session_handoff-의-최근-완료-작업-섹션-회전-정책-rotate_handoff_tasks.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/rotation.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": null
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/rotation.py"
+   }
+  ]
+ },
+ {
+  "id": "k-cb730f8b2e7f",
+  "title": "Skill memory_index retrieval 3-tuple (ADR-005, Phase 3d) — cue exact → BM25 → linked expansion + v0.15.21 auto-activate",
+  "path": "skill-memory_index-retrieval-3-tuple-adr-005-phase-3d-cue-exact-bm25-linked-expa.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/backlog-update/SKILL.md"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/README.md"
+   }
+  ]
+ },
+ {
+  "id": "k-7393a786777a",
+  "title": "smart-context-reader MCP stable output contract — skill_beta_criteria §3.1 6 condition 정합",
+  "path": "smart-context-reader-mcp-stable-output-contract-skill_beta_criteria-3-1-6-condit.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/schemas/smart_context_reader.py"
+   }
+  ]
+ },
+ {
+  "id": "k-add71dd557d6",
+  "title": "stable guarantee 표의 은퇴 행 보존 원칙 — stable 약속의 이력은 지우지 않는다",
+  "path": "stable-guarantee-표의-은퇴-행-보존-원칙-stable-약속의-이력은-지우지-않는다.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": null
+   },
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_release_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-4583ea7f12d8",
+  "title": "Stage gate completion contract — 8-field StageCompletion·2-option 승인·audit 기록",
+  "path": "stage-gate-completion-contract-8-field-stagecompletion-2-option-승인-audit-기록.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_skill_catalog.md"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/stage_gate.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/stage_gate_runtime.py"
+   }
+  ]
+ },
+ {
+  "id": "k-4860db3e498d",
+  "title": "Standard AI Workflow Kit 배포 채널 트리오 (plugin / bootstrap / package)",
+  "path": "standard-ai-workflow-kit-배포-채널-트리오-plugin-bootstrap-package.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_harness_distribution.md"
+   }
+  ]
+ },
+ {
+  "id": "k-488f51f354a5",
+  "title": "standard_ai_workflow의 Project Status Assessment 패턴 — maturity_matrix.json SSOT + 진단 문서 분리",
+  "path": "standard_ai_workflow의-project-status-assessment-패턴-maturity_matrix-json-ssot-진단-.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/project_status_assessment.md"
+   }
+  ]
+ },
+ {
+  "id": "k-b5a839e6819c",
+  "title": "standard_ai_workflow의 Prototype Promotion Scope — 4-tier 승격 기준",
+  "path": "standard_ai_workflow의-prototype-promotion-scope-4-tier-승격-기준.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/prototype_promotion_scope.md"
+   }
+  ]
+ },
+ {
+  "id": "k-1911726136c8",
+  "title": "state.json builder v0.14.0+ aggregate semantics — 5규칙",
+  "path": "state-json-builder-v0-14-0-aggregate-semantics-5규칙.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/state/builder.py"
+   }
+  ]
+ },
+ {
+  "id": "k-1811fcfb8790",
+  "title": "task 본문 라벨의 이중 언어 정책 — TASK_FIELD_LABELS 정본(영어, v1.3.0+) + TASK_FIELD_ALIASES 한국어 호환 + 부분 갱신 시 라인 보존",
+  "path": "task-본문-라벨의-이중-언어-정책-task_field_labels-정본-영어-v1-3-0-task_field_aliases-한국어-호환-부분.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/backlog_update_skill_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-fe95fdf00c7c",
+  "title": "Wiki bootstrap 신규 프로젝트 빈 스켈레톤 — 소스 wiki 데이터 복사 차단",
+  "path": "wiki-bootstrap-신규-프로젝트-빈-스켈레톤-소스-wiki-데이터-복사-차단.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/tests/check_bootstrap.py"
+   }
+  ]
+ },
+ {
+  "id": "k-1831ca885b5d",
+  "title": "Wiki cascade-delete 3-method matching (workflow_kit.common.wiki_cascade)",
+  "path": "wiki-cascade-delete-3-method-matching-workflow_kit-common-wiki_cascade.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/wiki_cascade.py"
+   }
+  ]
+ },
+ {
+  "id": "k-4787caf24aa4",
+  "title": "wiki → OKF 번들 익스포트 (workflow_kit.okf_export)",
+  "path": "wiki-okf-번들-익스포트-workflow_kit-okf_export.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/okf_export.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/okf_export.py"
+   }
+  ]
+ },
+ {
+  "id": "k-a8ee22afa419",
+  "title": "Workflow kit changed-file classification helpers (workflow_kit.common.change_types)",
+  "path": "workflow-kit-changed-file-classification-helpers-workflow_kit-common-change_type.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/change_types.py"
+   }
+  ]
+ },
+ {
+  "id": "k-f96780703ed5",
+  "title": "workflow state docs vs project docs 경계 규칙",
+  "path": "workflow-state-docs-vs-project-docs-경계-규칙.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_state_vs_project_docs.md"
+   }
+  ]
+ },
+ {
+  "id": "k-c41ce4cf6822",
+  "title": "Workflow Update 마이그레이션 규칙 — 데이터 보존 순위와 파일 분류",
+  "path": "workflow-update-마이그레이션-규칙-데이터-보존-순위와-파일-분류.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/core/workflow_update_migration_spec.md"
+   }
+  ]
+ },
+ {
+  "id": "k-edf5a788f09e",
+  "title": "Workflow 하네스 레지스트리 마이그레이션 — HARNESS_DEFINITIONS 는 v0.5.8부터 deprecated, HARNESS_SPECS + HARNESS_FILE_BUILDERS 사용",
+  "path": "workflow-하네스-레지스트리-마이그레이션-harness_definitions-는-v0-5-8부터-deprecated-harness_spec.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/scripts/scaffold_harness.py"
+   }
+  ]
+ },
+ {
+  "id": "k-55ff8a20572d",
+  "title": "workflow_kit.common.contracts.baselines — 7-baseline compliance evaluator dispatcher",
+  "path": "workflow_kit-common-contracts-baselines-7-baseline-compliance-evaluator-dispatch.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/baselines.py"
+   }
+  ]
+ },
+ {
+  "id": "k-5edf7fa65254",
+  "title": "workflow_kit.common.contracts.errors — 툴별 에러 계약 디스패치 (17종 error/error_code/source_context)",
+  "path": "workflow_kit-common-contracts-errors-툴별-에러-계약-디스패치-17종-error-error_code-source_c.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/errors.py"
+   }
+  ]
+ },
+ {
+  "id": "k-0b4ff75b1ef8",
+  "title": "workflow_kit.common.contracts.read_only — read-only 툴 output 계약 8종 (success key + OutputFieldShape)",
+  "path": "workflow_kit-common-contracts-read_only-read-only-툴-output-계약-8종-success-key-out.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/contracts/read_only.py"
+   }
+  ]
+ },
+ {
+  "id": "k-1718c61ad7e9",
+  "title": "workflow_kit.common.output_contracts — Pydantic SSOT + legacy surface derivation",
+  "path": "workflow_kit-common-output_contracts-pydantic-ssot-legacy-surface-derivation.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/output_contracts.py"
+   }
+  ]
+ },
+ {
+  "id": "k-eb688848e13b",
+  "title": "workflow_kit.common.patching — robust SEARCH/REPLACE atomic 적용 + per-block 추적",
+  "path": "workflow_kit-common-patching-robust-search-replace-atomic-적용-per-block-추적.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/patching.py"
+   }
+  ]
+ },
+ {
+  "id": "k-d57f63fddd27",
+  "title": "workflow_kit.common.resiliency — RES-WF-01~08 8-rule compliance evaluator (v0.7.3)",
+  "path": "workflow_kit-common-resiliency-res-wf-01-08-8-rule-compliance-evaluator-v0-7-3.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/resiliency.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/resiliency.py"
+   }
+  ]
+ },
+ {
+  "id": "k-af0eb88e72bf",
+  "title": "workflow_kit.common.runner — subprocess 오케스트레이션 공유 계약",
+  "path": "workflow_kit-common-runner-subprocess-오케스트레이션-공유-계약.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/runner.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/runner.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bd47191206f5",
+  "title": "workflow_kit.common.text — markdown bullet/section/label 파싱 헬퍼",
+  "path": "workflow_kit-common-text-markdown-bullet-section-label-파싱-헬퍼.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/text.py"
+   }
+  ]
+ },
+ {
+  "id": "k-3d3d46982bda",
+  "title": "workflow_kit.common.workflow_state — state.builder+cache 단일 import surface",
+  "path": "workflow_kit-common-workflow_state-state-builder-cache-단일-import-surface.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/workflow_state.py"
+   }
+  ]
+ },
+ {
+  "id": "k-94c60c1a9250",
+  "title": "workflow_kit demo orchestrator — run_demo_workflow.py의 8-스킬 시퀀스 + worker_assignment 표준 셰이프",
+  "path": "workflow_kit-demo-orchestrator-run_demo_workflow-py의-8-스킬-시퀀스-worker_assignment-.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/scripts/run_demo_workflow.py"
+   }
+  ]
+ },
+ {
+  "id": "k-6750c3bc7fdf",
+  "title": "workflow_kit.path_resolver — in-repo path → canonical GitHub URL (ADR-008 mutable + ADR-018 pinned)",
+  "path": "workflow_kit-path_resolver-in-repo-path-canonical-github-url-adr-008-mutable-adr.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/path_resolver.py"
+   }
+  ]
+ },
+ {
+  "id": "k-264abb0969a5",
+  "title": "workflow_kit V-R13 layer 2 commit-level diff — URL host cross-vendor dispatch",
+  "path": "workflow_kit-v-r13-layer-2-commit-level-diff-url-host-cross-vendor-dispatch.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/v_r13_commit_diff.py"
+   }
+  ]
+ },
+ {
+  "id": "k-08ac4b187dc7",
+  "title": "기존 프로젝트 도입 runner — repository_assessment → latest_backlog → session-start → validation-plan → code-index-update 오케스트레이션 (v1.7.0)",
+  "path": "기존-프로젝트-도입-runner-repository_assessment-latest_backlog-session-start-validation-.md",
+  "provenance": [
+   {
+    "commit": "5b9c976edecbbead61968c213a46308b2f3dfaa4",
+    "path": "ai-workflow/core/existing_project_onboarding_contract.md"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/scripts/run_existing_project_onboarding.py"
+   }
+  ]
+ },
+ {
+  "id": "k-4f8925c3e03e",
+  "title": "다중 에이전트 협업 규칙 §10 — 워크스페이스=작업=브랜치=에이전트=1 + push-as-claim",
+  "path": "다중-에이전트-협업-규칙-10-워크스페이스-작업-브랜치-에이전트-1-push-as-claim.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-3078d4559130",
+  "title": "산문 문서 broken link 검사 — 코드 영역 제거 + runtime layer 경로 해석 면제",
+  "path": "산문-문서-broken-link-검사-코드-영역-제거-runtime-layer-경로-해석-면제.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/tests/check_docs.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bbe7fde5d32e",
+  "title": "산문 문서 metadata 검사 — 한국어/영어 양 언어 셋 + markup tolerant + frontmatter/marker 예외",
+  "path": "산문-문서-metadata-검사-한국어-영어-양-언어-셋-markup-tolerant-frontmatter-marker-예외.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/tests/check_docs.py"
+   }
+  ]
+ },
+ {
+  "id": "k-a2d57de9adc7",
+  "title": "서브태스크 parent_delegation_id 검증 규칙",
+  "path": "서브태스크-parent_delegation_id-검증-규칙.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/contract_v1/delegator.py"
+   }
+  ]
+ },
+ {
+  "id": "k-bc8fc96dd617",
+  "title": "세션 종료 순서 §8.1 — 메모리 갱신은 같은 커밋에 (memory → commit → push)",
+  "path": "세션-종료-순서-8-1-메모리-갱신은-같은-커밋에-memory-commit-push.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-16480d3704ec",
+  "title": "실행형 skill 6종 error_code 패턴 — session-start / validation-plan / code-index-update / doc-sync / merge-doc-reconcile / backlog-update",
+  "path": "실행형-skill-6종-error_code-패턴-session-start-validation-plan-code-index-update-doc-s.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/README.md"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/skills/backlog-update/SKILL.md"
+   }
+  ]
+ },
+ {
+  "id": "k-07d0aa373422",
+  "title": "워크플로 SSOT 거버넌스 §7.1 — maturity_matrix.json 단일 출처 + 진입점 자동 생성",
+  "path": "워크플로-ssot-거버넌스-7-1-maturity_matrix-json-단일-출처-진입점-자동-생성.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-f4ca7a3ff55f",
+  "title": "워크플로 자기 적용(self-application) 원칙 §8.4",
+  "path": "워크플로-자기-적용-self-application-원칙-8-4.md",
+  "provenance": [
+   {
+    "commit": "4df5e1ee4c3db07ca67f16965ef21614f06a1605",
+    "path": "ai-workflow/core/global_workflow_standard.md"
+   }
+  ]
+ },
+ {
+  "id": "k-17614cbca9ad",
+  "title": "워크플로우 ID 정규식 정본 단일화 — WORK_ITEM_ID_PATTERN 에서 derive (v1.0.2)",
+  "path": "워크플로우-id-정규식-정본-단일화-work_item_id_pattern-에서-derive-v1-0-2.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/normalize.py"
+   }
+  ]
+ },
+ {
+  "id": "k-3b7aca1131bb",
+  "title": "워크플로우 도입 모드 분기 — 신규 vs 작업 중 프로젝트",
+  "path": "워크플로우-도입-모드-분기-신규-vs-작업-중-프로젝트.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_adoption_entrypoints.md"
+   }
+  ]
+ },
+ {
+  "id": "k-c21554fcd543",
+  "title": "워크플로우 린터의 _load_or_issue 패턴 — 부재/파싱 실패를 issue 로 보고",
+  "path": "워크플로우-린터의-_load_or_issue-패턴-부재-파싱-실패를-issue-로-보고.md",
+  "provenance": [
+   {
+    "commit": "15098666cd1d1c7db798c07618a541964b8e0d75",
+    "path": "ai-workflow/workflow_kit/common/linter.py"
+   },
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/schemas/linter.py"
+   }
+  ]
+ },
+ {
+  "id": "k-fe6f1dc55dc8",
+  "title": "워크플로우 문서 list boundary 파싱 v1.0.2+ — placeholder bullet과 section label",
+  "path": "워크플로우-문서-list-boundary-파싱-v1-0-2-placeholder-bullet과-section-label.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/workflow_writes.py"
+   }
+  ]
+ },
+ {
+  "id": "k-2c6e409f5435",
+  "title": "워크플로우 비침투적 주입 원칙",
+  "path": "워크플로우-비침투적-주입-원칙.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_global_injection_policy.md"
+   }
+  ]
+ },
+ {
+  "id": "k-0f128f3c5c98",
+  "title": "워크플로우 설정 3계층 우선순위 모델 — Harness Global / Shared Workflow / Project Local",
+  "path": "워크플로우-설정-3계층-우선순위-모델-harness-global-shared-workflow-project-local.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_configuration_layers.md"
+   }
+  ]
+ },
+ {
+  "id": "k-dca68721668e",
+  "title": "워크플로우 에이전트 권한 매트릭스 + Worker 분화",
+  "path": "워크플로우-에이전트-권한-매트릭스-worker-분화.md",
+  "provenance": [
+   {
+    "commit": "6c495e61795c18ada9acef399701a0aaf24bd4d1",
+    "path": "ai-workflow/core/workflow_agent_topology.md"
+   }
+  ]
+ },
+ {
+  "id": "k-ae2b2e6a1c33",
+  "title": "워크플로우 위키 ↔ 메모리 양방향 링크 동기화·감사 (bidir_link.py, v0.13.3+ Phase 13 AC4+)",
+  "path": "워크플로우-위키-메모리-양방향-링크-동기화-감사-bidir_link-py-v0-13-3-phase-13-ac4.md",
+  "provenance": [
+   {
+    "commit": "c5145caacddc0c8ff695aa39c799d5859e6f2830",
+    "path": "ai-workflow/workflow_kit/common/state/bidir_link.py"
+   }
+  ]
+ }
+]
