@@ -48,6 +48,18 @@ class Settings(BaseSettings):
             "개념은 한 자리에 모여야 저장소를 넘는 모순이 드러난다."
         ),
     )
+    source_exclude: str = Field(
+        default="",
+        description=(
+            "원천에서 뺄 경로 패턴 (**쉼표로 여럿**, glob). 비어 있으면 아무것도 빼지 "
+            "않는다 — **선언하지 않은 경로는 읽는다**가 기본이다. FR-9 의 설정 파일 "
+            "배제와 별개다: 그쪽은 *무엇이 지식이 될 수 없는가*(상태값)를 코드가 알고, "
+            "이쪽은 *이 저장소에서 무엇이 모 시스템의 것이 아닌가*를 **사람만 안다.** "
+            "메타 계층(세션 인계·백로그)이나 벤더링된 남의 소스가 그렇다 — 읽으면 "
+            "'작업을 어떻게 했는가'가 모 시스템 지식인 척 들어온다. "
+            "뺀 경로는 조용히 사라지지 않고 워커가 건수를 보고한다."
+        ),
+    )
     simulated_source: bool = Field(
         default=False,
         description=(
@@ -275,6 +287,11 @@ class Settings(BaseSettings):
         묻기 때문이다(NFR-1). 목록이 필요한 것은 수집 쪽이다.
         """
         return tuple(u.strip() for u in self.parent_repo_url.split(",") if u.strip())
+
+    @property
+    def source_exclude_patterns(self) -> tuple[str, ...]:
+        """원천에서 뺄 glob 패턴들. 쉼표로 나뉘고 빈 칸은 버린다."""
+        return tuple(x.strip() for x in self.source_exclude.split(",") if x.strip())
 
 
 def load_settings() -> Settings:

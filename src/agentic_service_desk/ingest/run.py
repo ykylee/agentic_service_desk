@@ -15,6 +15,7 @@ llm-wiki 의 운영 모델을 그대로 따른다 (§4).
 
 from __future__ import annotations
 
+import fnmatch
 import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
@@ -101,6 +102,14 @@ class IngestResult:
 
     broken_items: list[str] = field(default_factory=list)
 
+    excluded_paths: list[str] = field(default_factory=list)
+    """선언된 패턴으로 원천에서 뺀 경로 (`ASD_SOURCE_EXCLUDE`).
+
+    **건수만 세지 않는다.** 이 배제는 코드가 아니라 사람이 정한 것이라, 패턴이
+    너무 넓으면 **모 시스템의 진짜 코드가 조용히 빠진다** — 그때 지식베이스에는
+    "없다"는 사실조차 남지 않는다.
+    """
+
     unreadable_paths: list[str] = field(default_factory=list)
     """글자로 읽히지 않아 원천에서 뺀 경로 (zip·이미지 등).
 
@@ -145,6 +154,7 @@ class IngestRun:
         max_chars: int = MAX_CHARS_PER_CALL,
         should_stop: Callable[[], bool] | None = None,
         on_chunk: Callable[[str, int, int], None] | None = None,
+        exclude: Sequence[str] = (),
     ) -> None:
         self._repo = repo
         self._agent = agent
@@ -154,6 +164,7 @@ class IngestRun:
         self._mirrors = list(mirrors)
         self._max_chars = max_chars
         self._on_chunk = on_chunk or (lambda *_: None)
+        self._exclude = tuple(exclude)
 
     def run(self) -> IngestResult:
         self._repo.ensure_initialized()
@@ -238,6 +249,12 @@ class IngestRun:
             return None
 
         changed = mirror.changed_paths_since(cursor)
+        if self._exclude:
+            # **읽기 전에 뺀다.** 읽고 나서 버리면 큰 저장소에서 그 값을 그대로
+            # 치른다 — 배제의 요점이 시간과 오염 둘 다이므로 앞자리가 맞다.
+            kept = [p for p in changed if not _excluded(p, self._exclude)]
+            result.excluded_paths.extend(p for p in changed if p not in set(kept))
+            changed = kept
         commits = mirror.commits_since(cursor)
         messages = [c.full_message for c in commits]
         if len(messages) > MAX_COMMIT_MESSAGES:
@@ -461,6 +478,16 @@ class IngestRun:
         if answer_ids:
             parts.append(f"QnA 답변 {len(answer_ids)}건")
         return ", ".join(parts) or "원천 없음"
+
+
+def _excluded(path: str, patterns: Sequence[str]) -> bool:
+    """이 경로가 선언된 배제 패턴에 걸리는가.
+
+    디렉터리를 가리키는 뜻으로 `ai-workflow/*` 라고 쓰는 것이 자연스러운데
+    `fnmatch` 의 `*` 는 `/` 도 먹으므로 그대로 깊은 경로까지 걸린다. 그 편이
+    사람이 쓴 뜻에 가깝다 — 한 칸만 빼고 싶은 경우는 드물다.
+    """
+    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
 
 def _declared_in(chunk: SourceMaterial) -> dict[str, set[str]]:

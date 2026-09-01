@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import signal
 import time
+from collections import Counter
 from datetime import UTC, datetime
 from types import FrameType
 
@@ -656,6 +657,7 @@ class BatchRunner:
                 # 쳐다본다 — 2026-08-30 에 워커 다섯이 동시에 도는 것으로 드러났다.
                 should_stop=lambda: self._stopping,
                 on_chunk=_note_chunk,
+                exclude=self._cfg.source_exclude_patterns,
             ).run()
         except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] ingest 실패: {exc}")
@@ -1047,6 +1049,16 @@ def _ingest_notes(result) -> list[str]:  # noqa: ANN001
         )
     if result.dropped_config_paths:
         notes.append(f"설정 파일 {len(result.dropped_config_paths)}개를 원천에서 뺐다 (FR-9)")
+    if result.excluded_paths:
+        # **건수와 함께 상위 영역을 보인다.** 숫자만으로는 패턴이 의도한 것보다
+        # 넓게 잡았는지 알 수 없고, 넓게 잡히면 모 시스템의 진짜 코드가 조용히
+        # 빠진다 — 지식베이스에는 "없다"는 사실조차 남지 않는다.
+        areas = Counter(p.split("/")[0] for p in result.excluded_paths)
+        top = ", ".join(f"{a}/ {n}" for a, n in areas.most_common(4))
+        notes.append(
+            f"선언된 패턴으로 원천에서 {len(result.excluded_paths)}개 경로를 뺐다 "
+            f"(ASD_SOURCE_EXCLUDE) — {top}"
+        )
     for path in result.unreadable_paths:
         notes.append(f"글자로 읽히지 않아 원천에서 뺐다 — {path}")
     for dropped in result.dropped_dead_refs:

@@ -41,13 +41,14 @@ def _conn(tmp_path):  # noqa: ANN001, ANN202
     return c
 
 
-def _run(tmp_path, harness, *, mirror=None, conn=None):  # noqa: ANN001, ANN202
+def _run(tmp_path, harness, *, mirror=None, conn=None, exclude=()):  # noqa: ANN001, ANN202
     return IngestRun(
         repo=KnowledgeRepository(tmp_path / "knowledge"),
         agent=IngestAgent(harness),
         conn=conn if conn is not None else _conn(tmp_path),
         output_filter=OutputFilter(frozenset({BOT_ACCOUNT})),
         mirrors=[mirror] if mirror else [],
+        exclude=exclude,
     )
 
 
@@ -250,6 +251,51 @@ class TestSourceIngest:
         assert result.unreadable_paths == ["bundle.zip"]
         assert result.created == 1  # 나머지 원천은 그대로 읽혔다
         assert get_cursor(conn, source_key(mirror.repo_url)) == mirror.head()
+
+    def test_선언된_패턴은_원천에서_빠진다(self, tmp_path) -> None:
+        # 이 배제는 코드가 아니라 사람이 정한다 — 무엇이 모 시스템의 것이 아닌지는
+        # 사람만 안다(벤더링된 남의 소스, 메타 계층).
+        conn = _conn(tmp_path)
+        mirror = self._mirror_with_meta(tmp_path)
+        result = _run(
+            tmp_path,
+            FakeHarness(_item_json("한도 규칙")),
+            mirror=mirror,
+            conn=conn,
+            exclude=("vendor/*",),
+        ).run()
+
+        assert result.excluded_paths == ["vendor/copied.py"]
+        assert result.created == 1  # 남은 원천은 그대로 읽혔다
+
+    def test_배제하지_않으면_다_읽는다(self, tmp_path) -> None:
+        # 기본은 "선언하지 않은 경로는 읽는다" 다. 조용히 빠지는 것이 없어야 한다.
+        result = _run(
+            tmp_path,
+            FakeHarness(_item_json("한도 규칙")),
+            mirror=self._mirror_with_meta(tmp_path),
+            conn=_conn(tmp_path),
+        ).run()
+        assert result.excluded_paths == []
+
+    def _mirror_with_meta(self, tmp_path) -> SourceMirror:
+        origin = tmp_path / "origin-meta"
+        origin.mkdir()
+        subprocess.run(["git", "init", "--quiet"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=origin, check=True)
+        (origin / "limit.py").write_text("LIMIT_BY_GRADE = True\n")
+        (origin / "vendor").mkdir()
+        (origin / "vendor" / "copied.py").write_text("SOMEONE_ELSES = True\n")
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "벤더링된 사본을 넣음"],
+            cwd=origin,
+            check=True,
+        )
+        mirror = SourceMirror(str(origin), tmp_path / "mirror-meta")
+        mirror.ensure_cloned()
+        return mirror
 
     def test_설정_파일이_원천에서_빠진다(self, tmp_path) -> None:
         # FR-9 — 설정값은 굳는 순간 stale 이 된다.
