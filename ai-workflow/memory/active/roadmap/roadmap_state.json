@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "workflow_kit.common.state.roadmap.generate_roadmap_state",
-  "generated_at": "2026-08-31",
+  "generated_at": "2026-09-01",
   "milestones": [
     {
       "id": "M-001",
@@ -681,6 +681,20 @@
       "wbs_ref": "exempt",
       "exempt_reason": "실데이터 검증에서 드러난 결함 수정. 신규 기능이 아니라 기존 4.x 산출물의 정확성 보강이라 WBS leaf 를 새로 세우지 않는다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-01-main-001.md"
+    },
+    {
+      "task_id": "TASK-2026-09-01-main-002",
+      "task_status": "planned",
+      "wbs_ref": "exempt",
+      "exempt_reason": "부트스트랩 완주 후의 품질 판정. 4.2 완주 판정에 딸린 측정이라 WBS leaf 를 새로 세우지 않는다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-01-main-002.md"
+    },
+    {
+      "task_id": "TASK-2026-09-01-main-003",
+      "task_status": "planned",
+      "wbs_ref": "exempt",
+      "exempt_reason": "완주 후 성능 개선. 신규 기능이 아니라 기존 ingest 경로의 소요 단축이라 WBS leaf 를 새로 세우지 않는다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-01-main-003.md"
     }
   ],
   "issues": []

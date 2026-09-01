@@ -36,7 +36,8 @@
     "blocked_items": [],
     "planned_items": [
       "TASK-2026-09-01-main-001",
-      "TASK-2026-09-01-main-002"
+      "TASK-2026-09-01-main-002",
+      "TASK-2026-09-01-main-003"
     ],
     "recent_done_items": [
       "TASK-2026-08-30-main-001 — 워크플로우 킷 v1.7.0 bootstrap 재적용",
@@ -55,7 +56,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-01.md",
-    "task_count": 2,
+    "task_count": 3,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": []
