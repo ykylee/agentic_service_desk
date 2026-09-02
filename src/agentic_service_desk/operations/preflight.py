@@ -69,15 +69,17 @@ def check_live_exposure(cfg, *, binds_socket: bool = False) -> bool:  # noqa: AN
     시스템인지 알 수 없지만(그것은 사람만 안다), **선언과 구성이 서로
     모순된다는 것**은 알 수 있다.
 
-    **(2) 인증 없는 화면 + 루프백 밖 + 실운영.** 이 대시보드에는 인증이 없고
-    승인·게재·모순 해결·국면 전진을 **POST 로 실행한다**. S0 + mock 에서는
-    눌러도 나가지 않지만 실운영에서는 붙을 수 있는 사람이 곧 누를 수 있는
-    사람이다. `binds_socket` 로 나눈 이유는 **배치는 소켓을 열지 않기**
-    때문이다 — 같은 설정을 보고 배치까지 거부하면 고칠 이유가 없는 것을
-    고치게 만든다.
+    **(2) 인증 없는 화면 + 루프백 밖 + 실운영.** 이 대시보드는 승인·게재·모순
+    해결·국면 전진을 **POST 로 실행한다**. S0 + mock 에서는 눌러도 나가지
+    않지만 실운영에서는 붙을 수 있는 사람이 곧 누를 수 있는 사람이다.
+    `binds_socket` 로 나눈 이유는 **배치는 소켓을 열지 않기** 때문이다 —
+    같은 설정을 보고 배치까지 거부하면 고칠 이유가 없는 것을 고치게 만든다.
 
-    통과 조건을 넓게 잡지 않은 것이 요점이다. 인증이 생기면 (2)는 그 사실을
-    보고 풀려야 하며, 그때 이 함수가 고쳐질 자리다.
+    (2)는 `web_password` 를 보고 풀린다 (WBS-5.2.2). **암호를 강제하는 자리가
+    여기인 것이 요점이다** — 앱 쪽은 선언됐을 때만 인증하고, 선언하지 않은 채
+    밖에 여는 것은 기동이 막는다. 루프백 개발 구성에 암호를 강제하면 시험과
+    로컬 실행이 전부 그것을 들고 다녀야 하고, 그 부담은 결국 암호를 코드에
+    적게 만든다.
     """
     if not _live(cfg):
         return True
@@ -90,11 +92,11 @@ def check_live_exposure(cfg, *, binds_socket: bool = False) -> bool:  # noqa: AN
             "시스템이 아니다'라는 뜻이라 NFR-1 의 소스 조건을 푼다. 실운영이면 "
             "지운다"
         )
-    if binds_socket and cfg.web_host not in LOOPBACK:
+    if binds_socket and cfg.web_host not in LOOPBACK and not cfg.web_password:
         problems.append(
-            f"대시보드가 루프백 밖에 열린다({cfg.web_host}:{cfg.web_port}) — "
-            "이 화면에는 인증이 없고 승인·게재를 POST 로 실행한다. "
-            "`ASD_WEB_HOST` 를 지우면 루프백으로 돌아간다"
+            f"대시보드가 인증 없이 루프백 밖에 열린다({cfg.web_host}:{cfg.web_port}) — "
+            "이 화면은 승인·게재를 POST 로 실행한다. `ASD_WEB_PASSWORD` 를 정하거나 "
+            "`ASD_WEB_HOST` 를 지워 루프백으로 돌아간다"
         )
     if not problems:
         return True

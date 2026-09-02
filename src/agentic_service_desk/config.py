@@ -77,6 +77,27 @@ class Settings(BaseSettings):
         ),
     )
     web_port: int = Field(default=8000, description="`asd-web` 포트.")
+    web_password: str = Field(
+        default="",
+        description=(
+            "대시보드 접근 암호 (WBS-5.2.2). **비어 있으면 인증하지 않는다** — "
+            "루프백 개발 구성에 암호를 강제하면 시험과 로컬 실행이 전부 그것을 들고 "
+            "다녀야 하고, 그 부담은 결국 암호를 코드에 적게 만든다.\n\n"
+            "강제하는 자리는 여기가 아니라 **기동**이다 — 실운영 구성에서 화면이 "
+            "루프백 밖에 열리는데 이 값이 비어 있으면 `asd-web` 이 뜨지 않는다 "
+            "(`preflight.check_live_exposure`).\n\n"
+            "**최종 이용자 인증이 아니다.** 그것은 모 시스템의 책임이고 범위 밖이다 "
+            "— 여기서 지키는 것은 승인·게재·국면 전진 버튼이 있는 이 화면뿐이다."
+        ),
+    )
+    web_session_hours: int = Field(
+        default=12,
+        description=(
+            "로그인 세션이 사는 시간. 발급 시각이 **서명 안에** 들어가 만료를 뒤로 "
+            "미룰 수 없다. 기본 12시간은 1인 겸업의 하루 한 번 로그인을 전제한 값이고, "
+            "실운영에서 다시 볼 값이다."
+        ),
+    )
     retired_repo_url: str = Field(
         default="",
         description=(

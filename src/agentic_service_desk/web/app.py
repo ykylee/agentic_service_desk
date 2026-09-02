@@ -26,7 +26,7 @@ from agentic_service_desk.content import production as content_production
 from agentic_service_desk.content import publication as content_publication
 from agentic_service_desk.content import review as content_review
 from agentic_service_desk.content import store as content_store
-from agentic_service_desk.web import metrics
+from agentic_service_desk.web import auth, metrics
 from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
@@ -87,7 +87,58 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def shell() -> dict:
         """모든 화면이 함께 쓰는 것 — 켜진 단계와 그 단계의 대기열."""
-        return {"stage": cfg.stage, "queues": queues_for_stage(cfg.stage)}
+        return {
+            "stage": cfg.stage,
+            "queues": queues_for_stage(cfg.stage),
+            # 인증을 켜지 않았으면 "나간다"를 보여 줄 이유가 없다 — 나갈 곳이 없다.
+            "authenticated": bool(cfg.web_password),
+        }
+
+    # **암호가 선언됐을 때만 건다** (WBS-5.2.2). 선언하지 않은 구성에 인증을
+    # 강제하는 자리는 여기가 아니라 기동이다 (`preflight.check_live_exposure`).
+    if cfg.web_password:
+        app.add_middleware(
+            auth.RequireLogin,
+            password=cfg.web_password,
+            ttl_hours=cfg.web_session_hours,
+        )
+
+    @app.get("/login")
+    def login_form(request: Request, next: str = "/"):  # noqa: ANN201, A002
+        return TEMPLATES.TemplateResponse(
+            request, "login.html", shell() | {"next": next}
+        )
+
+    @app.post("/login")
+    def login_submit(  # noqa: ANN201
+        request: Request, password: str = Form(""), next: str = Form("/")  # noqa: A002
+    ):
+        """암호가 맞으면 세션을 발급한다.
+
+        **`next` 를 그대로 믿지 않는다.** 우리 화면 안의 절대 경로만 받는다 —
+        로그인 뒤에 남의 주소로 보내는 문을 열어 줄 이유가 없다.
+        """
+        if not auth.matches(password, cfg.web_password):
+            return TEMPLATES.TemplateResponse(
+                request,
+                "login.html",
+                shell() | {"next": next, "error": "암호가 맞지 않는다"},
+                status_code=401,
+            )
+        target = next if next.startswith("/") and not next.startswith("//") else "/"
+        response = RedirectResponse(target, status_code=303)
+        auth.set_cookie(
+            response,
+            auth.issue(cfg.web_password),
+            ttl_hours=cfg.web_session_hours,
+        )
+        return response
+
+    @app.post("/logout")
+    def logout():  # noqa: ANN201
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(auth.COOKIE)
+        return response
 
     @app.get("/health")
     def health() -> dict[str, str]:

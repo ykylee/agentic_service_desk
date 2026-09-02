@@ -629,9 +629,9 @@
       "sdlc_phase": "stabilization",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.08333333333333333,
+      "progress": 0.16666666666666666,
       "total_leaves": 12,
-      "done_leaves": 1,
+      "done_leaves": 2,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -674,10 +674,10 @@
         {
           "id": "WBS-5.2",
           "title": "접근 제어",
-          "derived_status": "in_progress",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 2,
-          "done_leaves": 1,
+          "done_leaves": 2,
           "children": [
             {
               "id": "WBS-5.2.1",
@@ -693,10 +693,12 @@
             {
               "id": "WBS-5.2.2",
               "title": "대시보드 인증",
-              "derived_status": "planned",
-              "linked_task_ids": [],
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-09-02-main-006"
+              ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

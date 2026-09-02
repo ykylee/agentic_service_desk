@@ -69,6 +69,15 @@ class TestUnauthenticatedScreen:
         cfg = _settings(tmp_path, parent_adapter="http", web_host="100.119.181.116")
         assert check_live_exposure(cfg)
 
+    def test_암호를_정하면_루프백_밖이어도_기동한다(self, tmp_path) -> None:
+        # (2)가 푸는 조건은 **인증의 존재**다 (WBS-5.2.2). 암호를 강제하는 자리는
+        # 앱이 아니라 여기이므로, 여기서 풀리지 않으면 인증을 넣어도 못 뜬다.
+        cfg = _settings(
+            tmp_path, parent_adapter="http", web_host="100.119.181.116",
+            web_password="비밀",
+        )
+        assert check_live_exposure(cfg, binds_socket=True)
+
     def test_0000_은_루프백이_아니다(self, tmp_path) -> None:
         # 이름과 달리 '내가 가진 모든 인터페이스'다.
         cfg = _settings(tmp_path, parent_adapter="http", web_host="0.0.0.0")
