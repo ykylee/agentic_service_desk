@@ -46,3 +46,4 @@ var/
 
 # 워커 로그 백업 — *.log 규칙을 비껴간다
 var-worker.log*
+var-web.log*

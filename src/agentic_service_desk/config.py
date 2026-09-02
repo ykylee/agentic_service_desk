@@ -48,6 +48,18 @@ class Settings(BaseSettings):
             "개념은 한 자리에 모여야 저장소를 넘는 모순이 드러난다."
         ),
     )
+    web_host: str = Field(
+        default="127.0.0.1",
+        description=(
+            "`asd-web` 이 묶일 주소. **기본은 루프백이다** — 대시보드에는 인증이 "
+            "없고 승인·게재·해결 표시를 **POST 로 실행하는 화면**이라, 기본값이 "
+            "넓으면 붙는 순간 누구나 그 버튼을 누를 수 있다.\n\n"
+            "넓히려면 **가능한 한 좁게** 넓힌다 — 사설망 주소 하나를 적는 것이 "
+            "`0.0.0.0` 보다 낫다. 후자는 이름과 달리 '내가 가진 모든 인터페이스'라, "
+            "카페 와이파이에 붙는 순간 그 랜에도 열린다."
+        ),
+    )
+    web_port: int = Field(default=8000, description="`asd-web` 포트.")
     retired_repo_url: str = Field(
         default="",
         description=(

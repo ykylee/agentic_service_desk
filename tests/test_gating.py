@@ -576,3 +576,28 @@ class TestQ2ShowsWhy:
         assert d.gate_signals == ("근거가 1개 이하", "새로운 유형의 질문이다")
         assert "게재 판정이 잡은 것" in d.look_here_first
         conn.close()
+
+
+class TestDashboardBindsToLoopbackByDefault:
+    """대시보드에는 인증이 없다 — 기본값이 넓으면 붙는 순간 누구나 누른다.
+
+    읽기 전용 화면이 아니다: 승인(`/queues/Q2/{id}/decide`) · 게재
+    (`/queues/Q3/{id}/publish`) · 모순 해결(`/queues/Q4/{id}/resolve`) ·
+    국면 전진(`/phase/advance`) 이 전부 POST 다. **붙을 수 있는 사람은 곧
+    누를 수 있는 사람이다.**
+    """
+
+    def test_기본은_루프백이다(self) -> None:
+        from agentic_service_desk.config import Settings
+
+        # `_env_file=None` 이 요점이다. `Settings()` 는 `.env` 를 읽으므로
+        # 그대로 부르면 **개발자 기계의 설정이 기본값 행세를 한다** — 실제로
+        # 이 시험을 처음 썼을 때 로컬 `.env` 의 tailnet 주소가 잡혔다.
+        cfg = Settings(_env_file=None)
+        assert cfg.web_host == "127.0.0.1"
+        assert cfg.web_port == 8000
+
+    def test_넓히는_것은_선언해야_된다(self) -> None:
+        from agentic_service_desk.config import Settings
+
+        assert Settings(web_host="100.64.0.1").web_host == "100.64.0.1"
