@@ -133,7 +133,8 @@ class TestOneRepositoryFailingDoesNotRewindOthers:
 
 class TestKnowledgeBaseStaysOne:
     def test_두_저장소가_한_커밋으로_들어온다(self, tmp_path) -> None:
-        # 1 회 ingest = 1 커밋 (FR-5). 저장소 수만큼 커밋이 늘어나지 않는다.
+        # 커밋은 묶음 단위지만 (FR-5, 2026-09-03 개정) **저장소 수만큼 늘어나지는
+        # 않는다** — 묶음이 하나면 커밋도 하나다.
         conn = _conn(tmp_path)
         result = _run(
             tmp_path, FakeHarness(_item("등급"), _item("라우팅")), _mirrors(tmp_path), conn

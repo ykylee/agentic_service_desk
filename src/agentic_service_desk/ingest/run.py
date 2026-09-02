@@ -5,7 +5,7 @@ llm-wiki 의 운영 모델을 그대로 따른다 (§4).
     1. 원천 읽기 — 변경된 소스 범위와 그 커밋 메시지, 또는 신규 QnA 묶음
     2. 대상 항목 식별 — 새로 만들 것과 갱신할 것
     3. 다중 항목 갱신
-    4. 로그 적재 — `log.md` 에 한 줄, **1 회 ingest = 1 커밋**
+    4. 로그 적재 — `log.md` 에 **런마다 한 줄**, 커밋은 **묶음마다** (FR-5)
 
 순서에 걸린 것이 하나 있다. **진행 표시는 커밋이 끝난 뒤에 옮긴다.** 먼저 옮기면
 중단됐을 때 그 구간을 건너뛰고, 그러면 지식에 구멍이 생기는데 아무도 알아채지
@@ -20,6 +20,7 @@ import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from pathlib import Path
 
 from agentic_service_desk.ingest.agent import (
     AgentOutputError,
@@ -141,7 +142,20 @@ class IngestResult:
 
 
 class IngestRun:
-    """원천 → 지식. 한 번 돌면 커밋 하나가 생긴다."""
+    """원천 → 지식.
+
+    **커밋은 묶음마다 남긴다** (WBS-5.6.1). 예전에는 런 끝에 한 번이었는데, 그러면
+    긴 런 도중 **디스크와 커밋이 계속 어긋난다** — 질의는 작업 트리를 읽어 새 항목을
+    바로 보지만 게재는 근거를 *커밋* 에 고정하므로(`pin()`), 그 사이에는 답변이
+    하나도 나가지 못한다. 2026-09-03 실측에서 그 창이 **4.96시간**이었다.
+
+    묶음마다 커밋하면 어긋남이 최대 한 묶음(중앙값 약 2분)이 된다. 대가는 이력이
+    길어지는 것인데, **근거 버전 고정의 관점에서는 오히려 정밀해진다** — 답변이
+    더 좁은 시점에 묶인다.
+
+    로그(`log.md`)는 여전히 런 단위다 — "1 ingest = 1 항목"(llm-wiki)은 *무엇을 한
+    런인가*의 기록이지 커밋의 단위가 아니다.
+    """
 
     def __init__(
         self,
@@ -308,6 +322,7 @@ class IngestRun:
                 result.stopped = True
                 return None
             self._on_chunk(mirror.repo_url, done, len(chunks))
+            before = (result.created, result.updated)
             try:
                 proposals = self._agent.from_source(chunk, index)
             except (AgentOutputError, RuntimeError) as exc:
@@ -330,7 +345,31 @@ class IngestRun:
                     index,
                     result,
                 )
+            # **묶음 경계가 커밋 경계다.** 여기서 남기지 않으면 다음 묶음이 도는
+            # 동안 방금 지은 항목이 디스크에만 있고, 그 상태로는 게재가 근거를
+            # 고정할 수 없다 (`pin()` 은 커밋에 실재하는 것만 받는다).
+            self._commit_chunk(
+                mirror, done, len(chunks),
+                result.created - before[0], result.updated - before[1],
+            )
         return None if len(result.failures) > failures_before else head
+
+    def _commit_chunk(
+        self, mirror: SourceMirror, done: int, total: int, created: int, updated: int
+    ) -> None:
+        """묶음 하나의 결과를 커밋한다 (WBS-5.6.1).
+
+        **진행을 메시지에 적는다.** 묶음마다 커밋하면 중간에 죽은 런의 결과도
+        이력에 남는데, `43/116` 이 있으면 마지막 ingest 커밋만 보고 완주 여부를
+        가릴 수 있다. 없으면 "다 읽은 것"과 "읽다 만 것"이 이력에서 같아 보인다.
+
+        아무것도 바뀌지 않았으면 `commit()` 이 알아서 지나간다 — 빈 커밋을 만들지
+        않는 규칙은 그대로다.
+        """
+        if not (created or updated):
+            return
+        name = Path(mirror.repo_url.rstrip("/")).name
+        self._repo.commit(f"ingest: {name} {done}/{total} — 신규 {created} · 갱신 {updated}")
 
     def _with_live_refs(
         self,

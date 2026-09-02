@@ -1,6 +1,10 @@
 """지식베이스 저장소 — 파일 + git (D12, FR-5).
 
-**1 회 ingest = 1 커밋** 이다 (llm-wiki 운영 모델, O30). 커밋 하나가 "이 원천을 읽고
+**커밋은 묶음 단위**다 (FR-5, 2026-09-03 개정). 예전에는 런 하나가 커밋 하나였는데,
+그러면 긴 런 도중 게재가 근거를 고정하지 못한다 — 그 창이 실측에서 4.96시간이었다.
+"이 원천을 읽고 이만큼 알게 됐다"를 한 덩어리로 남기는 몫은 `log.md` 의 한 줄이 진다.
+
+커밋 하나가 "이 원천을 읽고
 지식이 이만큼 바뀌었다"를 통째로 담으므로, 나중에 **어느 커밋이 어느 지식을 만들었는지**
 되짚을 수 있다. 항목마다 커밋하면 그 대응이 흩어진다.
 
@@ -24,7 +28,7 @@ from agentic_service_desk.knowledge.human_edit import (
     verify_edit,
 )
 from agentic_service_desk.knowledge.item import KnowledgeItem
-from agentic_service_desk.knowledge.layout import ensure_bundle, is_reserved
+from agentic_service_desk.knowledge.layout import TMP_SUFFIX, ensure_bundle, is_reserved
 from agentic_service_desk.knowledge.serialize import (
     MalformedItem,
     from_markdown,
@@ -81,7 +85,22 @@ class KnowledgeRepository:
             # 남지 않는 상태가 가장 나쁘다.
             self._git("config", "user.name", "agentic-service-desk")
             self._git("config", "user.email", "svc-agentic-desk@localhost")
+        self._ensure_gitignore()
         self.install_hook()
+
+    def _ensure_gitignore(self) -> None:
+        """임시 파일이 이력에 들어가지 않게 한다 (WBS-5.6.1).
+
+        `write_item` 은 옆에 쓰고 `os.replace` 로 바꿔 끼우므로 임시 파일이 사는
+        시간은 순간이다. 그런데 **그 순간에 죽으면 남고**, `commit()` 이
+        `git add -A` 라 다음 커밋이 그것까지 담는다. 한 줄로 막는다.
+        """
+        path = self._root / ".gitignore"
+        line = f"*{TMP_SUFFIX}\n"
+        if not path.exists():
+            path.write_text(line, encoding="utf-8")
+        elif line not in path.read_text(encoding="utf-8"):
+            path.write_text(path.read_text(encoding="utf-8").rstrip("\n") + "\n" + line, "utf-8")
 
     def commit(self, message: str) -> str | None:
         """바뀐 것을 **한 커밋으로** 남긴다. 바뀐 것이 없으면 `None`.

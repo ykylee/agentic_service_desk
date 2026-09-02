@@ -14,6 +14,18 @@ from pathlib import Path
 
 RESERVED_FILENAMES = frozenset({"index.md", "log.md"})
 
+TMP_SUFFIX = ".part"
+"""항목을 원자적으로 쓸 때 거치는 임시 파일의 접미사 (WBS-5.6.1).
+
+**`*.md` 에 걸리지 않는 것이 요점이다** — `scan()` 이 `rglob("*.md")` 로 훑으므로
+`x.md.part` 는 지식 항목으로 읽히지 않는다. 쓰다 만 파일이 항목으로 잡히면
+`MalformedItem` 이 되어 없는 고장이 대기열에 오른다.
+
+한 곳에 두는 이유는 `.gitignore` 도 같은 값을 알아야 하기 때문이다 — 죽는
+순간이 나쁘면 임시 파일이 남는데, `commit()` 이 `git add -A` 라 그것까지
+이력에 들어간다.
+"""
+
 
 def ensure_bundle(root: Path) -> None:
     """번들 뼈대를 만든다. 이미 있으면 건드리지 않는다."""

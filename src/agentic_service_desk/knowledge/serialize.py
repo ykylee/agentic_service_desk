@@ -11,11 +11,14 @@
 
 from __future__ import annotations
 
+import os
+
 import re
 from pathlib import Path
 
 import yaml
 
+from agentic_service_desk.knowledge.layout import TMP_SUFFIX
 from agentic_service_desk.knowledge.item import (
     Invalidation,
     InvalidationKind,
@@ -95,8 +98,21 @@ def read_item(path: Path) -> KnowledgeItem:
 
 
 def write_item(path: Path, item: KnowledgeItem) -> None:
+    """항목을 **원자적으로** 쓴다 (WBS-5.6.1).
+
+    같은 파일을 읽는 쪽이 늘 있다 — 질의는 `scan()` 으로 작업 트리를 매번 통째로
+    읽고, ingest 는 지식을 짓는 동안 계속 쓴다. `write_text` 는 자리에 바로 쓰므로
+    그 사이에 읽으면 **쓰다 만 내용**이 잡혀 `MalformedItem` 이 되고, 그것이
+    `broken_files` 로 세어져 없는 고장이 대기열에 오른다.
+
+    같은 디렉터리에 쓰고 `os.replace` 로 바꿔 끼운다 — 같은 파일 시스템이라야
+    원자적이므로 임시 파일을 옆에 둔다. 읽는 쪽은 **옛 내용이나 새 내용 중
+    하나**를 보고 그 중간은 보지 않는다.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(to_markdown(item), encoding="utf-8")
+    tmp = path.with_name(path.name + TMP_SUFFIX)
+    tmp.write_text(to_markdown(item), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def slugify(title: str) -> str:

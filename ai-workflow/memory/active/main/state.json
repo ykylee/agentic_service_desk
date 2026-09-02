@@ -29,13 +29,12 @@
   "session": {
     "current_baseline": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
     "current_axis": "**M-001~M-004 완료. 구현 40 leaf 전부 done — S0~S5 와 운영 부가 넷까지.** 다음 마일스톤은 아직 선언되지 않았다.",
-    "current_focus": "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기",
+    "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
-    "planned_items": [
-      "TASK-2026-09-02-main-009"
-    ],
+    "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기",
       "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
       "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
@@ -44,8 +43,7 @@
       "TASK-2026-09-02-main-003 — M-005 를 세우고 남은 결정을 기록한다",
       "TASK-2026-09-02-main-002 — 답변 경로를 실지식베이스로 태운다 — 조회 오탐부터",
       "TASK-2026-09-02-main-001 — 워크플로우 킷 v1.8.0 bootstrap 재적용",
-      "TASK-2026-09-01-main-003 — ingest 묶음당 소요를 줄인다 — 재시도·사고블록·색인",
-      "TASK-2026-09-01-main-002 — kit 출처 지식을 어떻게 할 것인가 (원래 제목: 두 미러가 같은 kit 을 두 번 지식으로 만드는지 판정한다)"
+      "TASK-2026-09-01-main-003 — ingest 묶음당 소요를 줄인다 — 재시도·사고블록·색인"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
@@ -63,7 +61,8 @@
       "TASK-2026-09-02-main-005 — 승격 경로 A 라이브 — 등록에서 지식 항목까지",
       "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
-      "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다"
+      "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
+      "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기"
     ]
   },
   "next_documents": [

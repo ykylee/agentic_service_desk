@@ -301,7 +301,12 @@ class Dashboard:
         return status
 
     def _recent_ingests(self, limit: int = 5) -> list[tuple[str, str]]:
-        """지식 저장소의 최근 커밋. **1 ingest = 1 커밋이라 이것이 곧 이력이다.**"""
+        """지식 저장소의 최근 커밋.
+
+        **커밋은 묶음 단위다** (FR-5, 2026-09-03 개정) — 한 번의 ingest 가 커밋을
+        여럿 남기므로 이 목록은 런이 아니라 **묶음의 이력**이다. 런 단위로 무엇을
+        했는지는 `log.md` 가 진다.
+        """
         if not (self._repo.root / ".git").exists():
             return []
         result = subprocess.run(  # noqa: S603

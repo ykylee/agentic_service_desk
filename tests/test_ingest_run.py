@@ -2,7 +2,8 @@
 
 여기서 지키는 것은 넷이다.
 
-    1. **1 회 ingest = 1 커밋** — 항목이 몇 개 바뀌든 커밋은 하나다
+    1. **커밋은 묶음 단위** (FR-5, 2026-09-03 개정) — 긴 런 도중에도 게재가 근거를
+       고정할 수 있어야 한다. 원천이 없는 QnA 런은 여전히 커밋 하나다
     2. **진행 표시는 커밋 뒤에** — 먼저 옮기면 중단 시 지식에 구멍이 생긴다
     3. **QnA 원천은 산출물 필터를 지나서만** 온다 (NFR-4)
     4. **사람이 고친 항목을 덮어쓰지 않는다** (D38)
@@ -389,3 +390,148 @@ class TestChunking:
         chunks = _chunks(material, max_chars=150)
         assert len(chunks) == 1
         assert chunks[0].messages == ("왜 지웠는가",)
+
+
+class TestChunkIsCommitBoundary:
+    """묶음마다 커밋한다 (WBS-5.6.1).
+
+    예전에는 런 끝에 한 번이었다. 그러면 긴 런 도중 **디스크와 커밋이 계속
+    어긋난다** — 질의는 작업 트리를 읽어 새 항목을 바로 보지만 게재는 근거를
+    *커밋* 에 고정하므로(`pin()`), 그 사이에는 답변이 하나도 나가지 못한다.
+    2026-09-03 실측에서 그 창이 4.96시간이었다.
+    """
+
+    def _mirror(self, tmp_path, files: dict[str, str]) -> SourceMirror:
+        origin = tmp_path / "origin-chunks"
+        origin.mkdir()
+        subprocess.run(["git", "init", "--quiet"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=origin, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=origin, check=True)
+        for name, body in files.items():
+            (origin / name).write_text(body)
+        subprocess.run(["git", "add", "-A"], cwd=origin, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "첫 커밋"], cwd=origin, check=True)
+        mirror = SourceMirror(str(origin), tmp_path / "mirror-chunks")
+        mirror.ensure_cloned()
+        return mirror
+
+    def _run(self, tmp_path, harness, mirror, *, max_chars: int):  # noqa: ANN001, ANN202
+        return IngestRun(
+            repo=KnowledgeRepository(tmp_path / "knowledge"),
+            agent=IngestAgent(harness),
+            conn=_conn(tmp_path),
+            output_filter=OutputFilter(frozenset({BOT_ACCOUNT})),
+            mirrors=[mirror],
+            max_chars=max_chars,
+        )
+
+    def _log(self, tmp_path) -> list[str]:
+        out = subprocess.run(
+            ["git", "log", "--format=%s"],
+            cwd=tmp_path / "knowledge", capture_output=True, text=True, check=True,
+        ).stdout
+        return out.strip().splitlines()
+
+    def test_묶음마다_커밋한다(self, tmp_path) -> None:
+        mirror = self._mirror(tmp_path, {"a.py": "A = 1\n", "b.py": "B = 2\n"})
+        harness = FakeHarness(_item_json("개념 하나"), _item_json("개념 둘"))
+
+        result = self._run(tmp_path, harness, mirror, max_chars=1).run()
+
+        assert result.created == 2
+        # 묶음 둘 + 런 끝의 로그 커밋
+        subjects = self._log(tmp_path)
+        assert sum(1 for s in subjects if "1/2" in s or "2/2" in s) == 2
+
+    def test_진행이_메시지에_남는다(self, tmp_path) -> None:
+        # 중간에 죽은 런의 결과도 이력에 남는다. `1/2` 가 있어야 마지막 ingest
+        # 커밋만 보고 **완주 여부를 가릴 수 있다.**
+        mirror = self._mirror(tmp_path, {"a.py": "A = 1\n", "b.py": "B = 2\n"})
+        harness = FakeHarness(_item_json("개념 하나"), _item_json("개념 둘"))
+
+        self._run(tmp_path, harness, mirror, max_chars=1).run()
+
+        subjects = " ".join(self._log(tmp_path))
+        assert "origin-chunks 1/2" in subjects
+        assert "origin-chunks 2/2" in subjects
+        assert "신규 1 · 갱신 0" in subjects
+
+    def test_런_도중에도_근거를_고정할_수_있다(self, tmp_path) -> None:
+        """**이 시험이 이 변경의 이유다.**
+
+        두 번째 묶음이 도는 시점에 첫 묶음의 항목이 이미 **커밋에** 있어야 한다.
+        없으면 그 사이에 온 질문은 근거를 고정하지 못해 게재가 거부된다.
+        """
+        mirror = self._mirror(tmp_path, {"a.py": "A = 1\n", "b.py": "B = 2\n"})
+        repo = KnowledgeRepository(tmp_path / "knowledge")
+        seen: list[list[str]] = []
+
+        class Watching(IngestAgent):
+            def from_source(self, material, index):  # noqa: ANN001, ANN202
+                # 지금 **커밋에** 무엇이 들어 있는가 — 디스크가 아니라.
+                # `core.quotepath=false` 가 없으면 git 이 한글 경로를 따옴표로
+                # 감싸 이스케이프해 돌려준다 — 경로 비교가 조용히 어긋난다.
+                out = subprocess.run(
+                    ["git", "-c", "core.quotepath=false",
+                     "ls-tree", "-r", "--name-only", "HEAD"],
+                    cwd=repo.root, capture_output=True, text=True,
+                )
+                seen.append(out.stdout.split())
+                return super().from_source(material, index)
+
+        harness = FakeHarness(_item_json("개념 하나"), _item_json("개념 둘"))
+        IngestRun(
+            repo=repo,
+            agent=Watching(harness),
+            conn=_conn(tmp_path),
+            output_filter=OutputFilter(frozenset({BOT_ACCOUNT})),
+            mirrors=[mirror],
+            max_chars=1,
+        ).run()
+
+        assert len(seen) == 2
+        # 첫 묶음이 볼 때는 아직 아무 항목도 없다
+        assert not [p for p in seen[0] if p.startswith("concepts/")]
+        # 두 번째 묶음이 볼 때는 첫 항목이 **이미 커밋돼 있다**
+        assert [p for p in seen[1] if p.startswith("concepts/")]
+
+    def test_아무것도_못_낸_묶음은_빈_커밋을_만들지_않는다(self, tmp_path) -> None:
+        mirror = self._mirror(tmp_path, {"a.py": "A = 1\n", "b.py": "B = 2\n"})
+        # 첫 묶음만 항목을 내고 둘째는 빈손이다.
+        harness = FakeHarness(_item_json("개념 하나"), '{"items": []}')
+
+        self._run(tmp_path, harness, mirror, max_chars=1).run()
+
+        subjects = " ".join(self._log(tmp_path))
+        assert "1/2" in subjects
+        assert "2/2" not in subjects
+
+
+class TestAtomicWrite:
+    """항목을 쓰는 중에 읽어도 쓰다 만 것이 잡히지 않는다 (WBS-5.6.1)."""
+
+    def test_임시_파일은_지식_항목으로_읽히지_않는다(self, tmp_path) -> None:
+        # `scan()` 이 `rglob("*.md")` 라 `.md.part` 는 걸리지 않는다 — 걸리면
+        # `MalformedItem` 이 되어 **없는 고장이 대기열에 오른다.**
+        repo = KnowledgeRepository(tmp_path / "knowledge")
+        repo.ensure_initialized()
+        (repo.root / "concepts").mkdir(parents=True, exist_ok=True)
+        (repo.root / "concepts" / "쓰다-만-것.md.part").write_text("---\n반쪽", encoding="utf-8")
+
+        items, broken = repo.scan()
+        assert items == []
+        assert broken == []
+
+    def test_임시_파일은_이력에_들어가지_않는다(self, tmp_path) -> None:
+        # 바꿔 끼우기 직전에 죽으면 남는다. `commit()` 이 `git add -A` 라
+        # 막아 두지 않으면 다음 커밋이 그것까지 담는다.
+        repo = KnowledgeRepository(tmp_path / "knowledge")
+        repo.ensure_initialized()
+        (repo.root / "concepts").mkdir(parents=True, exist_ok=True)
+        (repo.root / "concepts" / "남은-것.md.part").write_text("반쪽", encoding="utf-8")
+
+        repo.commit("임시 파일이 들어가는지 본다")
+        tracked = subprocess.run(
+            ["git", "ls-files"], cwd=repo.root, capture_output=True, text=True, check=True
+        ).stdout
+        assert ".part" not in tracked

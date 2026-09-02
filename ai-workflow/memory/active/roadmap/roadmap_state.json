@@ -629,9 +629,9 @@
       "sdlc_phase": "stabilization",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.15384615384615385,
+      "progress": 0.23076923076923078,
       "total_leaves": 13,
-      "done_leaves": 2,
+      "done_leaves": 3,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -771,20 +771,20 @@
         {
           "id": "WBS-5.6",
           "title": "갱신과 질의의 공존",
-          "derived_status": "planned",
+          "derived_status": "done",
           "linked_task_ids": [],
           "total_leaves": 1,
-          "done_leaves": 0,
+          "done_leaves": 1,
           "children": [
             {
               "id": "WBS-5.6.1",
               "title": "묶음 단위 커밋과 원자적 쓰기",
-              "derived_status": "planned",
+              "derived_status": "done",
               "linked_task_ids": [
                 "TASK-2026-09-02-main-009"
               ],
               "total_leaves": 1,
-              "done_leaves": 0,
+              "done_leaves": 1,
               "children": []
             }
           ]

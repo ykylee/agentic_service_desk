@@ -114,7 +114,7 @@ class TestKnowledgeStatus:
         assert (s.from_source, s.from_qna) == (1, 1)
 
     def test_최근_ingest_이력을_보여준다(self, tmp_path) -> None:
-        # 1 ingest = 1 커밋이라 지식 저장소의 커밋이 곧 이력이다.
+        # 커밋이 곧 이력이다. 단위는 묶음이다 (FR-5, 2026-09-03 개정).
         repo, conn = _repo(tmp_path), _conn(tmp_path)
         _item(repo)
         repo.commit("ingest: 신규 1 · 갱신 0")
