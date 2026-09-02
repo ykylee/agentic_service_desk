@@ -509,6 +509,20 @@ def _chunks(material: SourceMaterial, max_chars: int) -> list[SourceMaterial]:
 
     **파일을 쪼개지 않는다.** 파일 하나가 한도를 넘으면 그 파일만 담은 묶음이 된다 —
     반쪽짜리 코드에서 뽑은 개념은 틀리기 쉬운데, 틀렸다는 것이 드러나지 않는다.
+
+    **커밋 메시지도 나눠 싣는다.** 예전에는 같은 메시지 묶음이 모든 묶음에 통째로
+    실렸다. 2026-09-02 실측: 묶음 하나의 프롬프트 74,694자 중 메시지가 40,410자
+    (54%)로 **원천 파일(20,170자)의 두 배**였고, 116묶음이면 같은 것을 4.6M자
+    다시 보내는 셈이었다.
+
+    메시지는 **맥락이 아니라 원천이다** (D16, §2.2.1) — "왜 그렇게 정했는가"의
+    1차 출처라 그 자체가 개념이 된다. 원천이라면 **한 번 읽히면 족하다.** 파일을
+    나눠 싣듯 메시지도 나눠 싣는 것이 같은 규칙의 적용이고, 그래야 전부가 꼭
+    한 번씩 읽힌다.
+
+    대가는 **짝이 어긋난다**는 것이다 — 어떤 묶음은 A 영역 코드와 B 영역 메시지를
+    함께 보게 된다. 다만 메시지는 저장소 전체를 걸치고 묶음은 파일 일부라, 통째로
+    실을 때에도 대부분은 이미 어긋나 있었다.
     """
     if not material.files:
         return [material]
@@ -525,6 +539,28 @@ def _chunks(material: SourceMaterial, max_chars: int) -> list[SourceMaterial]:
         size += cost
     if current:
         out.append(_with_files(material, current))
+    return _spread_messages(out, material.messages)
+
+
+def _spread_messages(
+    chunks: list[SourceMaterial], messages: tuple[str, ...]
+) -> list[SourceMaterial]:
+    """메시지를 묶음들에 고르게 나눈다. **하나도 빠뜨리지 않는다.**
+
+    묶음보다 메시지가 적으면 앞쪽 묶음만 받는다 — 나머지는 코드만으로 읽힌다.
+    반대로 많으면 나눠 담기며, 나누어떨어지지 않는 나머지는 앞쪽부터 하나씩 더
+    받는다. **버리는 자리를 만들지 않는 것이 요점이다**: 메시지 하나가 사라지면
+    그 결정의 "왜"가 지식이 될 기회를 잃는데, 그것은 조용하다.
+    """
+    if not messages or not chunks:
+        return chunks
+    n = len(chunks)
+    out: list[SourceMaterial] = []
+    for i, chunk in enumerate(chunks):
+        share = messages[i::n]
+        out.append(
+            SourceMaterial(commit=chunk.commit, messages=share, files=chunk.files)
+        )
     return out
 
 

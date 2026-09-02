@@ -355,9 +355,37 @@ class TestChunking:
         assert len(chunks) == 1
         assert chunks[0].files[0][1] == "x" * 1000
 
-    def test_커밋_메시지는_모든_묶음에_실린다(self, tmp_path) -> None:
+    def test_커밋_메시지는_나뉘어_실리고_하나도_빠지지_않는다(self, tmp_path) -> None:
+        """**규약이 바뀌었다** (2026-09-02). 예전에는 모든 묶음에 통째로 실렸다.
+
+        실측: 묶음 하나의 프롬프트 74,694자 중 메시지가 40,410자(54%)로 원천
+        파일(20,170자)의 두 배였고, 116묶음이면 같은 것을 4.6M자 다시 보냈다.
+        메시지는 맥락이 아니라 **원천**이라(D16) 한 번 읽히면 족하다.
+        """
+        msgs = tuple(f"메시지{i}" for i in range(5))
         material = SourceMaterial(
-            commit="a", messages=("왜 그렇게 정했는가",), files=(("a.py", "x" * 100), ("b.py", "y" * 100))
+            commit="a", messages=msgs, files=(("a.py", "x" * 100), ("b.py", "y" * 100))
         )
-        for chunk in _chunks(material, max_chars=150):
-            assert chunk.messages == ("왜 그렇게 정했는가",)
+        chunks = _chunks(material, max_chars=150)
+        assert len(chunks) == 2
+
+        실린것 = [m for c in chunks for m in c.messages]
+        assert sorted(실린것) == sorted(msgs)  # 하나도 빠지지 않는다
+        assert len(실린것) == len(set(실린것))  # 두 번 실리지도 않는다
+
+    def test_묶음보다_메시지가_적으면_앞쪽만_받는다(self, tmp_path) -> None:
+        material = SourceMaterial(
+            commit="a",
+            messages=("하나뿐",),
+            files=(("a.py", "x" * 100), ("b.py", "y" * 100)),
+        )
+        chunks = _chunks(material, max_chars=150)
+        assert chunks[0].messages == ("하나뿐",)
+        assert chunks[1].messages == ()  # 나머지는 코드만으로 읽힌다
+
+    def test_파일이_없으면_메시지만_담긴_묶음_하나다(self, tmp_path) -> None:
+        # 삭제만 있었던 구간이다 — 커밋 메시지에는 "왜 지웠는가"가 남아 있다.
+        material = SourceMaterial(commit="a", messages=("왜 지웠는가",), files=())
+        chunks = _chunks(material, max_chars=150)
+        assert len(chunks) == 1
+        assert chunks[0].messages == ("왜 지웠는가",)
