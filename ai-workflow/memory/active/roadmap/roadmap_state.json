@@ -933,6 +933,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "기존 4.2.6(Lint) 산출물의 정확성 보강이다. 신규 기능이 아니라 검사 하나가 못 보던 구멍을 메운다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-008.md"
+    },
+    {
+      "task_id": "TASK-2026-09-03-main-001",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS 리프가 아니다 — 저장소 산출물이 아니라 워크플로우 메타 층(ai-workflow 킷 진입점)의 유지보수다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-03-main-001.md"
     }
   ],
   "issues": []

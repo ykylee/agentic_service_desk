@@ -10,7 +10,7 @@
     "daily_backlog_dir": "ai-workflow/memory/active/main/backlog",
     "tasks_dir": "ai-workflow/memory/active/main/backlog/tasks",
     "sessions_dir": "ai-workflow/memory/active/main/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-02.md",
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-03.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
       "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기",
       "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
@@ -42,33 +43,24 @@
       "TASK-2026-09-02-main-004 — WBS-5.2.1 실운영 조합 기동 거부",
       "TASK-2026-09-02-main-003 — M-005 를 세우고 남은 결정을 기록한다",
       "TASK-2026-09-02-main-002 — 답변 경로를 실지식베이스로 태운다 — 조회 오탐부터",
-      "TASK-2026-09-02-main-001 — 워크플로우 킷 v1.8.0 bootstrap 재적용",
-      "TASK-2026-09-01-main-003 — ingest 묶음당 소요를 줄인다 — 재시도·사고블록·색인"
+      "TASK-2026-09-02-main-001 — 워크플로우 킷 v1.8.0 bootstrap 재적용"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-02.md",
-    "task_count": 9,
+    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-03.md",
+    "task_count": 1,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
-      "TASK-2026-09-02-main-001 — 워크플로우 킷 v1.8.0 bootstrap 재적용",
-      "TASK-2026-09-02-main-002 — 답변 경로를 실지식베이스로 태운다 — 조회 오탐부터",
-      "TASK-2026-09-02-main-003 — M-005 를 세우고 남은 결정을 기록한다",
-      "TASK-2026-09-02-main-004 — WBS-5.2.1 실운영 조합 기동 거부",
-      "TASK-2026-09-02-main-005 — 승격 경로 A 라이브 — 등록에서 지식 항목까지",
-      "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
-      "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
-      "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
-      "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기"
+      "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용"
     ]
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/main/session_handoff.md",
-    "ai-workflow/memory/active/main/backlog/2026-09-02.md",
+    "ai-workflow/memory/active/main/backlog/2026-09-03.md",
     "ai-workflow/memory/active/main/work_backlog.md"
   ],
   "repository_assessment": {

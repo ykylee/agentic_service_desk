@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v1.8.0 -->
+<!-- standard-ai-workflow-kit: v1.9.0 -->
 
 # CLAUDE.md (Claude Code entry point)
 
@@ -6,7 +6,7 @@
 - Scope: session restore, the order to consult workflow state docs, working principles, session close order
 - Audience: Claude Code, repository maintainer, workflow designer
 - Status: beta
-- Last updated: 2026-09-02
+- Last updated: 2026-09-03
 - Related: `ai-workflow/memory/active/<branch>/state.json`, `docs/PROJECT_PROFILE.md`
 
 ## What this file is for
