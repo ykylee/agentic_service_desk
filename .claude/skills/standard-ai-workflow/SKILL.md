@@ -3,7 +3,7 @@ name: standard-ai-workflow
 description: The standard AI workflow entry point for this repository. Use it when starting or resuming a session, registering/updating a task in the backlog, syncing affected documents after a change, or leaving a handoff at session close.
 ---
 
-<!-- standard-ai-workflow-kit: v1.7.0 -->
+<!-- standard-ai-workflow-kit: v1.8.0 -->
 
 # Standard AI Workflow
 
@@ -11,7 +11,7 @@ description: The standard AI workflow entry point for this repository. Use it wh
 - **Location**: `.claude/skills/standard-ai-workflow/SKILL.md`
 - **Invocation**: the model selects it automatically when the situation matches the `description` above. To invoke it directly,
   `/workflow-session-start`, `/workflow-backlog-update`, `/workflow-doc-sync`, `/workflow-session-end` slash command.
-- Last updated: 2026-08-30
+- Last updated: 2026-09-02
 
 ## 1. Session start — always read these first
 

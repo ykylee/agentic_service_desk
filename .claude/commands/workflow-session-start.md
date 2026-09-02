@@ -2,7 +2,7 @@
 description: Standard AI workflow session start — restore the current baseline from state.json + session_handoff.md + backlog and report the next candidate tasks.
 ---
 
-<!-- standard-ai-workflow-kit: v1.7.0 -->
+<!-- standard-ai-workflow-kit: v1.8.0 -->
 
 # /workflow-session-start
 
