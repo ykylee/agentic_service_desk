@@ -5,12 +5,15 @@ from __future__ import annotations
 import uvicorn
 
 from agentic_service_desk.config import load_settings
-from agentic_service_desk.operations.preflight import check_schema
+from agentic_service_desk.operations.preflight import check_live_exposure, check_schema
 
 
 def main() -> int:
     cfg = load_settings()
     if not check_schema(cfg):
+        return 1
+    # **소켓을 여는 쪽이라 화면 노출까지 본다** (WBS-5.2.1).
+    if not check_live_exposure(cfg, binds_socket=True):
         return 1
     print(f"[web] stage={cfg.stage} — 온라인 경로 (대시보드 · 답변)")
     if cfg.web_host not in ("127.0.0.1", "localhost", "::1"):

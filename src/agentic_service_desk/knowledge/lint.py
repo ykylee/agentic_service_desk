@@ -235,10 +235,37 @@ class Lint:
             inv = s.item.invalidation
             if inv.kind is not InvalidationKind.LINKED or not inv.refs:
                 continue
+            if not any(p.commit for p in s.item.provenance):
+                # **출처에 커밋이 하나도 없다** — 승격 경로 A 로 온 항목이 이렇다
+                # (provenance 가 `qna` 하나). 그런데 `linked` 판정은 *커밋 기준*이라
+                # (`_linked_stale_reason` 이 최신 출처 커밋을 요구한다) 이 항목의
+                # 조건은 **경로가 맞든 틀리든 영영 발동하지 않는다.**
+                #
+                # 2026-09-02 라이브에서 드러났다: 승격된 항목이 `linked` refs 로
+                # "KIS inquire_fills API 명세 또는 스펙 정의 문서"라는 **산문**을
+                # 달고 Lint 를 `clean` 으로 통과했다. 아래 검사가 주인 저장소를
+                # 커밋으로 찾는데 커밋이 없어 통째로 건너뛰었기 때문이다.
+                #
+                # 조용히 넘기지 않는다 — 죽은 ref 가 없는 것보다 나쁜 이유가
+                # 여기에도 그대로 적용된다. **무엇을 할지는 사람이 정한다**:
+                # 주기형으로 바꾸든, 커밋 출처를 붙이든.
+                findings.append(
+                    Finding(
+                        kind=Kind.DEAD_INVALIDATION,
+                        subject=s.item.id,
+                        detail=(
+                            "출처에 커밋이 없는데 무효화가 `linked` 다 — 이 판정은 "
+                            "출처 커밋 이후의 변경을 보므로 조건이 영영 발동하지 "
+                            "않는다. 주기형으로 바꾸거나 커밋 출처를 붙인다"
+                        ),
+                    )
+                )
+                continue
             owner = self._owner_of(s.item)
             if owner is None:
-                # 출처 커밋 자체가 없다 — `MISSING_REFERENCE` 가 이미 말한다.
-                # 여기서 또 올리면 한 고장이 두 소견이 되어 대기열이 부풀려진다.
+                # 커밋은 있는데 어느 미러도 그것을 모른다 — `MISSING_REFERENCE` 가
+                # 이미 말한다. 여기서 또 올리면 한 고장이 두 소견이 되어 대기열이
+                # 부풀려진다.
                 continue
             dead = [
                 ref

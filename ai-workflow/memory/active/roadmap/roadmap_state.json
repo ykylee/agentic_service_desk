@@ -622,9 +622,182 @@
           ]
         }
       ]
+    },
+    {
+      "id": "M-005",
+      "title": "실데이터 연결과 운영 준비",
+      "sdlc_phase": "stabilization",
+      "declared_status": "in_progress",
+      "derived_status": "in_progress",
+      "progress": 0.08333333333333333,
+      "total_leaves": 12,
+      "done_leaves": 1,
+      "deliverables_missing": [],
+      "wbs": [
+        {
+          "id": "WBS-5.1",
+          "title": "실데이터 연결",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 3,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-5.1.1",
+              "title": "모 시스템 어댑터 실연동",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.1.2",
+              "title": "실운영 설정 전환",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.1.3",
+              "title": "QnA 유입 실검증",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-5.2",
+          "title": "접근 제어",
+          "derived_status": "in_progress",
+          "linked_task_ids": [],
+          "total_leaves": 2,
+          "done_leaves": 1,
+          "children": [
+            {
+              "id": "WBS-5.2.1",
+              "title": "위험 조합 기동 거부",
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-09-02-main-004"
+              ],
+              "total_leaves": 1,
+              "done_leaves": 1,
+              "children": []
+            },
+            {
+              "id": "WBS-5.2.2",
+              "title": "대시보드 인증",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-5.3",
+          "title": "임계값 확정",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 2,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-5.3.1",
+              "title": "국면 전진 임계",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.3.2",
+              "title": "나머지 여섯",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-5.4",
+          "title": "미검증 축",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 3,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-5.4.1",
+              "title": "임베딩 다리",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.4.2",
+              "title": "주기형 무효화",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.4.3",
+              "title": "두 저장소 동시 완주",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-5.5",
+          "title": "운영 진입 판정",
+          "derived_status": "planned",
+          "linked_task_ids": [],
+          "total_leaves": 2,
+          "done_leaves": 0,
+          "children": [
+            {
+              "id": "WBS-5.5.1",
+              "title": "단계 상향 조건 확인",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            },
+            {
+              "id": "WBS-5.5.2",
+              "title": "자동 승격 전제 확인",
+              "derived_status": "planned",
+              "linked_task_ids": [],
+              "total_leaves": 1,
+              "done_leaves": 0,
+              "children": []
+            }
+          ]
+        }
+      ]
     }
   ],
-  "current_milestone_id": null,
+  "current_milestone_id": "M-005",
   "exempt_tasks": [
     {
       "task_id": "TASK-2026-08-28-main-001",
@@ -709,6 +882,20 @@
       "wbs_ref": "exempt",
       "exempt_reason": "실데이터 검증에서 드러난 결함 수정. 신규 기능이 아니라 기존 4.x 산출물(조회·파이프라인)의 정확성 보강이라 WBS leaf 를 새로 세우지 않는다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-002.md"
+    },
+    {
+      "task_id": "TASK-2026-09-02-main-003",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "로드맵 층의 선언 작업이다 — WBS leaf 가 아니라 leaf 를 담을 마일스톤을 만든다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-003.md"
+    },
+    {
+      "task_id": "TASK-2026-09-02-main-005",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS-4.3.4(승격 경로 A)의 라이브 검증과 거기서 드러난 결함 수정이다. 신규 기능이 아니다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-005.md"
     }
   ],
   "issues": []

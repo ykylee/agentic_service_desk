@@ -6,7 +6,7 @@
 - 범위: 마일스톤 선언 · SDLC 순서 · WBS (각 마일스톤 파일)
 - 대상 독자: AI agent (session-start / backlog-update), 저장소 관리자
 - 상태: active
-- 최종 수정일: 2026-08-28
+- 최종 수정일: 2026-09-02
 - 관련 문서: [`roadmap_state.json`](./roadmap_state.json)
 
 > 이 목록의 **순서가 곧 SDLC 순서 선언**이다. status 는 선언이고, 파생
@@ -23,3 +23,5 @@
   - path: [`./M-003-design.md`](./M-003-design.md)
 - **M-004** [implementation] 구현 — status: done
   - path: [`./M-004-implementation.md`](./M-004-implementation.md)
+- **M-005** [stabilization] 실데이터 연결과 운영 준비 — status: in_progress
+  - path: [`./M-005-stabilization.md`](./M-005-stabilization.md)

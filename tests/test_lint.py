@@ -196,6 +196,37 @@ class TestDeadInvalidation:
         report = Lint(repo=repo, conn=conn, mirror=mirror).run()
         assert not [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
 
+    def test_커밋_출처가_없는데_linked_면_잡는다(self, tmp_path) -> None:
+        # **승격 경로 A 로 온 항목이 이렇다** — provenance 가 `qna` 하나다.
+        # `linked` 판정은 출처 커밋 이후의 변경을 보므로, 커밋이 없으면 경로가
+        # 맞든 틀리든 조건이 영영 발동하지 않는다. 2026-09-02 라이브에서 승격
+        # 항목이 산문 refs 를 달고 `clean` 을 통과한 것이 이 자리였다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        item = _item(
+            repo,
+            provenance=[Provenance(qna="q-1")],
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=["limit.py"]),
+        )
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        found = [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+        assert [f.subject for f in found] == [item.id]
+        assert "커밋이 없는데" in found[0].detail
+
+    def test_커밋_출처가_없어도_주기형이면_잡지_않는다(self, tmp_path) -> None:
+        # 주기형은 시간으로 재므로 커밋이 필요 없다 — 이것이 정상 형태다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        _item(
+            repo,
+            provenance=[Provenance(qna="q-1")],
+            invalidation=Invalidation(kind=InvalidationKind.PERIODIC, period_days=90),
+        )
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror).run()
+        assert not [f for f in report.findings if f.kind is Kind.DEAD_INVALIDATION]
+
     def test_출처가_없으면_한_고장을_두_번_올리지_않는다(self, tmp_path) -> None:
         # 출처 커밋 자체가 없으면 `MISSING_REFERENCE` 가 이미 말한다.
         repo, conn = _repo(tmp_path), _conn(tmp_path)
