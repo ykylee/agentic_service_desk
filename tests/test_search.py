@@ -122,6 +122,30 @@ class TestKeyword:
         _item(repo, "결재 한도 규칙")
         assert Search(repo=repo, conn=conn).find("결재")[0].matched_by == {"keyword"}
 
+    def test_뒤에서_겹치는_것은_같은_낱말이_아니다(self, tmp_path) -> None:
+        # 조사·어미는 **뒤에** 붙으므로 어간이 앞에 온다. 그 가정을 넘어 아무
+        # 자리나 받으면 "백테스트"가 "테스트"에 걸린다 — 그리고 그것이 제목이면
+        # 우연한 겹침이 개념 이름의 일치와 같은 무게(3.0)를 받는다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _item(repo, "테스트 인프라 사전 검증")
+
+        assert Search(repo=repo, conn=conn).find("백테스트") == []
+
+    def test_앞에서_겹치면_여전히_찾는다(self, tmp_path) -> None:
+        # 좁힌 것이 너무 넓게 잡지 않는지 — 넘으려던 변형은 그대로 넘어야 한다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _item(repo, "백테스트 결과 읽는 법")
+
+        assert Search(repo=repo, conn=conn).find("백테스트를 어떻게 보나요")
+
+    def test_단일_낱말_질의는_여전히_근거를_얻는다(self, tmp_path) -> None:
+        # 낱말 하나만 맞은 것을 버리는 규칙(`MIN_VOCAB_MATCHES`)을 키워드 다리에
+        # 얹지 않은 이유다 — 개발자는 식별자 하나로 묻는다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _item(repo, "가드 auto_transition 실행 단계")
+
+        assert Search(repo=repo, conn=conn).find("가드")
+
 
 class TestNothingFound:
     """FR-18 의 입력 — 억지로 채우지 않는다."""

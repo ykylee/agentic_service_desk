@@ -12,8 +12,8 @@
    "messages": 1,
    "proposals": 3,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 0,
@@ -24,8 +24,8 @@
    "messages": 50,
    "proposals": 0,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 1,
@@ -36,11 +36,11 @@
    "messages": 50,
    "proposals": 0,
    "retries": 2,
-   "retry_notes": [
-    "1: `items` 가 없다 — 받은 것: ` greedy matching + header-based body extraction for MiniMax-M3 pattern (reasoning + 4 headers all inside ). This is a specific model behavior. The policy k-dc97e9016d28 already captures \"greedy 매칭 + 본문 fallback\". The \"본문 fallback\" part might be exactly this header-based extraction. So this is cover…",
-    "2: `items` 가 없다 — 받은 것: 패턴 (, but it's part of clean_model_output concept. The fix is already in k-dc97e9016d28. This is just one of many models that exhibits this behavior. Hmm. Let me try another angle — what's NOT in existing items? Looking at the commit messages: - \"refusal_reason 5종\" — k-ba72bc604769 covers this - \"li…"
-   ],
-   "error": null
+   "error": null,
+   "retry_kinds": [
+    "items_missing",
+    "items_missing"
+   ]
   },
   {
    "chunk": 1,
@@ -51,8 +51,8 @@
    "messages": 1,
    "proposals": 2,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 2,
@@ -63,8 +63,8 @@
    "messages": 1,
    "proposals": 0,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 2,
@@ -75,11 +75,11 @@
    "messages": 50,
    "proposals": 0,
    "retries": 2,
-   "retry_notes": [
-    "1: `items` 가 없다 — 받은 것: 본문 모두 update to existing. 7. **TASK-007 30-일 paper 운영 데이터 축적 + 1차 검토 일정** - covered by k-7788ac755f5c 8. **Reverse feature deploy coupling** - The fact that PR backend endpoint commit + PR frontend commit require primary+dashboard 동시 재기동. Covered by k-1f1588981329 (Realtime feature deploy coupling).…",
-    "2: `items` 가 없다 — 받은 것: \")` non </think> re.compile(\"-greedy 매칭이 raw 전체를 매칭 - 운영 결과 9/1 latest.json raw 19057자 — fix 적용 시 본문 1-개 헤더(66자) 추출, 4-개 헤더 전부 복구는 모델 prompt + LiteLLM config 추가 fix 필요 - Already has k-dc97e9016d28 covering greedy 매칭 정책. The new info adds: prompt + LiteLLM 후속 fix 필요. **Concept C: PR 운영 deploy 직전 PR 파…"
-   ],
-   "error": "AgentOutputError: `items` 가 없다 — 받은 것: `\\`)` non-greedy matching was the issue - Fix: greedy matching + extract body from last `## ` header (last of 4) before closing tag So the policy becomes: - Use greedy matching for think block - Extract body from last ## heading before closing tag - Preserves case where normal body is after closing …"
+   "error": "items_missing",
+   "retry_kinds": [
+    "items_missing",
+    "items_missing"
+   ]
   },
   {
    "chunk": 3,
@@ -90,10 +90,10 @@
    "messages": 50,
    "proposals": 0,
    "retries": 1,
-   "retry_notes": [
-    "1: `items` 가 없다 — 받은 것: `\\`)` non-greedy 매칭 → fix: greedy 매칭 But k-dc97e9016d28 already says \"greedy 매칭 + 본문 fallback\". Looking at the source carefully: - The fix is: \"greedy 매칭으로의 마지막 위치까지 매칭 후 </think> 닫기 직전 마지막 `## ` 헤더 (4-개 중 마지막) 부터 닫기 직전까지를 본문으로 추출\" - So this commit **adds** a fallback - the existing greedy match alo…"
-   ],
-   "error": null
+   "error": null,
+   "retry_kinds": [
+    "items_missing"
+   ]
   },
   {
    "chunk": 3,
@@ -104,8 +104,8 @@
    "messages": 1,
    "proposals": 1,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 4,
@@ -116,8 +116,8 @@
    "messages": 1,
    "proposals": 0,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 4,
@@ -128,11 +128,11 @@
    "messages": 50,
    "proposals": 5,
    "retries": 2,
-   "retry_notes": [
-    "1: `items` 가 없다 — 받은 것: ` non-greedy matching was eating the body, fixed by greedy matching to last position. There's already an item `k-dc97e9016d28: clean_model_output think 블록 추출 정책 — greedy 매칭 + 본문 fallback` - need to update. 2. **LiteLLM max_tokens increase (PR #12)** - Reasoning chain filling up max_tokens. There's a…",
-    "2: `items` 가 없다 — 받은 것: `)` 비-greedy 매칭이 raw 전체를 매칭하여 reasoning+본문 모두 제거하는 결함 → greedy 매칭으로 닫는 마지막 위치까지 매칭\\n- greedy 매칭 후 닫기 직전 마지막 `## ` 헤더 (4-개 헤더 중 마지막) 부터 닫기 직전까지를 본문으로 추출\\n- 닫은 후 별도 본문이 있는 정상 케이스는 그대로 보존 (regression 25/25 통과)\\n\\n**발화 패턴 (MiniMax-M3)**\\n- reasoning + 4-개 헤더 분석 본문 모두 안에 작성 후 닫음\\n- 결과: visible_analysis 0…"
-   ],
-   "error": null
+   "error": null,
+   "retry_kinds": [
+    "items_missing",
+    "items_missing"
+   ]
   },
   {
    "chunk": 5,
@@ -143,8 +143,8 @@
    "messages": 50,
    "proposals": 0,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   },
   {
    "chunk": 5,
@@ -155,8 +155,9 @@
    "messages": 1,
    "proposals": 2,
    "retries": 0,
-   "retry_notes": [],
-   "error": null
+   "error": null,
+   "retry_kinds": []
   }
- ]
+ ],
+ "redaction": "재시도·실패 메시지 원문은 싣지 않는다 — 모델이 원천을 읽고 쓴 사고 내용이 그대로 들어 있고 이 저장소는 공개다. 실패의 모양(`retry_kinds` · `error`)만 남긴다."
 }

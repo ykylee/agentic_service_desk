@@ -702,6 +702,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS 리프가 아니다 — 저장소 산출물이 아니라 워크플로우 메타 층(ai-workflow 킷 진입점)의 유지보수다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-001.md"
+    },
+    {
+      "task_id": "TASK-2026-09-02-main-002",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "실데이터 검증에서 드러난 결함 수정. 신규 기능이 아니라 기존 4.x 산출물(조회·파이프라인)의 정확성 보강이라 WBS leaf 를 새로 세우지 않는다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-002.md"
     }
   ],
   "issues": []
