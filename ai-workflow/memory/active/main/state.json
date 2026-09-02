@@ -34,7 +34,9 @@
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서"
     ],
     "blocked_items": [],
-    "planned_items": [],
+    "planned_items": [
+      "TASK-2026-09-02-main-009"
+    ],
     "recent_done_items": [
       "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
       "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
@@ -52,7 +54,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-02.md",
-    "task_count": 8,
+    "task_count": 9,
     "in_progress_items": [
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서"
     ],
