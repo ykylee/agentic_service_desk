@@ -227,6 +227,15 @@ class TestPrompt:
         )
         assert "한도 계산을 부서 등급으로 바꿈" in prompt
 
+    def test_used_paths_가_무엇인지_지시에_있다(self) -> None:
+        # 2026-09-02 실측: 항목 182개 중 101개(55%)가 provenance 에 경로가 없었다.
+        # 그중 37개는 무효화 ref 로 **실재 경로를 대고 있었다** — 모델은 경로를
+        # 알았는데 used_paths 를 채우지 않은 것이다. 규칙이 refs 만 설명하고
+        # used_paths 는 JSON 예시에만 있었다.
+        prompt = build_source_prompt(SourceMaterial(commit="a"), [])
+        assert "실제로 읽은 파일의 경로" in prompt
+        assert "무엇을 보고 썼는가" in prompt
+
     def test_설정값_금지가_지시에_있다(self) -> None:
         assert "설정값을 지식으로 쓰지 않는다" in build_source_prompt(
             SourceMaterial(commit="a"), []
