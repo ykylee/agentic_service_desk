@@ -47,7 +47,23 @@ class TestRender:
     def test_모델이_반영된다(self) -> None:
         out = render_models_json(_cfg(llm_base_url=LOCAL, llm_model="MiniMax-M3",
                                       parent_adapter="http"))
-        assert out["providers"][PROVIDER_NAME]["models"] == [{"id": "MiniMax-M3"}]
+        assert out["providers"][PROVIDER_NAME]["models"] == [
+            {"id": "MiniMax-M3", "maxTokens": 32_768}
+        ]
+
+    def test_출력_한도를_비워_두지_않는다(self) -> None:
+        """**정하지 않으면 pi 기본값 16,384 가 쓰인다.**
+
+        사고를 길게 하는 모델에서는 그 예산이 사고로 다 나가 `stop=length` 로
+        잘리고, 잘린 자리가 사고 안이면 `strip_thinking()` 뒤에 본문이 빈
+        문자열이 된다. 2026-08~09 부트스트랩 실패 62건 중 59건이 이것이었다.
+        """
+        out = render_models_json(
+            _cfg(llm_base_url=LOCAL, llm_model="m", parent_adapter="http",
+                 llm_max_output_tokens=65_536)
+        )
+        model = out["providers"][PROVIDER_NAME]["models"][0]
+        assert model["maxTokens"] == 65_536
 
     def test_설정이_비면_거부한다(self) -> None:
         with pytest.raises(ValueError):

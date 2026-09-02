@@ -61,6 +61,19 @@ class HarnessResult:
     def had_thinking(self) -> bool:
         return self.text != self.raw.strip()
 
+    @property
+    def all_thinking(self) -> bool:
+        """**사고만 하다 끝났는가.**
+
+        모델이 출력 예산을 전부 사고에 쓰고 잘리면(`stop=length`) 걷어낸 뒤
+        본문이 빈 문자열이 된다. 그때 `raw` 는 수만 자로 가득 차 있으므로,
+        "아무 말도 안 했다"와 "사고만 하다 잘렸다"를 **여기서 가른다.**
+
+        둘을 뭉뚱그리면 로그에 `받은 것: ` 뒤가 빈 줄만 쌓이고, 원인을 찾는
+        길이 막힌다 — 2026-08~09 에 실제로 그렇게 막혔다.
+        """
+        return not self.text.strip() and bool(self.raw.strip())
+
 
 #: pi 를 **생성기로** 부르는 인자. 이 경로에 필요한 것은 문장 하나를 받아 문장
 #: 하나를 내는 것뿐이고, 그 밖의 능력은 전부 위험이다.

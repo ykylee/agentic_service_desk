@@ -47,7 +47,17 @@ def render_models_json(settings: Settings) -> dict:
                 "api": "openai-completions",
                 # **키를 파일에 박지 않는다.** pi 가 `$VAR` 참조를 지원한다 (ADR-009).
                 "apiKey": "$ASD_LLM_API_KEY",
-                "models": [{"id": settings.llm_model}],
+                # **출력 한도를 우리가 정한다.** 비워 두면 pi 기본값 16,384 가
+                # 쓰이는데, 사고를 길게 하는 모델에서는 그 예산이 사고로 다 나가
+                # `stop=length` 로 잘린다 — 그리고 잘린 자리가 사고 안이면
+                # `strip_thinking()` 뒤에 **본문이 빈 문자열**이 된다.
+                # 2026-08~09 부트스트랩 실패 62건 중 59건이 이것이었다.
+                "models": [
+                    {
+                        "id": settings.llm_model,
+                        "maxTokens": settings.llm_max_output_tokens,
+                    }
+                ],
             }
         }
     }

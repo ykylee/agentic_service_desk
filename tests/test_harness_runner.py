@@ -148,3 +148,23 @@ class TestFailures:
 class TestResult:
     def test_공백만_다른_경우는_사고로_치지_않는다(self) -> None:
         assert HarnessResult(text="답", raw="  답  ").had_thinking is False
+
+
+class TestAllThinking:
+    """사고만 하다 잘린 것을 "아무 말도 안 했다"와 가른다.
+
+    둘을 뭉뚱그리면 로그에 `받은 것: ` 뒤가 빈 줄만 쌓이고 원인을 찾을 길이
+    막힌다 — 2026-08~09 에 실제로 그렇게 막혔고, 62건 중 59건이 이것이었다.
+    """
+
+    def test_사고만_있으면_참이다(self) -> None:
+        r = HarnessResult(text="", raw="<think>" + "x" * 5000)
+        assert r.all_thinking
+
+    def test_본문이_있으면_거짓이다(self) -> None:
+        r = HarnessResult(text='{"items": []}', raw='<think>a</think>{"items": []}')
+        assert not r.all_thinking
+
+    def test_정말_빈_응답은_거짓이다(self) -> None:
+        # 이쪽은 모델이 아무것도 내지 않은 것이다 — 원인이 다르다.
+        assert not HarnessResult(text="", raw="").all_thinking

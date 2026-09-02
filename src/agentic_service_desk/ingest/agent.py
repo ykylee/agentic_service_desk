@@ -378,10 +378,19 @@ def _with_stderr(exc: AgentOutputError, result: object) -> AgentOutputError:
 
     `Harness` 규약은 `.text` 만 요구하므로 `err` 는 있을 때만 읽는다.
     """
+    parts = [str(exc)]
+    if getattr(result, "all_thinking", False):
+        # **"아무 말도 안 했다"가 아니라 "사고만 하다 잘렸다"이다.**
+        # 이 구분이 없으면 로그에 빈 줄만 쌓여 원인을 찾을 수 없다.
+        raw = str(getattr(result, "raw", "") or "")
+        parts.append(
+            f"사고만 하다 끝났다 (출력 한도 초과로 보인다) — 걷어내기 전 {len(raw):,}자: "
+            f"{_snippet(raw, 160)}"
+        )
     err = str(getattr(result, "err", "") or "").strip()
-    if not err:
-        return exc
-    return AgentOutputError(f"{exc} | stderr: {_snippet(err, 200)}")
+    if err:
+        parts.append(f"stderr: {_snippet(err, 200)}")
+    return AgentOutputError(" | ".join(parts)) if len(parts) > 1 else exc
 
 
 # --- 제안 → 지식 항목 (출처는 여기서 붙는다) --------------------------------
