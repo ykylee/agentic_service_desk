@@ -1,0 +1,162 @@
+{
+ "measured_at": "2026-09-02",
+ "method": "같은 묶음을 새 방식(_spread_messages)과 옛 방식(묶음마다 메시지 전량)으로 각각 호출. 짝마다 순서 반전. 워커 정지. IngestRun._apply 미호출 — 지식베이스에 쓰지 않았다.",
+ "source": "auto-trading HEAD · 묶음 116 · 커밋 메시지 50 · 색인 185항목 · MAX_CHARS_PER_CALL=24000 · llm_max_output_tokens=32768",
+ "rows": [
+  {
+   "chunk": 0,
+   "variant": "new",
+   "elapsed": 141.2,
+   "prompt_chars": 35348,
+   "files": 5,
+   "messages": 1,
+   "proposals": 3,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 0,
+   "variant": "old",
+   "elapsed": 242.3,
+   "prompt_chars": 70330,
+   "files": 5,
+   "messages": 50,
+   "proposals": 0,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 1,
+   "variant": "old",
+   "elapsed": 1103.3,
+   "prompt_chars": 63881,
+   "files": 7,
+   "messages": 50,
+   "proposals": 0,
+   "retries": 2,
+   "retry_notes": [
+    "1: `items` 가 없다 — 받은 것: ` greedy matching + header-based body extraction for MiniMax-M3 pattern (reasoning + 4 headers all inside ). This is a specific model behavior. The policy k-dc97e9016d28 already captures \"greedy 매칭 + 본문 fallback\". The \"본문 fallback\" part might be exactly this header-based extraction. So this is cover…",
+    "2: `items` 가 없다 — 받은 것: 패턴 (, but it's part of clean_model_output concept. The fix is already in k-dc97e9016d28. This is just one of many models that exhibits this behavior. Hmm. Let me try another angle — what's NOT in existing items? Looking at the commit messages: - \"refusal_reason 5종\" — k-ba72bc604769 covers this - \"li…"
+   ],
+   "error": null
+  },
+  {
+   "chunk": 1,
+   "variant": "new",
+   "elapsed": 379.6,
+   "prompt_chars": 28924,
+   "files": 7,
+   "messages": 1,
+   "proposals": 2,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 2,
+   "variant": "new",
+   "elapsed": 172.1,
+   "prompt_chars": 74733,
+   "files": 1,
+   "messages": 1,
+   "proposals": 0,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 2,
+   "variant": "old",
+   "elapsed": 783.9,
+   "prompt_chars": 109872,
+   "files": 1,
+   "messages": 50,
+   "proposals": 0,
+   "retries": 2,
+   "retry_notes": [
+    "1: `items` 가 없다 — 받은 것: 본문 모두 update to existing. 7. **TASK-007 30-일 paper 운영 데이터 축적 + 1차 검토 일정** - covered by k-7788ac755f5c 8. **Reverse feature deploy coupling** - The fact that PR backend endpoint commit + PR frontend commit require primary+dashboard 동시 재기동. Covered by k-1f1588981329 (Realtime feature deploy coupling).…",
+    "2: `items` 가 없다 — 받은 것: \")` non </think> re.compile(\"-greedy 매칭이 raw 전체를 매칭 - 운영 결과 9/1 latest.json raw 19057자 — fix 적용 시 본문 1-개 헤더(66자) 추출, 4-개 헤더 전부 복구는 모델 prompt + LiteLLM config 추가 fix 필요 - Already has k-dc97e9016d28 covering greedy 매칭 정책. The new info adds: prompt + LiteLLM 후속 fix 필요. **Concept C: PR 운영 deploy 직전 PR 파…"
+   ],
+   "error": "AgentOutputError: `items` 가 없다 — 받은 것: `\\`)` non-greedy matching was the issue - Fix: greedy matching + extract body from last `## ` header (last of 4) before closing tag So the policy becomes: - Use greedy matching for think block - Extract body from last ## heading before closing tag - Preserves case where normal body is after closing …"
+  },
+  {
+   "chunk": 3,
+   "variant": "old",
+   "elapsed": 634.4,
+   "prompt_chars": 55093,
+   "files": 2,
+   "messages": 50,
+   "proposals": 0,
+   "retries": 1,
+   "retry_notes": [
+    "1: `items` 가 없다 — 받은 것: `\\`)` non-greedy 매칭 → fix: greedy 매칭 But k-dc97e9016d28 already says \"greedy 매칭 + 본문 fallback\". Looking at the source carefully: - The fix is: \"greedy 매칭으로의 마지막 위치까지 매칭 후 </think> 닫기 직전 마지막 `## ` 헤더 (4-개 중 마지막) 부터 닫기 직전까지를 본문으로 추출\" - So this commit **adds** a fallback - the existing greedy match alo…"
+   ],
+   "error": null
+  },
+  {
+   "chunk": 3,
+   "variant": "new",
+   "elapsed": 100.4,
+   "prompt_chars": 20187,
+   "files": 2,
+   "messages": 1,
+   "proposals": 1,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 4,
+   "variant": "new",
+   "elapsed": 62.0,
+   "prompt_chars": 46544,
+   "files": 1,
+   "messages": 1,
+   "proposals": 0,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 4,
+   "variant": "old",
+   "elapsed": 1274.4,
+   "prompt_chars": 81642,
+   "files": 1,
+   "messages": 50,
+   "proposals": 5,
+   "retries": 2,
+   "retry_notes": [
+    "1: `items` 가 없다 — 받은 것: ` non-greedy matching was eating the body, fixed by greedy matching to last position. There's already an item `k-dc97e9016d28: clean_model_output think 블록 추출 정책 — greedy 매칭 + 본문 fallback` - need to update. 2. **LiteLLM max_tokens increase (PR #12)** - Reasoning chain filling up max_tokens. There's a…",
+    "2: `items` 가 없다 — 받은 것: `)` 비-greedy 매칭이 raw 전체를 매칭하여 reasoning+본문 모두 제거하는 결함 → greedy 매칭으로 닫는 마지막 위치까지 매칭\\n- greedy 매칭 후 닫기 직전 마지막 `## ` 헤더 (4-개 헤더 중 마지막) 부터 닫기 직전까지를 본문으로 추출\\n- 닫은 후 별도 본문이 있는 정상 케이스는 그대로 보존 (regression 25/25 통과)\\n\\n**발화 패턴 (MiniMax-M3)**\\n- reasoning + 4-개 헤더 분석 본문 모두 안에 작성 후 닫음\\n- 결과: visible_analysis 0…"
+   ],
+   "error": null
+  },
+  {
+   "chunk": 5,
+   "variant": "old",
+   "elapsed": 152.1,
+   "prompt_chars": 65021,
+   "files": 2,
+   "messages": 50,
+   "proposals": 0,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  },
+  {
+   "chunk": 5,
+   "variant": "new",
+   "elapsed": 148.8,
+   "prompt_chars": 30127,
+   "files": 2,
+   "messages": 1,
+   "proposals": 2,
+   "retries": 0,
+   "retry_notes": [],
+   "error": null
+  }
+ ]
+}
