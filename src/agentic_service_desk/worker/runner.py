@@ -698,7 +698,13 @@ class BatchRunner:
         initialize(conn)
         try:
             report = Lint(
-                repo=repo, conn=conn, mirror=MirrorSet(mirrors) if mirrors else None
+                repo=repo,
+                conn=conn,
+                mirror=MirrorSet(mirrors) if mirrors else None,
+                # **ingest 와 같은 배제를 본다.** 넘기지 않으면 Lint 는 배제를
+                # 모른 채 "낡았다"고 표시하고, ingest 는 그 경로를 읽지 않아
+                # 고치지 못한다 — 회복 불가 상태가 조용히 생긴다.
+                exclude=self._cfg.source_exclude_patterns,
             ).run()
         except (KnowledgeRepoError, RuntimeError) as exc:
             print(f"[worker] lint 실패: {exc}")

@@ -38,8 +38,10 @@ llm-wiki 의 3연산 중 셋째다. Ingest 가 지식을 짓고 Query 가 꺼내
 from __future__ import annotations
 
 import enum
+import fnmatch
 import sqlite3
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
@@ -75,6 +77,22 @@ class Kind(enum.StrEnum):
 
     죽은 ref 는 **없는 것보다 나쁘다.** 조건이 붙어 있으니 살아 있어 보이는데
     교집합이 영원히 비어 그 항목은 절대 stale 이 되지 않는다.
+    """
+
+    EXCLUDED_INVALIDATION = "excluded_invalidation"
+    """무효화 조건이 **원천에서 배제한 경로**를 가리킨다 (2026-09-02 실데이터).
+
+    `DEAD_INVALIDATION` 과 방향이 반대라 따로 센다. 죽은 ref 는 발동하지 않는
+    것이 문제인데, **배제된 ref 는 발동하고 나서 회복하지 못하는 것**이 문제다:
+
+    - stale 판정은 `changed_paths_since` 를 쓰고 **배제를 적용하지 않으므로**
+      그 경로가 바뀌면 표시가 뜬다.
+    - 그런데 ingest 는 `ASD_SOURCE_EXCLUDE` 로 그 경로를 **읽지 않으므로**
+      항목이 갱신될 길이 없다.
+
+    한 번 stale 이 되면 영영 stale 이다. 2026-08-31 에 kit 출처 지식 115개를
+    지운 이유가 이 구조였고, 그때 그물에 걸리지 않은 4건이 남아 있었다 —
+    출처가 순수 kit 이 아니면서 무효화만 배제 영역을 가리키는 항목들이다.
     """
 
     # Q5 에는 **세 번째 출처**가 있다 — 근거가 낡은 채로 나가 있는 게재 답변
@@ -149,9 +167,14 @@ class Lint:
         repo: KnowledgeRepository,
         conn: sqlite3.Connection,
         mirror: SourceMirror | MirrorSet | None = None,
+        exclude: Sequence[str] = (),
     ) -> None:
         self._repo = repo
         self._conn = conn
+        # **ingest 가 읽지 않는 경로를 Lint 도 알아야 한다.** 두 쪽이 같은 원천을
+        # 다르게 보면, 한쪽이 낡았다고 표시한 것을 다른 쪽이 고칠 수 없는 상태가
+        # 조용히 생긴다 (`Kind.EXCLUDED_INVALIDATION`).
+        self._exclude = tuple(exclude)
         # **저장소가 여럿이어도 Lint 가 묻는 것은 같다** — 이 커밋이 실재하는가,
         # 그 뒤에 무엇이 바뀌었는가. 커밋은 저장소 하나에만 속하므로 `MirrorSet`
         # 이 주인을 찾아 넘긴다. 여기 코드는 미러가 하나이던 때와 다르지 않다.
@@ -165,6 +188,7 @@ class Lint:
         report.open_contradictions = len(contradiction.list_open(self._conn))
 
         report.findings.extend(self._check_references(stored))
+        report.findings.extend(self._check_excluded_invalidation(stored))
         report.findings.extend(self._check_invalidation_refs(stored))
         self._check_stale(stored, report)
         report.findings.extend(self._check_broken_links(stored))
@@ -208,6 +232,45 @@ class Lint:
         return findings
 
     # --- 죽은 무효화 조건 --------------------------------------------------
+
+    def _check_excluded_invalidation(self, stored: list[StoredItem]) -> list[Finding]:
+        """`linked` 무효화가 **원천에서 배제한 경로**를 가리키는가 (FR-8).
+
+        형제 검사(`_check_invalidation_refs`)와 묻는 것이 반대다. 저쪽은 "이 경로가
+        변경분에 나타날 수 있는가"를 물어 **발동하지 않는 조건**을 잡는다. 여기서
+        잡는 것은 **발동하고 나서 회복하지 못하는 조건**이다 — stale 판정은 배제를
+        적용하지 않아 표시가 뜨는데, ingest 는 그 경로를 읽지 않아 갱신될 길이 없다.
+        한 번 stale 이 되면 영영 stale 이다.
+
+        **미러가 필요 없다.** 배제는 선언된 glob 이라 대조가 정확하고, 저장소를
+        보지 않아도 거짓 소견이 나올 수 없다 — 형제 검사가 미러를 요구하는 이유
+        ("없는 것과 사라진 것을 구분하지 못한다")가 여기에는 없다. 배제 선언이
+        비어 있으면 볼 것이 없으므로 그대로 지나간다.
+
+        **지우지 않는다.** 배제를 되돌릴지, 주기형으로 바꿀지, 항목을 버릴지는
+        지식베이스의 구성을 정하는 판단이라 사람의 몫이다 (§8.6).
+        """
+        if not self._exclude:
+            return []
+        findings: list[Finding] = []
+        for s in stored:
+            inv = s.item.invalidation
+            if inv.kind is not InvalidationKind.LINKED or not inv.refs:
+                continue
+            hit = [r for r in inv.refs if _excluded(r, self._exclude)]
+            if hit:
+                findings.append(
+                    Finding(
+                        kind=Kind.EXCLUDED_INVALIDATION,
+                        subject=s.item.id,
+                        detail=(
+                            f"무효화 조건이 원천에서 배제한 경로를 가리킨다: "
+                            f"{', '.join(sorted(hit))}. 그 경로가 바뀌면 stale 이 "
+                            f"되지만 ingest 가 읽지 않아 **다시 갱신되지 않는다**"
+                        ),
+                    )
+                )
+        return findings
 
     def _check_invalidation_refs(self, stored: list[StoredItem]) -> list[Finding]:
         """`linked` 무효화가 **나타날 수 있는 경로**를 가리키는가 (FR-8).
@@ -270,7 +333,11 @@ class Lint:
             dead = [
                 ref
                 for ref in inv.refs
-                if not seen.setdefault(
+                # 배제된 경로는 `EXCLUDED_INVALIDATION` 이 이미 말한다. 여기서 또
+                # 올리면 한 고장이 두 소견이 되어 대기열이 부풀려진다 — 게다가
+                # 배제 경로는 대개 저장소에 **실재하므로** 죽은 것도 아니다.
+                if not _excluded(ref, self._exclude)
+                and not seen.setdefault(
                     (owner.repo_url, ref), owner.can_appear_in_diff(ref)
                 )
             ]
@@ -522,3 +589,14 @@ def resolve(conn: sqlite3.Connection, key: str, *, note: str = "") -> None:
         invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=(row["subject"],)),
     )
     ticket_domain.transition(conn, row["ticket_id"], ticket_domain.State.CLOSED)
+
+
+def _excluded(path: str, patterns: Sequence[str]) -> bool:
+    """이 경로가 선언된 배제 패턴에 걸리는가.
+
+    `ingest.run._excluded` 와 **같은 규칙이어야 한다** — 다르면 ingest 가 읽는
+    것과 Lint 가 읽는다고 보는 것이 갈리고, 그 틈이 정확히 이 검사가 잡으려던
+    상태다. 여기 두는 이유는 반대 방향 의존(knowledge → ingest)을 만들지 않기
+    위해서이고, 같은 두 줄이라 시험이 양쪽을 함께 센다.
+    """
+    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)

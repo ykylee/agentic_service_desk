@@ -242,6 +242,18 @@ class TestDeadInvalidation:
         assert Kind.MISSING_REFERENCE in kinds
         assert Kind.DEAD_INVALIDATION not in kinds
 
+    def test_배제된_경로는_죽은_것으로_세지_않는다(self, tmp_path) -> None:
+        # 한 고장이 두 소견이 되면 대기열이 부풀려진다. 게다가 배제 경로는 대개
+        # 저장소에 **실재하므로** 죽은 것도 아니다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _, mirror = _origin(tmp_path)
+        self._linked(repo, mirror, ["vendor/kit/x.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=mirror, exclude=["vendor/*"]).run()
+        kinds = [f.kind for f in report.findings]
+        assert Kind.EXCLUDED_INVALIDATION in kinds
+        assert Kind.DEAD_INVALIDATION not in kinds
+
     def test_미러가_없으면_검사하지_않는다(self, tmp_path) -> None:
         repo, conn = _repo(tmp_path), _conn(tmp_path)
         _item(
@@ -566,3 +578,68 @@ class TestCompletionCriterion:
         (repo.root / "concepts" / "깨진.md").write_text("# frontmatter 가 없다\n")
 
         assert Lint(repo=repo, conn=conn, mirror=None).run().broken_files
+
+
+class TestExcludedInvalidation:
+    """배제된 무효화 — **발동하고 나서 회복하지 못한다** (2026-09-02 실데이터).
+
+    죽은 무효화와 방향이 반대다. stale 판정은 배제를 적용하지 않아 표시가 뜨는데,
+    ingest 는 그 경로를 읽지 않아 갱신될 길이 없다 — 한 번 stale 이면 영영 stale 이다.
+    2026-08-31 에 kit 출처 지식 115개를 지운 이유가 이 구조였고, 그때 그물에
+    걸리지 않은 4건이 실지식베이스에 남아 있었다.
+    """
+
+    def _linked(self, repo, refs):  # noqa: ANN001, ANN202
+        return _item(
+            repo,
+            invalidation=Invalidation(kind=InvalidationKind.LINKED, refs=list(refs)),
+        )
+
+    def test_배제_경로를_가리키면_잡는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        item = self._linked(repo, ["ai-workflow/workflow_kit/common/paths.py"])
+
+        report = Lint(repo=repo, conn=conn, exclude=["ai-workflow/*"]).run()
+        found = [f for f in report.findings if f.kind is Kind.EXCLUDED_INVALIDATION]
+        assert [f.subject for f in found] == [item.id]
+        assert "다시 갱신되지 않는다" in found[0].detail
+
+    def test_미러가_없어도_검사한다(self, tmp_path) -> None:
+        # 배제는 선언된 glob 이라 대조가 정확하다 — 저장소를 보지 않아도 거짓
+        # 소견이 나올 수 없다. 형제 검사가 미러를 요구하는 이유가 여기엔 없다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        self._linked(repo, ["ai-workflow/x.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=None, exclude=["ai-workflow/*"]).run()
+        assert [f.kind for f in report.findings] == [Kind.EXCLUDED_INVALIDATION]
+
+    def test_배제_선언이_없으면_지나간다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        self._linked(repo, ["ai-workflow/x.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=None).run()
+        assert not [f for f in report.findings if f.kind is Kind.EXCLUDED_INVALIDATION]
+
+    def test_배제_밖_경로는_잡지_않는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        self._linked(repo, ["src/limit.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=None, exclude=["ai-workflow/*"]).run()
+        assert not [f for f in report.findings if f.kind is Kind.EXCLUDED_INVALIDATION]
+
+    def test_주기형은_보지_않는다(self, tmp_path) -> None:
+        # 주기형은 경로에 기대지 않으므로 배제와 무관하다.
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        _item(repo, invalidation=Invalidation(kind=InvalidationKind.PERIODIC, period_days=30))
+
+        report = Lint(repo=repo, conn=conn, mirror=None, exclude=["ai-workflow/*"]).run()
+        assert not [f for f in report.findings if f.kind is Kind.EXCLUDED_INVALIDATION]
+
+    def test_배제_밖_refs_와_섞여_있으면_배제된_것만_적는다(self, tmp_path) -> None:
+        repo, conn = _repo(tmp_path), _conn(tmp_path)
+        self._linked(repo, ["src/limit.py", "ai-workflow/x.py"])
+
+        report = Lint(repo=repo, conn=conn, mirror=None, exclude=["ai-workflow/*"]).run()
+        found = [f for f in report.findings if f.kind is Kind.EXCLUDED_INVALIDATION]
+        assert "ai-workflow/x.py" in found[0].detail
+        assert "src/limit.py" not in found[0].detail

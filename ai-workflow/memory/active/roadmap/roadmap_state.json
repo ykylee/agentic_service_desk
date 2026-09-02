@@ -898,6 +898,20 @@
       "wbs_ref": "exempt",
       "exempt_reason": "WBS-4.3.4(승격 경로 A)의 라이브 검증과 거기서 드러난 결함 수정이다. 신규 기능이 아니다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-005.md"
+    },
+    {
+      "task_id": "TASK-2026-09-02-main-007",
+      "task_status": "in_progress",
+      "wbs_ref": "exempt",
+      "exempt_reason": "기존 4.2 산출물의 관측이다. 신규 기능이 아니라 앞선 두 변경(11bb616 · 1671dd0)의 효과를 큰 표본으로 재는 일이다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-007.md"
+    },
+    {
+      "task_id": "TASK-2026-09-02-main-008",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "기존 4.2.6(Lint) 산출물의 정확성 보강이다. 신규 기능이 아니라 검사 하나가 못 보던 구멍을 메운다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-02-main-008.md"
     }
   ],
   "issues": []
