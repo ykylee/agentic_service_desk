@@ -44,6 +44,7 @@
   <a href="/"><strong>Agentic Service Desk</strong></a>
   {% for q in queues %}<a href="/queues/{{ q.id }}">{{ q.id }} {{ q.title }}</a>{% endfor %}
   <a href="/entry">＋ 질문 등록</a>
+  <a href="/ask">? 지식에 묻기</a>
   <span class="dim small">단계 {{ stage }}</span>
   {% if authenticated %}<form method="post" action="/logout" style="float:right;">
     <button type="submit" class="small">나간다</button>

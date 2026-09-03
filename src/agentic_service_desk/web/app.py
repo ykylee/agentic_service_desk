@@ -40,6 +40,8 @@ from agentic_service_desk.operations import recheck as recheck_domain
 from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.pipeline import draft_store, review as review_domain
+from agentic_service_desk.ingest.harness_runner import PiHarness
+from agentic_service_desk.pipeline.answer import AnswerPipeline
 from agentic_service_desk.pipeline import correction, publication
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
@@ -84,6 +86,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if "it" not in parent_cache:
             parent_cache["it"] = build_parent_system(cfg)
         return parent_cache["it"]
+
+    def harness():  # noqa: ANN202
+        """생성에 쓸 모델. **없으면 없는 대로 간다.**
+
+        모델이 없으면 파이프라인이 3단계에서 멈추고 조회 결과만 남는다 — 그것도
+        답이다: "지식베이스가 이만큼은 갖고 있다"를 보여 준다. 배치 쪽과 같은
+        판단이다 (`worker.runner._harness`).
+        """
+        if not cfg.llm_base_url or not cfg.llm_model:
+            return None
+        return PiHarness(cfg.llm_model, cfg.llm_api_key)
 
     def shell() -> dict:
         """모든 화면이 함께 쓰는 것 — 켜진 단계와 그 단계의 대기열."""
@@ -503,6 +516,63 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return RedirectResponse(f"/queues/Q1/{ticket_id}", status_code=303)
+
+    @app.get("/ask")
+    def ask_form(request: Request):  # noqa: ANN201
+        """지식베이스에 직접 묻는 자리 (FR-60, WBS-5.7.1).
+
+        §8.1 은 대시보드가 "조회 화면이 아니라 작업대"라고 못 박았지만, 그 절이
+        경계한 것은 **차트 구경 화면이 되는 것**이다. 같은 절이 이렇게도 적었다 —
+        *"여기서 할 수 없는 일은 아무도 할 수 없는 일이 된다."* 지식베이스에
+        무언가를 물어볼 수 있는 사람이 **아무도 없었다**: 답변 파이프라인은 모
+        시스템에서 온 질문에만 걸린다.
+
+        **단계를 보지 않는다.** 지식베이스는 S0 부터 있고 이 화면은 아무것도
+        내보내지 않으므로, 대기열처럼 점증시킬 이유가 없다 (FR-59 는 *내보내는*
+        기능의 대기열을 다룬다).
+        """
+        return TEMPLATES.TemplateResponse(request, "ask.html", shell())
+
+    @app.post("/ask")
+    def ask_submit(request: Request, question: str = Form("")):  # noqa: ANN201
+        """물어보고 결과를 펼친다. **아무것도 저장하지 않는다.**
+
+        `AnswerPipeline` 은 그 자체로는 무엇도 쓰지 않는다 — 초안 보관·티켓·답변
+        이력·게재는 전부 유입 처리(`operations.intake`)가 이어 붙이는 것이다.
+        여기서는 그 배선을 붙이지 않는 것이 요구의 절반이다 (FR-60): 검수를 지나지
+        않은 산출이 답변 이력에 남으면 지표가 오염되고, **게재 출구가 하나라는
+        규약**(NFR-3)이 흐려진다.
+
+        **동기로 답한다.** 40~60초가 걸리지만 이것은 대기열이 아니라 도구다 —
+        배치로 미루면 확인하러 다시 와야 하고, 그 순간 대기열이 하나 더 느는 것과
+        같아진다 (§8.6 이 경계한 바로 그것이다).
+        """
+        question = question.strip()
+        ctx = shell() | {"question": question}
+        if not question:
+            return TEMPLATES.TemplateResponse(
+                request, "ask.html", ctx | {"error": "물어볼 것을 적는다."}
+            )
+        repo = KnowledgeRepository(cfg.knowledge_dir)
+        if not repo.root.exists():
+            return TEMPLATES.TemplateResponse(
+                request, "ask.html", ctx | {"error": "지식베이스가 아직 없다."}
+            )
+        _, conn = dashboard()
+        try:
+            outcome = AnswerPipeline(
+                search=Search(repo=repo, conn=conn),
+                conn=conn,
+                harness=harness(),
+                generated_by=cfg.llm_model,
+            ).run(question)
+        except Exception as exc:  # noqa: BLE001 — 모델이 터져도 화면은 서야 한다
+            return TEMPLATES.TemplateResponse(
+                request, "ask.html", ctx | {"error": f"물어보다 터졌다 — {exc}"}
+            )
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "ask.html", ctx | {"outcome": outcome})
 
     @app.get("/entry")
     def entry_form(request: Request):  # noqa: ANN201

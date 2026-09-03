@@ -629,9 +629,9 @@
       "sdlc_phase": "stabilization",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.23076923076923078,
-      "total_leaves": 13,
-      "done_leaves": 3,
+      "progress": 0.2857142857142857,
+      "total_leaves": 14,
+      "done_leaves": 4,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -782,6 +782,27 @@
               "derived_status": "done",
               "linked_task_ids": [
                 "TASK-2026-09-02-main-009"
+              ],
+              "total_leaves": 1,
+              "done_leaves": 1,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "WBS-5.7",
+          "title": "지식베이스 질의 콘솔",
+          "derived_status": "done",
+          "linked_task_ids": [],
+          "total_leaves": 1,
+          "done_leaves": 1,
+          "children": [
+            {
+              "id": "WBS-5.7.1",
+              "title": "`/ask` 화면",
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-09-03-main-003"
               ],
               "total_leaves": 1,
               "done_leaves": 1,

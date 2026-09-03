@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}지식에 묻기{% endblock %}
+{% block body %}
+<h1>지식에 묻기</h1>
+<p class="dim small">
+  지식베이스가 <strong>무엇을 아는지</strong> 확인하는 자리다. 답변 파이프라인의
+  1~3단계(분석 · 조회 · 생성)를 그대로 태우고 결과를 펼쳐 보여 준다 —
+  <strong>여기서 나온 답은 저장되지도, 나가지도 않는다</strong> (FR-60).
+  묻는 자리이지 답하는 자리가 아니다.
+</p>
+
+<form method="post" action="/ask" style="display:block; margin:1rem 0;">
+  <input name="question" value="{{ question or '' }}" autofocus
+         placeholder="예: 주문이 체결됐는지 어떻게 확인하나요"
+         style="font:inherit; padding:.4rem .6rem; border:1px solid var(--line);
+                border-radius:4px; background:transparent; color:inherit; width:min(100%,36rem);">
+  <button type="submit">묻는다</button>
+  <span class="dim small">모델을 부르므로 <strong>40~60초</strong> 걸린다.</span>
+</form>
+
+{% if error %}<p class="warn">{{ error }}</p>{% endif %}
+
+{% if outcome %}
+<h2>거친 단계</h2>
+<table>
+  <tr><th>단계</th><th>무엇을 했는가</th></tr>
+  {% for s in outcome.stages %}
+  <tr>
+    <td>{{ s.stage }}{% if s.halted %} <span class="warn">멈춤</span>{% endif %}</td>
+    <td>{{ s.detail }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if outcome.halted %}
+<p class="warn" style="margin-top:1rem;">
+  <strong>답을 만들지 않았다 — {{ outcome.halted }}.</strong>
+  실제 유입이었다면 이 질문은 티켓으로 갔을 것이다 (FR-18). 지어내지 않는 것이 규칙이다.
+</p>
+{% endif %}
+
+<h2>근거 후보 {{ outcome.hits|length }}건</h2>
+{% if outcome.hits %}
+<table>
+  <tr><th>점수</th><th>어떻게 걸렸나</th><th>지식 항목</th></tr>
+  {% for h in outcome.hits %}
+  <tr>
+    <td>{{ '%.1f'|format(h.score) }}</td>
+    <td class="small dim">{{ h.matched_by|sort|join(' · ') }}</td>
+    <td>{{ h.item.title }}{% if h.is_stale %} <span class="warn small">stale</span>{% endif %}
+        <div class="small dim">{{ h.item.id }}</div></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="dim">없다. 근거가 없으면 답을 만들지 않는다.</p>
+{% endif %}
+
+{% if outcome.draft %}
+<h2>초안 — 진술 {{ outcome.draft.statements|length }}개</h2>
+<p class="dim small">
+  강도는 <strong>진술 단위</strong>다 (ADR-007). <code>확인됨</code> 은 근거 원문에
+  있는 말로 이뤄진 것이고, <code>추론</code>·<code>근거 얇음</code> 은 사람이 볼 곳이다.
+</p>
+<table>
+  <tr><th>강도</th><th>진술</th></tr>
+  {% for st in outcome.draft.statements %}
+  <tr>
+    <td class="small {% if st.confidence.needs_review %}warn{% else %}ok{% endif %}">{{ st.confidence }}</td>
+    <td>{{ st.text }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if outcome.draft.unanswered %}
+<h2>모른다고 밝힌 것 {{ outcome.draft.unanswered|length }}건</h2>
+<p class="dim small">비어 있는 것이 늘 좋은 것은 아니다 — 질문이 여러 갈래인데 전부
+  답했다면 억지 완성을 의심한다 (FR-19).</p>
+<ul>{% for u in outcome.draft.unanswered %}<li>{{ u }}</li>{% endfor %}</ul>
+{% endif %}
+
+<p class="dim small" style="margin-top:1rem;">
+  근거로 쓴 항목: {{ outcome.draft.grounding|join(' · ') }}
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}
