@@ -41,7 +41,9 @@ from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.pipeline import draft_store, review as review_domain
 from agentic_service_desk.ingest.harness_runner import PiHarness
+from agentic_service_desk.pipeline import audience as audience_domain
 from agentic_service_desk.pipeline.answer import AnswerPipeline
+from agentic_service_desk.pipeline.review import ReviewInput
 from agentic_service_desk.pipeline import correction, publication
 from agentic_service_desk.operations import resolution as resolution_domain
 from agentic_service_desk.operations import ticket as ticket_domain
@@ -572,7 +574,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         finally:
             conn.close()
-        return TEMPLATES.TemplateResponse(request, "ask.html", ctx | {"outcome": outcome})
+        ctx |= {"outcome": outcome}
+        if outcome.draft is not None:
+            ctx |= {"renderings": _renderings(question, outcome, harness())}
+        return TEMPLATES.TemplateResponse(request, "ask.html", ctx)
 
     @app.get("/entry")
     def entry_form(request: Request):  # noqa: ANN201
@@ -891,6 +896,27 @@ def _transitions(detail) -> list[tuple[str, str]]:  # noqa: ANN001
     }
     allowed = ticket_domain.TRANSITIONS[detail.item.ticket.state]
     return [(str(s), labels[s]) for s in labels if s in allowed]
+
+
+def _renderings(question: str, outcome, harness):  # noqa: ANN001, ANN202
+    """초안을 대상 둘로 정제한다 (FR-61).
+
+    **호출 하나를 더 쓴다.** 대상마다 부르면 둘이 되는데, 두 글은 같은 초안을
+    다르게 쓰는 것이라 한 번에 내는 편이 서로 어긋날 여지도 적다.
+
+    실패하면 **빈 목록을 돌려준다** — 정제는 덤이고, 그것 때문에 조회·초안 결과가
+    화면에서 사라지면 안 된다.
+    """
+    if harness is None:
+        return []
+    from agentic_service_desk.ingest.agent import extract_json
+
+    review = ReviewInput.of(outcome.draft, outcome.hits)
+    prompt = audience_domain.build_prompt(question, outcome.draft, outcome.hits)
+    try:
+        return audience_domain.parse(extract_json(harness.run(prompt).text), review)
+    except Exception:  # noqa: BLE001 — 덤이 본체를 무너뜨리지 않는다
+        return []
 
 
 def _chosen_invalidation(  # noqa: ANN001

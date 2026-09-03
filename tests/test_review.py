@@ -125,6 +125,28 @@ class TestMechanical:
             _input("한도는 300만원이다.", source="한도는 300만원으로 정해진다.")
         ) is None
 
+    def test_목록_번호는_수치가_아니다(self) -> None:
+        # **서식이지 사실이 아니다.** `1.` 을 수치로 세면 근거 원문에 그 토큰이
+        # 있을 리 없어, **번호 목록을 쓴 초안이 통째로 반려된다.** 2026-09-03
+        # 라이브에서 정제 산출이 `1.` `2.` `3.` 으로 걸리며 드러났다.
+        assert check_ungrounded_numbers(
+            _input("1. 먼저 확인한다\n2) 그다음을 본다", source="확인 절차가 있다.")
+        ) is None
+
+    def test_문장_끝_마침표가_수치를_다르게_만들지_않는다(self) -> None:
+        # `300.` 과 `300` 이 다른 것으로 대조되면 그것도 같은 종류의 거짓 반려다.
+        assert check_ungrounded_numbers(
+            _input("한도는 300만원이다.", source="한도는 300만원으로 정해진다")
+        ) is None
+
+    def test_목록_안의_진짜_수치는_여전히_잡는다(self) -> None:
+        # 번호만 빼는 것이지 목록 안의 수치를 봐주는 것이 아니다.
+        verdict = check_ungrounded_numbers(
+            _input("1. 한도는 900만원이다", source="한도는 등급으로 정해진다.")
+        )
+        assert verdict.reason is Reject.P1
+        assert "900" in verdict.detail
+
     def test_기계가_잡으면_모델을_부르지_않는다(self) -> None:
         # 반려는 하나면 충분하고, 확정된 것을 다시 물을 이유가 없다.
         harness = FakeHarness('{"passed": true}')

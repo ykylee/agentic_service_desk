@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-09-03-main-004 — WBS-5.7.2 대상별 정제 — 고객응대용과 개발자용",
       "TASK-2026-09-03-main-003 — WBS-5.7.1 지식에 묻기 — 운영자 질의 콘솔",
       "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유",
       "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
@@ -42,21 +43,21 @@
       "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
       "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
       "TASK-2026-09-02-main-005 — 승격 경로 A 라이브 — 등록에서 지식 항목까지",
-      "TASK-2026-09-02-main-004 — WBS-5.2.1 실운영 조합 기동 거부",
-      "TASK-2026-09-02-main-003 — M-005 를 세우고 남은 결정을 기록한다"
+      "TASK-2026-09-02-main-004 — WBS-5.2.1 실운영 조합 기동 거부"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-03.md",
-    "task_count": 3,
+    "task_count": 4,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
       "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유",
-      "TASK-2026-09-03-main-003 — WBS-5.7.1 지식에 묻기 — 운영자 질의 콘솔"
+      "TASK-2026-09-03-main-003 — WBS-5.7.1 지식에 묻기 — 운영자 질의 콘솔",
+      "TASK-2026-09-03-main-004 — WBS-5.7.2 대상별 정제 — 고객응대용과 개발자용"
     ]
   },
   "next_documents": [

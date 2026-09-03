@@ -117,6 +117,22 @@ COLUMN_REASONS: tuple[Reject, ...] = (Reject.P6, Reject.P7, Reject.P8)
 #: 고유명사는 언어별 판정이 필요해 의미 판정 쪽으로 넘긴다 (§5.5.1).
 _NUMERIC = re.compile(r"[0-9][0-9,._]*")
 
+#: 줄 앞의 목록 번호. **수치가 아니라 서식이다** (2026-09-03).
+#: `1. 우선 …` 을 그대로 훑으면 `1.` 이 수치로 잡히고, 근거 원문에 그 토큰이 있을
+#: 리 없으므로 **번호 목록을 쓴 초안이 통째로 P1 에 반려된다.** 라이브에서
+#: 정제 산출이 `1.` `2.` `3.` 로 걸리며 드러났다.
+_LIST_MARKER = re.compile(r"(?m)^\s*[0-9]+[.)]\s")
+
+
+def _numbers_in(text: str) -> list[str]:
+    """이 글이 든 수치. **서식은 빼고 센다.**
+
+    목록 번호를 지우고 훑은 뒤, 꼬리의 구분자를 떼어 `3000.` 과 `3000` 이 같은
+    것으로 대조되게 한다 — 문장 끝의 마침표 때문에 근거에 있는 수치가 없는 것으로
+    판정되면 그것도 같은 종류의 거짓 반려다.
+    """
+    return [n.rstrip(".,_") for n in _NUMERIC.findall(_LIST_MARKER.sub("", text)) if n.rstrip(".,_")]
+
 
 @dataclass(frozen=True)
 class Verdict:
@@ -187,10 +203,8 @@ def check_ungrounded_numbers(review: ReviewInput) -> Verdict | None:
     판정 자체는 옳다.
     """
     source = " ".join(review.source_text.get(g, "") for g in review.grounding)
-    source_numbers = set(_NUMERIC.findall(source))
-    ungrounded = [
-        n for n in _NUMERIC.findall(review.draft_body) if n not in source_numbers
-    ]
+    source_numbers = set(_numbers_in(source))
+    ungrounded = [n for n in _numbers_in(review.draft_body) if n not in source_numbers]
     if not ungrounded:
         return None
     return Verdict(

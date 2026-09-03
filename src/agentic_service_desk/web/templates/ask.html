@@ -20,6 +20,34 @@
 
 {% if error %}<p class="warn">{{ error }}</p>{% endif %}
 
+{% if renderings %}
+<h2>정제된 답 — 대상 둘</h2>
+<p class="warn small">
+  <strong>검수를 지나지 않은 글이다.</strong> 이 화면은 아무것도 저장하지 않고
+  내보내지 않는다 — 그대로 사람에게 전달하면 검수 체계 밖으로 나가는 셈이다.
+  실제 답변은 유입 → 파이프라인 → Q2 검수 → 게재를 지난다.
+</p>
+<div class="sides">
+  {% for r in renderings %}
+  <div class="side">
+    <h4>{% if r.audience == 'customer' %}고객응대용 — 질문한 사람에게{% else %}개발자용 — 원인을 찾는 사람에게{% endif %}</h4>
+    <div style="white-space:pre-wrap">{{ r.text }}</div>
+    {% if r.ungrounded %}
+    <p class="warn small" style="margin-bottom:0">
+      근거 원문에 없는 수치가 섞였다: {{ r.ungrounded|join(', ') }} — 정제가 사실을
+      보탰을 수 있다 (검수 P1 과 같은 대조).
+    </p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+<p class="dim small">
+  정제는 <strong>다시 쓰는 것이지 새로 답하는 것이 아니다</strong> — 초안과 근거 원문에
+  없는 것은 쓰지 않게 지시했고, 수치는 기계적으로 한 번 더 대조한다. 아래 초안이
+  그 원본이다.
+</p>
+{% endif %}
+
 {% if outcome %}
 <h2>거친 단계</h2>
 <table>
