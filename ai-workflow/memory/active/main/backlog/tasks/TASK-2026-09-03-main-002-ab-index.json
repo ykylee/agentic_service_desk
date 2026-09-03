@@ -1,0 +1,29 @@
+{
+ "measured_at": "2026-09-03",
+ "method": "같은 파일 하나로 옛 프롬프트(제목만 색인 + 옛 규칙 4)와 새 프롬프트(경로 색인 + 재확인 지시)를 각각 한 번 호출. 제안은 적용하지 않았다 — 지식베이스에 쓰지 않는다.",
+ "target": "src/auto_trading/dashboard_api/app.py",
+ "target_chars": 27888,
+ "anchored_items": 12,
+ "anchored_stale": 10,
+ "arms": [
+  {
+   "arm": "old_index_title_only",
+   "elapsed_s": 97,
+   "prompt_chars": 42514,
+   "proposals": 5,
+   "chose_existing_ids": 0,
+   "anchored_hits": 0,
+   "stale_recovered": 0
+  },
+  {
+   "arm": "new_index_with_paths",
+   "elapsed_s": 169,
+   "prompt_chars": 52571,
+   "proposals": 13,
+   "chose_existing_ids": 10,
+   "anchored_hits": 10,
+   "stale_recovered": 8
+  }
+ ],
+ "caveat": "n=1 파일 · 각 1회 호출 · 모델은 비결정적이다. 효과 크기는 주장하지 않는다."
+}

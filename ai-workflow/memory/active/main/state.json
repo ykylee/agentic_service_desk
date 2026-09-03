@@ -34,6 +34,7 @@
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유",
       "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
       "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기",
       "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
@@ -42,19 +43,19 @@
       "TASK-2026-09-02-main-005 — 승격 경로 A 라이브 — 등록에서 지식 항목까지",
       "TASK-2026-09-02-main-004 — WBS-5.2.1 실운영 조합 기동 거부",
       "TASK-2026-09-02-main-003 — M-005 를 세우고 남은 결정을 기록한다",
-      "TASK-2026-09-02-main-002 — 답변 경로를 실지식베이스로 태운다 — 조회 오탐부터",
-      "TASK-2026-09-02-main-001 — 워크플로우 킷 v1.8.0 bootstrap 재적용"
+      "TASK-2026-09-02-main-002 — 답변 경로를 실지식베이스로 태운다 — 조회 오탐부터"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-03.md",
-    "task_count": 1,
+    "task_count": 2,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
-      "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용"
+      "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
+      "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유"
     ]
   },
   "next_documents": [

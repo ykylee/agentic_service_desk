@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from agentic_service_desk.ingest.agent import (
+    IndexEntry,
     AgentOutputError,
     IngestAgent,
     ProposedItem,
@@ -186,7 +187,7 @@ class IngestRun:
 
         stored, result.broken_items = self._repo.scan()
         by_id = {s.item.id: s for s in stored}
-        index = [(s.item.id, s.item.title) for s in stored]
+        index = [_index_entry(s.item) for s in stored]
 
         heads = self._ingest_source(result, by_id, index)
         answer_ids = self._ingest_qna(result, by_id, index)
@@ -220,7 +221,7 @@ class IngestRun:
         self,
         result: IngestResult,
         by_id: dict[str, StoredItem],
-        index: list[tuple[str, str]],
+        index: list[IndexEntry],
     ) -> dict[str, str]:
         """붙은 저장소들의 변경분을 읽는다.
 
@@ -250,7 +251,7 @@ class IngestRun:
         mirror: SourceMirror,
         result: IngestResult,
         by_id: dict[str, StoredItem],
-        index: list[tuple[str, str]],
+        index: list[IndexEntry],
     ) -> str | None:
         """저장소 하나. 무사히 끝났을 때만 HEAD 를 돌려준다."""
         if not mirror.is_cloned:
@@ -421,7 +422,7 @@ class IngestRun:
         self,
         result: IngestResult,
         by_id: dict[str, StoredItem],
-        index: list[tuple[str, str]],
+        index: list[IndexEntry],
     ) -> list[str]:
         """QnA 를 읽는다. **산출물 필터를 지난 것만 온다** (NFR-4)."""
         done = {
@@ -462,7 +463,7 @@ class IngestRun:
         proposal: ProposedItem,
         provenance: list,
         by_id: dict[str, StoredItem],
-        index: list[tuple[str, str]],
+        index: list[IndexEntry],
         result: IngestResult,
     ) -> None:
         """제안 하나를 반영한다. **사람이 고친 항목은 건드리지 않는다** (D38).
@@ -495,7 +496,7 @@ class IngestRun:
         else:
             # 같은 실행의 다음 묶음이 방금 만든 항목을 갱신 대상으로 볼 수 있게 한다 —
             # 없으면 한 번의 ingest 안에서 같은 개념이 여러 항목으로 갈린다.
-            index.append((item.id, item.title))
+            index.append(_index_entry(item))
             result.created += 1
 
     # --- 진행 표시 -------------------------------------------------------
@@ -517,6 +518,33 @@ class IngestRun:
         if answer_ids:
             parts.append(f"QnA 답변 {len(answer_ids)}건")
         return ", ".join(parts) or "원천 없음"
+
+
+def _index_entry(item) -> IndexEntry:  # noqa: ANN001
+    """항목 하나를 색인 줄로 만든다.
+
+    **출처 경로를 먼저, 무효화 refs 를 뒤에 둔다.** 앞엣것은 *무엇을 보고 썼는가*라
+    "이 파일에서 나온 항목"을 가장 곧게 가리키고, 뒤엣것은 *무엇이 바뀌면
+    틀려지는가*라 대개 같은 자리를 가리키되 아닐 수도 있다. 상한이 걸리므로
+    더 곧은 쪽이 앞에 와야 한다.
+
+    합치는 이유는 실측이다 — 출처 경로가 없는 항목이 55%였고(2026-09-02), 그
+    항목들도 무효화 refs 로는 실재 경로를 대고 있었다. 한쪽만 보면 절반이 색인에서
+    익명으로 남는다.
+    """
+    paths: list[str] = []
+    for p in item.provenance:
+        if p.path and p.path not in paths:
+            paths.append(p.path)
+    for r in item.invalidation.refs:
+        if r not in paths:
+            paths.append(r)
+    return IndexEntry(
+        id=item.id,
+        title=item.title,
+        paths=tuple(paths),
+        edited_by_human=item.edited_by_human,
+    )
 
 
 def _excluded(path: str, patterns: Sequence[str]) -> bool:

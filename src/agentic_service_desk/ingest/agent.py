@@ -120,7 +120,13 @@ _RULES = """당신은 지식베이스를 짓는 에이전트다. 아래 원천�
    "지금 이 부서의 한도는 300만 원"은 상태다. 상태는 굳는 순간 틀려진다.
 3. **원천의 언어를 그대로 따른다.** 같은 개념을 언어별로 나누지 않으며, 한 항목 안에
    여러 언어가 섞여도 된다.
-4. 이미 있는 항목 목록을 준다. 같은 개념이면 **새로 만들지 말고 그 id 로 갱신**한다.
+4. 이미 있는 항목 목록을 준다. `←` 뒤는 그 항목이 **묶인 곳**이다.
+   - 같은 개념이면 **새로 만들지 말고 그 id 로 갱신**한다.
+   - **지금 읽는 파일에 묶인 항목은 다시 확인해 낸다.**
+     달라졌으면 고쳐서 내고, 그대로면 그대로 다시 낸다.
+     내지 않으면 그 항목은 **근거가 바뀐 채로 남고 아무도 고치지 않는다.**
+   - `사람이 고침` 이 붙은 항목은 **기계적으로 다시 내지 않는다.** 판단이 실제로
+     다를 때만 낸다 — 그때는 덮이지 않고 사람에게 올라간다.
 5. 각 항목에 **무효화 조건**을 단다 — 무엇이 바뀌면 이 지식이 틀려지는가.
    코드에 묶을 수 있으면 kind="linked" 와 refs(경로 목록), 묶을 대상이 없으면
    kind="periodic" 과 period_days.
@@ -148,14 +154,50 @@ _RULES = """당신은 지식베이스를 짓는 에이전트다. 아래 원천�
 만들 것이 없으면 {"items": []} 를 낸다."""
 
 
-def _index_block(index: list[tuple[str, str]]) -> str:
+MAX_INDEX_PATHS = 3
+"""색인 한 줄에 실을 경로 수 상한.
+
+전부 실으면 경로가 많은 항목 하나가 줄을 길게 차지해 **다른 항목이 묻힌다.**
+알아보는 데 필요한 것은 "이 파일에 묶여 있다"는 사실이지 목록의 완전함이 아니다.
+"""
+
+
+@dataclass(frozen=True)
+class IndexEntry:
+    """색인 한 줄 — 모델이 **이미 있는 것**을 알아보는 재료.
+
+    제목만 주던 것을 고친 자리다 (2026-09-03). 지시는 "같은 개념이면 그 id 로
+    갱신하라"고 하는데, 제목만으로는 **지금 읽는 파일에서 나온 항목이 어느
+    것인지 알 수가 없다** — `ARM64 클러스터 토폴로지` 가 `app.py` 에서 나왔는지
+    모델은 모른다. 실측에서 항목의 21%가 근거가 바뀐 채(stale) 남아 있었고,
+    커서는 이미 그 변경을 읽고 지나간 뒤였다.
+    """
+
+    id: str
+    title: str
+    paths: tuple[str, ...] = ()
+    """이 항목이 묶인 곳 — 출처 경로와 무효화 refs 를 합친 것."""
+
+    edited_by_human: bool = False
+    """사람이 고친 항목인가. **기계적으로 다시 내면 안 되는 표시다** — 덮이지 않고
+    모순으로 남으므로(FR-6), 판단이 실제로 다를 때만 내야 대기열이 조용하다."""
+
+
+def _index_line(e: IndexEntry) -> str:
+    marks = list(e.paths[:MAX_INDEX_PATHS])
+    if e.edited_by_human:
+        marks.append("사람이 고침")
+    return f"- {e.id}: {e.title}" + (f"  ← {' · '.join(marks)}" if marks else "")
+
+
+def _index_block(index: list[IndexEntry]) -> str:
     if not index:
         return "이미 있는 항목: (없다 — 처음이다)"
-    lines = "\n".join(f"- {item_id}: {title}" for item_id, title in index)
-    return f"이미 있는 항목:\n{lines}"
+    lines = "\n".join(_index_line(e) for e in index)
+    return f"이미 있는 항목 (`←` 뒤는 그 항목이 묶인 곳):\n{lines}"
 
 
-def build_source_prompt(material: SourceMaterial, index: list[tuple[str, str]]) -> str:
+def build_source_prompt(material: SourceMaterial, index: list[IndexEntry]) -> str:
     parts = [_RULES, "", _index_block(index), "", f"원천 — 커밋 {material.commit}"]
     if material.messages:
         parts += ["", "커밋 메시지 (왜 그렇게 정했는가의 1차 출처):"]
@@ -165,7 +207,7 @@ def build_source_prompt(material: SourceMaterial, index: list[tuple[str, str]]) 
     return "\n".join(parts)
 
 
-def build_qna_prompt(material: QnaMaterial, index: list[tuple[str, str]]) -> str:
+def build_qna_prompt(material: QnaMaterial, index: list[IndexEntry]) -> str:
     return "\n".join(
         [
             _RULES,
@@ -339,12 +381,12 @@ class IngestAgent:
         self._on_retry = on_retry
 
     def from_source(
-        self, material: SourceMaterial, index: list[tuple[str, str]]
+        self, material: SourceMaterial, index: list[IndexEntry]
     ) -> list[ProposedItem]:
         return self._call(build_source_prompt(material, index))
 
     def from_qna(
-        self, material: QnaMaterial, index: list[tuple[str, str]]
+        self, material: QnaMaterial, index: list[IndexEntry]
     ) -> list[ProposedItem]:
         return self._call(build_qna_prompt(material, index))
 

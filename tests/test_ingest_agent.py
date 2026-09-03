@@ -16,6 +16,7 @@ from agentic_service_desk.ingest.agent import (
     ProposedItem,
     QnaMaterial,
     SourceMaterial,
+    IndexEntry,
     build_source_prompt,
     extract_json,
     parse_proposals,
@@ -216,9 +217,46 @@ class TestPrompt:
     def test_이미_있는_항목을_알려준다(self) -> None:
         # 없으면 같은 개념이 매번 새 항목으로 갈린다 (ingest 절차 2단계).
         prompt = build_source_prompt(
-            SourceMaterial(commit="a1b2c3d"), [("k-1", "결재 한도가 결정되는 규칙")]
+            SourceMaterial(commit="a1b2c3d"),
+            [IndexEntry(id="k-1", title="결재 한도가 결정되는 규칙")],
         )
         assert "k-1: 결재 한도가 결정되는 규칙" in prompt
+
+    def test_항목이_어디에_묶였는지_알려준다(self) -> None:
+        # **제목만으로는 알아볼 수 없다.** 2026-09-03 실측: 항목의 21%가 근거가
+        # 바뀐 채 남아 있었는데 커서는 그 변경을 이미 읽고 지나간 뒤였다 —
+        # 모델이 `ARM64 클러스터 토폴로지` 가 `app.py` 에서 나온 줄 몰랐다.
+        prompt = build_source_prompt(
+            SourceMaterial(commit="a"),
+            [IndexEntry(id="k-1", title="개념", paths=("src/limit.py",))],
+        )
+        assert "k-1: 개념  ← src/limit.py" in prompt
+
+    def test_경로가_많으면_잘라_싣는다(self) -> None:
+        # 한 항목이 줄을 길게 차지하면 다른 항목이 묻힌다. 알아보는 데 필요한 것은
+        # "이 파일에 묶여 있다"이지 목록의 완전함이 아니다.
+        prompt = build_source_prompt(
+            SourceMaterial(commit="a"),
+            [IndexEntry(id="k-1", title="개념", paths=("a.py", "b.py", "c.py", "d.py"))],
+        )
+        assert "a.py · b.py · c.py" in prompt
+        assert "d.py" not in prompt
+
+    def test_사람이_고친_항목을_표시한다(self) -> None:
+        # 기계적으로 다시 내면 덮이지 않고 **모순으로 남아** 대기열이 찬다 (FR-6).
+        prompt = build_source_prompt(
+            SourceMaterial(commit="a"),
+            [IndexEntry(id="k-1", title="개념", edited_by_human=True)],
+        )
+        assert "사람이 고침" in prompt
+
+    def test_묶인_항목을_다시_확인하라는_지시가_있다(self) -> None:
+        # 회복 조건이 하나뿐이다 — 모델이 그 항목을 다시 내놓아야만 stale 이 풀린다
+        # (`to_knowledge_item` 이 쓸 때 `stale=False`). "확인했는데 그대로다"를
+        # 표현할 다른 길이 없다.
+        prompt = build_source_prompt(SourceMaterial(commit="a"), [])
+        assert "지금 읽는 파일에 묶인 항목은 다시 확인해 낸다" in prompt
+        assert "그대로면 그대로 다시 낸다" in prompt
 
     def test_커밋_메시지가_실린다(self) -> None:
         # 히스토리가 "왜 그렇게 정했는가"의 1차 출처다 (D16, §2.2.1).
