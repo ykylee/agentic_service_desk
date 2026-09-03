@@ -813,7 +813,8 @@
               "title": "대상별 정제",
               "derived_status": "done",
               "linked_task_ids": [
-                "TASK-2026-09-03-main-004"
+                "TASK-2026-09-03-main-004",
+                "TASK-2026-09-03-main-005"
               ],
               "total_leaves": 1,
               "done_leaves": 1,

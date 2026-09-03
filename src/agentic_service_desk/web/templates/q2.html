@@ -60,6 +60,16 @@
   {% endif %}
 </p>
 
+<h4 style="margin-bottom:.3rem">나갈 글</h4>
+<div class="side" style="white-space:pre-wrap">{{ d.body }}</div>
+<p class="dim small">
+  {% if d.rendered %}질문자가 읽을 말로 다시 쓴 글이다 (FR-61) — <strong>승인하면 이대로
+  나간다.</strong> 아래 진술은 이 글이 어디서 왔고 어디가 약한지를 보여 준다.
+  {% else %}<strong>정제되지 않았다</strong> — 진술을 이어 붙인 원본이 그대로 나간다.
+  모델이 없었거나 정제가 실패한 것이다.{% endif %}
+</p>
+
+<h4 style="margin:1rem 0 .3rem">근거가 된 진술 — 어디가 약한가</h4>
 <table>
   {% for s in d.statements %}
   <tr>

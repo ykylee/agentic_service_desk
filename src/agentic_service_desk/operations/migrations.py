@@ -281,6 +281,19 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=14,
+        name="answer_draft.rendered — 나가는 글을 초안과 함께 든다 (FR-61)",
+        statements=(
+            # **이 칸이 없으면 정제가 게재에 닿지 않는다.** 파이프라인 4단계가 다시
+            # 쓴 글이 초안 저장에서 떨어져 나가고, Q2 를 지나 나가는 것은 진술을
+            # 이어 붙인 원본이다 — 질문한 사람에게 내부 경로가 그대로 간다.
+            #
+            # 비워 두는 것이 기본이다. 이행 시점의 옛 초안은 정제된 적이 없으므로
+            # `NULL` 이고, 그때는 종전대로 진술이 나간다.
+            "ALTER TABLE answer_draft ADD COLUMN rendered TEXT",
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

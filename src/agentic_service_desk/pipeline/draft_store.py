@@ -55,6 +55,14 @@ class PendingDraft:
     agent_outcome: str | None
     agent_reason: str | None
     agent_detail: str
+    rendered: str = ""
+    """질문자가 읽을 말로 다시 쓴 글 (FR-61). **이것이 나가는 글이다.**
+
+    진술과 따로 드는 이유는 강도가 진술에 붙기 때문이다 — 나가는 글에는 강도가
+    없고(운영자 화면 전용), 검수자는 두 가지를 함께 본다: 나갈 글과, 그 글이 어느
+    진술에서 왔고 어디가 약한지.
+    """
+
     corrects: str | None = None
     """정정 대상 `answer_record.id` (PO-1). **후속에 대한 새 답변과 정정은 다르다** —
     전자는 글을 하나 더 올리고 후자는 있는 글을 고친다."""
@@ -72,7 +80,12 @@ class PendingDraft:
 
     @property
     def body(self) -> str:
-        return "\n\n".join(s.text for s in self.statements)
+        """나가는 글. 정제된 것이 있으면 그쪽이다 (FR-61).
+
+        **`Draft.body` 와 같은 규칙이어야 한다** — 갈리면 검수 화면이 보여 준 글과
+        게재된 글이 달라진다.
+        """
+        return self.rendered or "\n\n".join(s.text for s in self.statements)
 
     @property
     def weak_points(self) -> tuple[Statement, ...]:
@@ -122,10 +135,10 @@ def save(
     draft_id = f"ad-{uuid.uuid4().hex[:12]}"
     conn.execute(
         "INSERT INTO answer_draft "
-        "(id, qna_item_id, question, statements, grounding, unanswered, "
+        "(id, qna_item_id, question, statements, grounding, unanswered, rendered, "
         " agent_outcome, agent_reason, agent_detail, generated_by, corrects, "
         " state, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             draft_id,
             qna_item_id,
@@ -143,6 +156,9 @@ def save(
             ),
             json.dumps(list(draft.grounding), ensure_ascii=False),
             json.dumps(list(draft.unanswered), ensure_ascii=False),
+            # **정제가 여기서 떨어지면 게재에 닿지 않는다** — Q2 를 지나 나가는 것은
+            # 진술을 이어 붙인 원본이 되고, 질문한 사람에게 내부 경로가 그대로 간다.
+            getattr(draft, "rendered", "") or None,
             verdict.outcome if verdict else None,
             str(verdict.reason) if verdict and verdict.reason else None,
             verdict.detail if verdict else "",
@@ -277,6 +293,7 @@ def _from_row(row: sqlite3.Row) -> PendingDraft:
         ),
         grounding=tuple(json.loads(row["grounding"])),
         unanswered=tuple(json.loads(row["unanswered"])),
+        rendered=row["rendered"] or "",
         agent_outcome=row["agent_outcome"],
         agent_reason=row["agent_reason"],
         agent_detail=row["agent_detail"] or "",

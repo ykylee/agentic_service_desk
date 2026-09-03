@@ -143,6 +143,10 @@ CREATE TABLE IF NOT EXISTS answer_draft (
     statements   TEXT NOT NULL,   -- JSON — 진술과 근거 강도
     grounding    TEXT NOT NULL,   -- JSON — 지식 항목 id
     unanswered   TEXT NOT NULL,   -- JSON — 모른다고 밝힌 경계 (FR-19)
+    rendered     TEXT,            -- 질문자가 읽을 말로 다시 쓴 **한 편의 글** (FR-61).
+                                  -- **이것이 나가는 글이다** — 없으면 진술을 이어 붙인
+                                  -- 원본이 나간다. 진술과 따로 드는 이유는 강도가
+                                  -- 진술에 붙기 때문이다: 나가는 글에는 강도가 없다
     agent_outcome TEXT,           -- passed | rejected. 에이전트 검수 결과
     agent_reason TEXT,            -- P1~P5
     agent_detail TEXT,
