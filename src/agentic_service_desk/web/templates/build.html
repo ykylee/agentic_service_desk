@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}지식베이스 구축{% endblock %}
+{% block body %}
+<h1>지식베이스 구축</h1>
+<p class="dim small">
+  지금 돌고 있는가, 얼마나 남았는가 (FR-63) ·
+  <a href="/"><strong>지식이 자라고 있는가는 첫 화면</strong></a>
+</p>
+
+{% if error %}<p class="warn">{{ error }}</p>{% endif %}
+{% if note %}<p class="ok">{{ note }}</p>{% endif %}
+
+<div class="cards">
+  <div class="card">
+    <div class="dim small">워커</div>
+    <div class="n {% if beat.alive %}ok{% else %}warn{% endif %}">
+      {{ '돈다' if beat.alive else '안 돈다' }}
+    </div>
+    <div class="dim small">{{ beat.label }}</div>
+  </div>
+  <div class="card">
+    <div class="dim small">구축</div>
+    <div class="n {% if control.paused %}warn{% endif %}">
+      {{ '멈춤' if control.paused else ('진행 중' if run else '대기') }}
+    </div>
+    <div class="dim small">
+      {% if control.paused %}화면이 세웠다 — 시작을 눌러야 다시 돈다
+      {% elif run %}{{ run.repo_url or '원천을 고르는 중' }}
+      {% else %}주기마다 바뀐 것이 있으면 돈다{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="dim small">모델</div>
+    <div class="n {% if endpoint.configured %}ok{% else %}warn{% endif %}">
+      {{ '붙었다' if endpoint.configured else '없다' }}
+    </div>
+    <div class="dim small">
+      {% if endpoint.configured %}{{ endpoint.model }}
+      {% else %}<a href="/settings/llm">연결을 정한다</a> — 없으면 ingest 가 아예 돌지 않는다{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="dim small">지식 항목</div>
+    <div class="n">{{ s.total }}</div>
+    <div class="dim small">소스 {{ s.from_source }} · QnA {{ s.from_qna }}</div>
+  </div>
+</div>
+
+<h2>지금 도는 런</h2>
+{% if run %}
+<table>
+  <tr><th style="width:9rem">진행</th>
+      <td><strong>묶음 {{ run.chunks_done }}/{{ run.chunks_total or '?' }}</strong>
+        {%- if run.chunks_total %} · {{ '%.0f'|format(run.ratio * 100) }}%{% endif %}
+        <div class="dim small">{{ run.repo_url or '—' }}</div></td></tr>
+  <tr><th>경과</th><td>{{ run.elapsed_label }}
+      <span class="dim small">· 시작 {{ run.started_at[:16].replace('T', ' ') }}</span></td></tr>
+  <tr><th>남은 시간</th>
+      <td>{% if run.remaining_label %}{{ run.remaining_label }}
+        <div class="dim small">
+          묶음당 평균 {{ '%.0f'|format(run.seconds_per_chunk) }}초로 잡은 값이다.
+          <strong>평균이지 중앙값이 아니다</strong> — 묶음마다의 시각은 남기지 않는다
+        </div>
+        {% else %}<span class="dim">아직 잴 수 없다 — 묶음 하나가 끝나야 안다</span>{% endif %}</td></tr>
+</table>
+{% else %}
+<p class="dim">지금 도는 런이 없다.</p>
+{% endif %}
+
+<h2>어디까지 읽었나</h2>
+<p class="dim small">
+  커서는 <strong>ingest 가 끝난 뒤에만</strong> 옮겨진다 (ADR-006) — 먼저 옮기면 중단된
+  구간을 건너뛰고, 그러면 지식에 구멍이 생기는데 아무도 알아채지 못한다.
+</p>
+<table>
+  <tr><th style="width:16rem">원천</th><th>커서</th><th style="width:11rem">갱신</th></tr>
+  {% for kind, cursor, updated in cursors %}
+  <tr><td class="small">{{ kind }}</td>
+      {# 소스 커서는 커밋 해시이고 QnA 커서는 시각이다 — 같은 길이로 자르면 시각이 잘린다. #}
+      <td class="small"><code>{{ cursor[:12] if cursor|length == 40 else cursor }}</code></td>
+      <td class="dim small">{{ updated[:16].replace('T', ' ') }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="dim">아직 아무것도 읽지 않았다 — 처음 도는 런이 전체를 읽는다.</td></tr>
+  {% endfor %}
+</table>
+{% if repos %}
+<p class="dim small">붙은 저장소: {% for r in repos %}<code>{{ r }}</code> {% endfor %}</p>
+{% else %}
+<p class="warn small">붙은 저장소가 없다 — <code>ASD_PARENT_REPO_URL</code> 이 비어 있다.</p>
+{% endif %}
+
+<h2>런 이력</h2>
+<table>
+  <tr><th style="width:11rem">시작</th><th style="width:7rem">경과</th>
+      <th style="width:6rem">묶음</th><th>결과</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td class="dim small">{{ r.started_at[:16].replace('T', ' ') }}
+      {%- if r.trigger != 'schedule' %} <span class="small">({{ r.trigger }})</span>{% endif %}</td>
+    <td class="small">{{ r.elapsed_label }}</td>
+    <td class="small">{{ r.chunks_done }}{% if r.chunks_total %}/{{ r.chunks_total }}{% endif %}</td>
+    <td class="small {% if r.outcome == 'failed' %}warn{% elif r.outcome == 'completed' %}ok{% endif %}">
+      {{ r.outcome_label }}{% if r.note %} <span class="dim">— {{ r.note }}</span>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="dim">아직 없다. 이 표는 워커가 런을 열 때부터 쌓인다.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>제어</h2>
+<p class="dim small">
+  화면의 버튼은 워커에게 <strong>뜻을 남길 뿐</strong>이다 — 웹과 워커는 다른
+  프로세스라(ADR-001) 버튼이 함수를 부를 수 없다. 워커가 떠 있지 않으면 아무 일도
+  일어나지 않고, 위 카드가 그것을 말한다.
+</p>
+<p>
+  <form method="post" action="/build/start"><button type="submit">지금 시작</button></form>
+  <form method="post" action="/build/stop"><button type="submit">중단</button></form>
+  <span class="dim small">
+    중단은 <strong>현재 묶음을 마치고</strong> 멈춘다 (FR-5) — 커서를 옮기지 않으므로
+    다시 시작하면 그 구간부터 이어 읽는다.
+  </span>
+</p>
+
+<h3>처음부터 다시 읽기</h3>
+<p class="dim small">
+  커서를 지운다. <strong>지식 항목은 지우지 않는다</strong> — 다시 읽으면 같은 항목이
+  갱신되고 사람이 고친 것은 덮이지 않는다 (FR-6). 실측 기준
+  <strong>442파일 / 116묶음이 약 5시간</strong>이며, <strong>런이 도는 중에는 거부한다.</strong>
+</p>
+<form method="post" action="/build/rebuild">
+  <input name="confirm" placeholder="재구축" size="12">
+  <button type="submit">커서를 지우고 다시 읽는다</button>
+  <span class="dim small">확인 칸에 <code>재구축</code> 을 적는다</span>
+</form>
+{% endblock %}

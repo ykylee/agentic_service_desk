@@ -294,6 +294,61 @@ MIGRATIONS: tuple[Migration, ...] = (
             "ALTER TABLE answer_draft ADD COLUMN rendered TEXT",
         ),
     ),
+    Migration(
+        version=15,
+        name="운영 콘솔 — 연결·심박·런·제어 (FR-62·FR-63)",
+        statements=(
+            # **연결의 SSOT 가 파일에서 DB 로 옮겨온다** (ADR-009 개정). 이행은
+            # 행을 만들지 않는다 — 비어 있으면 `.env` 를 씨앗으로 읽으므로, 지금
+            # 도는 구성이 이행 하나로 달라지지 않는다.
+            """
+            CREATE TABLE IF NOT EXISTS llm_endpoint (
+                id                 INTEGER PRIMARY KEY,
+                base_url           TEXT NOT NULL,
+                model              TEXT NOT NULL,
+                embedding_model    TEXT NOT NULL DEFAULT '',
+                embedding_base_url TEXT NOT NULL DEFAULT '',
+                max_output_tokens  INTEGER NOT NULL,
+                allow_remote       INTEGER NOT NULL DEFAULT 0,
+                updated_at         TEXT NOT NULL,
+                note               TEXT NOT NULL DEFAULT ''
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS worker_heartbeat (
+                id      INTEGER PRIMARY KEY,
+                beat_at TEXT NOT NULL,
+                stage   TEXT NOT NULL DEFAULT '',
+                doing   TEXT NOT NULL DEFAULT ''
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS ingest_run (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL,
+                ended_at     TEXT,
+                outcome      TEXT,
+                trigger      TEXT NOT NULL DEFAULT 'schedule',
+                repo_url     TEXT NOT NULL DEFAULT '',
+                chunks_done  INTEGER NOT NULL DEFAULT 0,
+                chunks_total INTEGER NOT NULL DEFAULT 0,
+                note         TEXT NOT NULL DEFAULT ''
+            )
+            """,
+            # **멈춤은 꺼짐이 아니라 상태다.** 기본이 0(안 쉼)인 이유는 이행이
+            # 도는 구축을 세우지 않게 하기 위해서다.
+            """
+            CREATE TABLE IF NOT EXISTS build_control (
+                id         INTEGER PRIMARY KEY,
+                paused     INTEGER NOT NULL DEFAULT 0,
+                wake       INTEGER NOT NULL DEFAULT 0,
+                changed_at TEXT NOT NULL,
+                note       TEXT NOT NULL DEFAULT ''
+            )
+            """,
+        ),
+    ),
 )
 """적용 순서대로. **번호는 `BASELINE + 1` 부터 하나씩 는다.**
 

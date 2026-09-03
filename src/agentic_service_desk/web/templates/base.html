@@ -45,6 +45,8 @@
   {% for q in queues %}<a href="/queues/{{ q.id }}">{{ q.id }} {{ q.title }}</a>{% endfor %}
   <a href="/entry">＋ 질문 등록</a>
   <a href="/ask">? 지식에 묻기</a>
+  <a href="/build">⛏ 구축</a>
+  <a href="/settings/llm">⚙ 연결</a>
   <span class="dim small">단계 {{ stage }}</span>
   {% if authenticated %}<form method="post" action="/logout" style="float:right;">
     <button type="submit" class="small">나간다</button>

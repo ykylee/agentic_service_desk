@@ -518,6 +518,64 @@ CREATE TABLE IF NOT EXISTS retention_run (
     anonymized     INTEGER NOT NULL DEFAULT 0   -- 행은 남기고 식별자만 지운 건수
 );
 
+-- 모델 연결 (FR-62, ADR-009 개정 2026-09-03). **한 행만 산다.**
+-- `.env` 는 씨앗이고 SSOT 는 여기다 — 국면(phase_state)과 같은 형태다. 연결을
+-- 바꾸는 길이 파일 편집과 재기동뿐이면 그것은 대시보드에서 할 수 없는 일이 되고,
+-- §8.1 에 따르면 곧 아무도 할 수 없는 일이 된다.
+--
+-- **키는 여기 없다.** 키는 환경변수에 남고 pi 의 `models.json` 에도 `$VAR` 참조만
+-- 들어간다 (ADR-009) — 자격증명을 `var/` 의 파일 하나가 들게 하지 않는다.
+CREATE TABLE IF NOT EXISTS llm_endpoint (
+    id                 INTEGER PRIMARY KEY,   -- 언제나 1
+    base_url           TEXT NOT NULL,
+    model              TEXT NOT NULL,
+    embedding_model    TEXT NOT NULL DEFAULT '',
+    embedding_base_url TEXT NOT NULL DEFAULT '',
+    max_output_tokens  INTEGER NOT NULL,
+    allow_remote       INTEGER NOT NULL DEFAULT 0,
+    updated_at         TEXT NOT NULL,
+    note               TEXT NOT NULL DEFAULT ''
+);
+
+-- 워커 심박 (FR-63). **한 행만 산다.**
+-- 화면이 "구축이 왜 안 도나"에 답하려면 먼저 **워커가 살아 있는가**를 알아야 한다.
+-- 이것이 없으면 진행 0 이 "할 일이 없다"인지 "아무도 안 돈다"인지 구분되지 않는다.
+CREATE TABLE IF NOT EXISTS worker_heartbeat (
+    id      INTEGER PRIMARY KEY,   -- 언제나 1
+    beat_at TEXT NOT NULL,
+    stage   TEXT NOT NULL DEFAULT '',
+    doing   TEXT NOT NULL DEFAULT ''   -- 지금 하는 일. 빈 값이면 잠들어 있다
+);
+
+-- ingest 런 기록과 진행 (FR-63, FR-5).
+-- **묶음 커밋은 이력에 남지만 런은 남지 않았다** — 커밋 목록만으로는 지금 도는
+-- 중인지, 완주했는지, 중단됐는지를 가릴 수 없다. 실측된 부트스트랩이 116묶음 ·
+-- 4.96시간이므로 화면이 "얼마나 남았는가"에 답하려면 진행이 디스크에 있어야 한다.
+CREATE TABLE IF NOT EXISTS ingest_run (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    ended_at     TEXT,
+    outcome      TEXT,               -- completed | stopped | failed (도는 중이면 NULL)
+    trigger      TEXT NOT NULL DEFAULT 'schedule',   -- schedule | dashboard
+    repo_url     TEXT NOT NULL DEFAULT '',           -- 지금 읽고 있는 저장소
+    chunks_done  INTEGER NOT NULL DEFAULT 0,
+    chunks_total INTEGER NOT NULL DEFAULT 0,
+    note         TEXT NOT NULL DEFAULT ''
+);
+
+-- 구축 제어 (FR-63). **한 행만 산다.**
+-- 웹과 워커는 다른 프로세스라 버튼이 함수를 부를 수 없다. 화면은 여기에 뜻을
+-- 적고 워커가 자기 주기에서 읽는다 — **중단은 신호가 아니라 상태다**: 신호로
+-- 두면 멈춘 다음 주기에 다시 시작해 버려 멈춘 것이 아니게 된다.
+CREATE TABLE IF NOT EXISTS build_control (
+    id         INTEGER PRIMARY KEY,   -- 언제나 1
+    paused     INTEGER NOT NULL DEFAULT 0,   -- 1 이면 ingest 를 쉰다
+    wake       INTEGER NOT NULL DEFAULT 0,   -- 1 이면 잠을 깨고 즉시 한 주기 돈다
+    changed_at TEXT NOT NULL,
+    note       TEXT NOT NULL DEFAULT ''
+);
+
 -- 배치 진행 지점 (ADR-005 · ADR-006)
 -- 배치는 중단 가능해야 하므로 어디까지 했는지를 남긴다.
 CREATE TABLE IF NOT EXISTS ingest_checkpoint (

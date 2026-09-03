@@ -629,9 +629,9 @@
       "sdlc_phase": "stabilization",
       "declared_status": "in_progress",
       "derived_status": "in_progress",
-      "progress": 0.3333333333333333,
-      "total_leaves": 15,
-      "done_leaves": 5,
+      "progress": 0.4117647058823529,
+      "total_leaves": 17,
+      "done_leaves": 7,
       "deliverables_missing": [],
       "wbs": [
         {
@@ -823,6 +823,38 @@
           ]
         },
         {
+          "id": "WBS-5.8",
+          "title": "운영 콘솔",
+          "derived_status": "done",
+          "linked_task_ids": [],
+          "total_leaves": 2,
+          "done_leaves": 2,
+          "children": [
+            {
+              "id": "WBS-5.8.1",
+              "title": "LLM 연결 설정",
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-09-03-main-006"
+              ],
+              "total_leaves": 1,
+              "done_leaves": 1,
+              "children": []
+            },
+            {
+              "id": "WBS-5.8.2",
+              "title": "지식베이스 구축 현황과 제어",
+              "derived_status": "done",
+              "linked_task_ids": [
+                "TASK-2026-09-03-main-007"
+              ],
+              "total_leaves": 1,
+              "done_leaves": 1,
+              "children": []
+            }
+          ]
+        },
+        {
           "id": "WBS-5.5",
           "title": "운영 진입 판정",
           "derived_status": "planned",
@@ -980,6 +1012,13 @@
       "wbs_ref": "exempt",
       "exempt_reason": "기존 4.2.4(Ingest) 산출물의 정확성 보강이다. 신규 기능이 아니라 갱신 인식이 못 하던 것을 하게 만든다",
       "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-03-main-002.md"
+    },
+    {
+      "task_id": "TASK-2026-09-03-main-008",
+      "task_status": "done",
+      "wbs_ref": "exempt",
+      "exempt_reason": "WBS 리프가 아니다 — 워크플로우 메타 층(ai-workflow 킷 진입점)의 유지보수다",
+      "source_path": "ai-workflow/memory/active/main/backlog/tasks/TASK-2026-09-03-main-008.md"
     }
   ],
   "issues": []

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v1.9.0 -->
+<!-- standard-ai-workflow-kit: v1.9.1 -->
 
 # CLAUDE.md (Claude Code entry point)
 

@@ -44,7 +44,9 @@ from agentic_service_desk.pipeline.review import Reviewer
 from agentic_service_desk.llm.embeddings import build_embedding_provider
 from agentic_service_desk.knowledge.repository import KnowledgeRepoError, KnowledgeRepository
 from agentic_service_desk.operations import alert as alert_domain
+from agentic_service_desk.operations import build as build_domain
 from agentic_service_desk.operations import intake as intake_domain
+from agentic_service_desk.operations import llm_endpoint
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import recheck as recheck_domain
@@ -64,8 +66,18 @@ class BatchRunner:
     """
 
     def __init__(self, settings: Settings) -> None:
+        self._seed = settings
+        """`.env` 에서 읽은 값. **연결의 SSOT 는 운영 DB 다** (FR-62, ADR-009 개정) —
+        여기는 DB 에 아무것도 없을 때 쓰는 씨앗이다."""
+
         self._cfg = settings
+        """이번 주기에 쓰는 설정. `_tick` 머리에서 DB 의 연결을 입혀 갈아 끼운다."""
+
         self._stopping = False
+        self._paused = False
+        """화면이 세운 멈춤 (FR-63). **중단 신호와 다르다** — 이쪽은 프로세스를
+        살려 둔 채 ingest 만 쉬며, 화면이 다시 시작을 누를 때까지 남는다."""
+
         self._filter: OutputFilter | None = None
 
     def _mirrors(self):  # noqa: ANN201
@@ -133,16 +145,54 @@ class BatchRunner:
             self._output_filter()
         except BotAccountsNotConfigured as exc:
             print(f"[worker] ingest 를 건너뛴다 — {exc}")
+        # **죽으며 열어 둔 런을 닫는다** (FR-63). 남겨 두면 화면이 영원히
+        # "도는 중"을 보여 주는데, 그것은 이 화면이 없애려던 바로 그 무지다.
+        self._with_conn(build_domain.abandon_stale)
+
         while not self._stopping:
             self._tick()
             for _ in range(interval):
                 if self._stopping:
                     break
+                # **화면이 깨울 수 있다** (FR-63). 웹과 워커는 다른 프로세스라
+                # 버튼이 함수를 부를 수 없다 — 표시를 남기고 여기서 집는다.
+                if self._with_conn(build_domain.take_wake):
+                    print("[worker] 화면이 깨웠다 — 주기를 앞당긴다")
+                    break
                 time.sleep(1)
         print("[worker] 멈췄다.")
 
+    def _with_conn(self, work):  # noqa: ANN001, ANN202
+        """운영 DB 를 잠깐 열어 하나만 하고 닫는다.
+
+        **연결을 들고 있지 않는다** — 온라인과 배치가 같은 SQLite 파일을 쓰므로
+        (ADR-002) 배치가 붙들고 있으면 화면이 그 뒤에서 기다린다.
+        """
+        conn = connect(self._cfg.operations_db)
+        initialize(conn)
+        try:
+            return work(conn)
+        finally:
+            conn.close()
+
+    def _refresh_endpoint(self) -> None:
+        """이번 주기의 모델 연결을 DB 에서 읽어 설정에 입힌다 (FR-62).
+
+        **주기마다 읽는 것이 요점이다.** 화면이 연결을 바꿔도 워커가 기동 때 읽은
+        값을 계속 쓰면, 운영자는 바꿨는데 지식 구축만 옛 모델로 도는 어긋남을
+        보지 못한다 — ADR-009 가 애초에 막으려던 그 상태다.
+        """
+        endpoint = self._with_conn(lambda conn: llm_endpoint.current(conn, self._seed))
+        if endpoint is None:
+            return
+        self._cfg = llm_endpoint.apply(self._seed, endpoint)
+
     def _tick(self) -> None:
         """한 주기. 단계에 따라 할 일이 붙는다."""
+        self._refresh_endpoint()
+        self._with_conn(
+            lambda conn: build_domain.beat(conn, stage=self._cfg.stage, doing="주기 시작")
+        )
         self._judge_phase()
         self._sync_source()
         self._sync_qna()
@@ -161,6 +211,7 @@ class BatchRunner:
         self._reindex()
         self._expire()
         self._notify()
+        self._with_conn(lambda conn: build_domain.beat(conn, stage=self._cfg.stage, doing=""))
 
     def _judge_phase(self) -> None:
         """세 축을 관측하고, 필요하면 **국면을 내린다** (WBS-4.8.1, FR-49, §1.3.3).
@@ -657,28 +708,78 @@ class BatchRunner:
         conn = connect(self._cfg.operations_db)
         initialize(conn)
         try:
-            result = IngestRun(
-                repo=repo,
-                agent=IngestAgent(harness, on_retry=_note_ingest_retry),
-                conn=conn,
-                output_filter=output_filter,
-                mirrors=self._mirrors(),
-                # **여기를 잇지 않으면 중단 신호가 ingest 에 닿지 않는다.**
-                # 최초 부트스트랩은 묶음이 수백이라 한 tick 이 반나절인데, 정지
-                # 플래그를 바깥 루프에서만 보면 그 반나절이 다 지나야 신호를
-                # 쳐다본다 — 2026-08-30 에 워커 다섯이 동시에 도는 것으로 드러났다.
-                should_stop=lambda: self._stopping,
-                on_chunk=_note_chunk,
-                exclude=self._cfg.source_exclude_patterns,
-            ).run()
-        except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
-            print(f"[worker] ingest 실패: {exc}")
-            return
+            # **화면이 세운 멈춤은 주기마다 다시 읽는다** (FR-63). 워커는 살아
+            # 있고 나머지 단계는 계속 돈다 — 쉬는 것은 ingest 하나다.
+            self._paused = build_domain.control(conn).paused
+            if self._paused:
+                build_domain.beat(conn, stage=self._cfg.stage, doing="구축을 쉰다 (화면이 멈춤)")
+                return
+
+            build_domain.beat(conn, stage=self._cfg.stage, doing="지식 구축 (ingest)")
+            run_id = build_domain.start_run(conn)
+            try:
+                result = IngestRun(
+                    repo=repo,
+                    agent=IngestAgent(harness, on_retry=_note_ingest_retry),
+                    conn=conn,
+                    output_filter=output_filter,
+                    mirrors=self._mirrors(),
+                    # **여기를 잇지 않으면 중단 신호가 ingest 에 닿지 않는다.**
+                    # 최초 부트스트랩은 묶음이 수백이라 한 tick 이 반나절인데, 정지
+                    # 플래그를 바깥 루프에서만 보면 그 반나절이 다 지나야 신호를
+                    # 쳐다본다 — 2026-08-30 에 워커 다섯이 동시에 도는 것으로 드러났다.
+                    #
+                    # **화면의 중단도 같은 자리로 들어온다** (FR-63). 다른 프로세스가
+                    # 세운 뜻이라 플래그가 아니라 DB 를 봐야 하고, 보는 시점은
+                    # 묶음 경계 하나뿐이다.
+                    should_stop=lambda: self._stopping or self._stop_requested(conn),
+                    on_chunk=lambda url, done, total: self._note_progress(
+                        conn, run_id, url, done, total
+                    ),
+                    exclude=self._cfg.source_exclude_patterns,
+                ).run()
+            except (HarnessError, KnowledgeRepoError, RuntimeError) as exc:
+                build_domain.end_run(conn, run_id, outcome=build_domain.FAILED, note=str(exc))
+                print(f"[worker] ingest 실패: {exc}")
+                return
+            if not result.changed and not result.stopped:
+                # **읽은 것이 없으면 런으로 남기지 않는다.** 주기마다 확인은 하므로
+                # 남기면 이력이 "바뀐 것이 없다"로만 찬다 — 확인했다는 사실은
+                # 심박이 진다.
+                build_domain.discard_run(conn, run_id)
+            else:
+                build_domain.end_run(
+                    conn,
+                    run_id,
+                    outcome=(
+                        build_domain.STOPPED if result.stopped else build_domain.COMPLETED
+                    ),
+                    note=result.summary() if result.changed else "읽다 말았다",
+                )
         finally:
             conn.close()
 
         for note in _ingest_notes(result):
             print(f"[worker] {note}")
+
+    def _stop_requested(self, conn) -> bool:  # noqa: ANN001
+        """화면이 멈추라고 했는가. **묶음 경계에서만 묻는다.**"""
+        if build_domain.control(conn).paused:
+            self._paused = True
+            return True
+        return False
+
+    def _note_progress(self, conn, run_id, repo_url, done, total) -> None:  # noqa: ANN001
+        """묶음 진행을 **로그와 디스크 양쪽에** 남긴다.
+
+        로그는 터미널을 보고 있는 사람의 것이고 디스크는 화면의 것이다 —
+        부트스트랩이 반나절이면 그 반나절 동안 물을 곳이 화면뿐이다 (FR-63).
+        """
+        _note_chunk(repo_url, done, total)
+        build_domain.note_chunk(conn, run_id, repo_url=repo_url, done=done, total=total)
+        build_domain.beat(
+            conn, stage=self._cfg.stage, doing=f"지식 구축 — 묶음 {done}/{total}"
+        )
 
 
     def _lint(self) -> None:

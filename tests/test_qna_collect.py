@@ -340,10 +340,18 @@ class TestWorkerWiring:
         assert conn.execute("SELECT COUNT(*) FROM raw_question").fetchone()[0] == 5
         assert get_cursor(conn, QNA) is not None
 
-    def test_연동이_비어_있으면_아무것도_하지_않는다(self, tmp_path) -> None:
+    def test_연동이_비어_있으면_아무것도_수집하지_않는다(self, tmp_path) -> None:
         # 기본은 실제 연동이고 주소가 비어 있다 — 조용히 빈 결과를 만들지 않는다.
+        #
+        # **심박은 남는다** (FR-63, 2026-09-03). 예전에는 DB 파일조차 생기지 않는
+        # 것으로 이 성질을 확인했는데, 그러면 "워커가 떠 있지 않다"와 "워커는 도는데
+        # 연동이 없다"가 화면에서 같아진다 — 후자야말로 운영자가 알아야 할 것이다.
+        # 확인해야 할 것은 **수집물이 없다**이지 파일이 없다가 아니다.
         from agentic_service_desk.worker.runner import BatchRunner
 
         cfg = self._settings(tmp_path, parent_adapter="http", parent_api_base_url="")
         BatchRunner(cfg)._tick()
-        assert not (tmp_path / "ops.sqlite3").exists()
+
+        conn = connect(tmp_path / "ops.sqlite3")
+        assert conn.execute("SELECT COUNT(*) FROM raw_question").fetchone()[0] == 0
+        assert get_cursor(conn, QNA) is None

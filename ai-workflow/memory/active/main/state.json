@@ -27,30 +27,30 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "**M-001~M-004 완료(구현 40 leaf). M-005 [stabilization] 진행 중 — 5/15.**",
-    "current_axis": "**M-001~M-004 완료(구현 40 leaf). M-005 [stabilization] 진행 중 — 5/15.**",
+    "current_baseline": "**M-001~M-004 완료(구현 40 leaf). M-005 [stabilization] 진행 중 — 7/17.**",
+    "current_axis": "**M-001~M-004 완료(구현 40 leaf). M-005 [stabilization] 진행 중 — 7/17.**",
     "current_focus": null,
     "in_progress_items": [],
     "blocked_items": [],
     "planned_items": [],
     "recent_done_items": [
+      "TASK-2026-09-03-main-008 — 워크플로우 킷 v1.9.1 bootstrap 재적용",
+      "TASK-2026-09-03-main-007 — WBS-5.8.2 지식베이스 구축 현황과 제어 — 화면이 진행을 안다",
+      "TASK-2026-09-03-main-006 — WBS-5.8.1 LLM 연결 설정 — 화면에서 모델을 붙인다",
       "TASK-2026-09-03-main-005 — 정제를 게재까지 잇는다 — 저장에서 떨어지고 있었다",
       "TASK-2026-09-03-main-004 — WBS-5.7.2 대상별 정제 — 고객응대용과 개발자용",
       "TASK-2026-09-03-main-003 — WBS-5.7.1 지식에 묻기 — 운영자 질의 콘솔",
       "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유",
       "TASK-2026-09-03-main-001 — 워크플로우 킷 v1.9.0 bootstrap 재적용",
       "TASK-2026-09-02-main-009 — WBS-5.6.1 묶음 단위 커밋과 원자적 쓰기",
-      "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다",
-      "TASK-2026-09-02-main-007 — 부트스트랩 완주 재실행 — 116묶음을 빈 상태에서",
-      "TASK-2026-09-02-main-006 — WBS-5.2.2 대시보드 인증",
-      "TASK-2026-09-02-main-005 — 승격 경로 A 라이브 — 등록에서 지식 항목까지"
+      "TASK-2026-09-02-main-008 — Lint 가 배제를 알게 한다 — 회복 불가 무효화를 지목한다"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-09-03.md",
-    "task_count": 5,
+    "task_count": 8,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -58,7 +58,10 @@
       "TASK-2026-09-03-main-002 — 색인이 항목을 알아보게 한다 — stale 이 회복되지 않던 이유",
       "TASK-2026-09-03-main-003 — WBS-5.7.1 지식에 묻기 — 운영자 질의 콘솔",
       "TASK-2026-09-03-main-004 — WBS-5.7.2 대상별 정제 — 고객응대용과 개발자용",
-      "TASK-2026-09-03-main-005 — 정제를 게재까지 잇는다 — 저장에서 떨어지고 있었다"
+      "TASK-2026-09-03-main-005 — 정제를 게재까지 잇는다 — 저장에서 떨어지고 있었다",
+      "TASK-2026-09-03-main-006 — WBS-5.8.1 LLM 연결 설정 — 화면에서 모델을 붙인다",
+      "TASK-2026-09-03-main-007 — WBS-5.8.2 지식베이스 구축 현황과 제어 — 화면이 진행을 안다",
+      "TASK-2026-09-03-main-008 — 워크플로우 킷 v1.9.1 bootstrap 재적용"
     ]
   },
   "next_documents": [

@@ -2,7 +2,7 @@
 description: Standard AI workflow backlog update — register/update a task in today's backlog and warn about scope creep when it overlaps PURPOSE.md's excluded areas.
 ---
 
-<!-- standard-ai-workflow-kit: v1.9.0 -->
+<!-- standard-ai-workflow-kit: v1.9.1 -->
 
 # /workflow-backlog-update
 

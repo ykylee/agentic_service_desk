@@ -31,16 +31,20 @@ from agentic_service_desk.web.dashboard import Dashboard, queues_for_stage
 from agentic_service_desk.knowledge.repository import KnowledgeRepository
 from agentic_service_desk.knowledge.item import Invalidation, InvalidationKind
 from agentic_service_desk.operations import alert as alert_domain
+from agentic_service_desk.operations import build as build_domain
+from agentic_service_desk.operations import llm_endpoint
 from agentic_service_desk.operations import intake
 from agentic_service_desk.operations import manual_entry
 from agentic_service_desk.operations import phase as phase_domain
 from agentic_service_desk.knowledge.search import Search
+from agentic_service_desk.llm import harness as pi_harness_config
+from agentic_service_desk.llm.policy import RemoteEndpointRejected
 from agentic_service_desk.operations import promotion as promotion_domain
 from agentic_service_desk.operations import recheck as recheck_domain
 from agentic_service_desk.adapters.factory import build_parent_system
 from agentic_service_desk.adapters.parent_system import NotConfigured
 from agentic_service_desk.pipeline import draft_store, review as review_domain
-from agentic_service_desk.ingest.harness_runner import PiHarness
+from agentic_service_desk.ingest.harness_runner import HarnessError, PiHarness
 from agentic_service_desk.pipeline import audience as audience_domain
 from agentic_service_desk.pipeline.answer import AnswerPipeline
 from agentic_service_desk.pipeline.review import ReviewInput
@@ -89,16 +93,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             parent_cache["it"] = build_parent_system(cfg)
         return parent_cache["it"]
 
-    def harness():  # noqa: ANN202
+    def harness(endpoint: llm_endpoint.Endpoint):  # noqa: ANN202
         """생성에 쓸 모델. **없으면 없는 대로 간다.**
 
         모델이 없으면 파이프라인이 3단계에서 멈추고 조회 결과만 남는다 — 그것도
         답이다: "지식베이스가 이만큼은 갖고 있다"를 보여 준다. 배치 쪽과 같은
         판단이다 (`worker.runner._harness`).
+
+        **연결은 인자로 받는다** (FR-62). SSOT 가 운영 DB 로 옮겨 갔으므로
+        (ADR-009 개정) 기동 때 읽은 `cfg` 를 쓰면 화면에서 바꾼 값이 재기동
+        전까지 닿지 않는다. 키만 환경변수에서 온다.
         """
-        if not cfg.llm_base_url or not cfg.llm_model:
+        if not endpoint.configured:
             return None
-        return PiHarness(cfg.llm_model, cfg.llm_api_key)
+        return PiHarness(endpoint.model, cfg.llm_api_key)
 
     def shell() -> dict:
         """모든 화면이 함께 쓰는 것 — 켜진 단계와 그 단계의 대기열."""
@@ -562,11 +570,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         _, conn = dashboard()
         try:
+            endpoint = llm_endpoint.current(conn, cfg)
             outcome = AnswerPipeline(
                 search=Search(repo=repo, conn=conn),
                 conn=conn,
-                harness=harness(),
-                generated_by=cfg.llm_model,
+                harness=harness(endpoint),
+                generated_by=endpoint.model,
             ).run(question)
         except Exception as exc:  # noqa: BLE001 — 모델이 터져도 화면은 서야 한다
             return TEMPLATES.TemplateResponse(
@@ -576,7 +585,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             conn.close()
         ctx |= {"outcome": outcome}
         if outcome.draft is not None:
-            ctx |= {"renderings": _renderings(question, outcome, harness())}
+            ctx |= {"renderings": _renderings(question, outcome, harness(endpoint))}
         return TEMPLATES.TemplateResponse(request, "ask.html", ctx)
 
     @app.get("/entry")
@@ -879,6 +888,239 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         return TEMPLATES.TemplateResponse(request, "q8.html", shell() | {"rows": rows})
+
+    # --- 운영 콘솔 (FR-62 · FR-63) ----------------------------------------
+    #
+    # **대기열이 아니다.** 여기서 하는 일은 판정이 아니라 *이 시스템을 어떻게
+    # 돌릴 것인가*이고, 대기열 옆에 세우면 매번 훑는 목록이 하나 는다 (§8.6).
+    # 그런데 화면에 없으면 아무도 할 수 없는 일이 된다 (§8.1) — 그래서 있다.
+
+    def _llm_context(conn, endpoint=None, **extra) -> dict:  # noqa: ANN001
+        endpoint = endpoint or llm_endpoint.current(conn, cfg)
+        return shell() | {
+            "e": endpoint,
+            # **키는 보여주지 않는다** (ADR-009). 있고 없음만 말한다 — 그것이
+            # 화면이 답해야 할 물음("왜 401 이 나는가")에 필요한 전부다.
+            "api_key_set": bool(cfg.llm_api_key),
+            "exposure": llm_endpoint.exposure_of(cfg),
+            "models_json": str(pi_harness_config.DEFAULT_MODELS_JSON),
+        } | extra
+
+    @app.get("/settings/llm")
+    def llm_form(request: Request):  # noqa: ANN201
+        """모델 연결 (FR-62).
+
+        **모델이 안 붙은 것과 지식이 없는 것은 다른 상태다.** 화면이 둘을 가르지
+        못하면 "답을 못 만들었다"가 같은 모양으로 보이는데, 대응은 정반대다.
+        """
+        _, conn = dashboard()
+        try:
+            return TEMPLATES.TemplateResponse(request, "llm.html", _llm_context(conn))
+        finally:
+            conn.close()
+
+    @app.post("/settings/llm")
+    def llm_save(  # noqa: ANN201, PLR0913
+        request: Request,
+        base_url: str = Form(""),
+        model: str = Form(""),
+        embedding_model: str = Form(""),
+        embedding_base_url: str = Form(""),
+        max_output_tokens: str = Form("32768"),
+        allow_remote: str = Form(""),
+    ):
+        """저장한다. **정책을 통과하지 못하면 아무것도 바뀌지 않는다** (NFR-1).
+
+        거부를 화면에 남기는 것이 요점이다 — 조용히 옛 값으로 돌아가면 운영자는
+        바꿨다고 믿는다.
+        """
+        _, conn = dashboard()
+        try:
+            try:
+                tokens = int(max_output_tokens)
+            except ValueError:
+                tokens = 0
+            if tokens <= 0:
+                return TEMPLATES.TemplateResponse(
+                    request,
+                    "llm.html",
+                    _llm_context(conn, error="출력 한도는 1 이상의 정수다"),
+                )
+            candidate = llm_endpoint.Endpoint(
+                base_url=base_url.strip(),
+                model=model.strip(),
+                embedding_model=embedding_model.strip(),
+                embedding_base_url=embedding_base_url.strip(),
+                max_output_tokens=tokens,
+                allow_remote=bool(allow_remote),
+            )
+            try:
+                saved = llm_endpoint.save(conn, cfg, candidate)
+            except RemoteEndpointRejected as exc:
+                # **거부된 값을 화면에 남긴다** — 다시 치게 하지 않는다.
+                return TEMPLATES.TemplateResponse(
+                    request, "llm.html", _llm_context(conn, endpoint=candidate, error=str(exc))
+                )
+            note = "저장했다 — 다음 생성부터 쓰인다"
+            if saved.models_json is not None:
+                note += f" · pi 설정을 다시 썼다 ({saved.models_json})"
+            return TEMPLATES.TemplateResponse(
+                request,
+                "llm.html",
+                _llm_context(
+                    conn,
+                    endpoint=saved.endpoint,
+                    saved=note,
+                    error=(
+                        f"pi 설정을 쓰지 못했다 — 지식 구축은 옛 모델로 돈다: "
+                        f"{saved.harness_error}"
+                        if saved.harness_error
+                        else ""
+                    ),
+                ),
+            )
+        finally:
+            conn.close()
+
+    @app.post("/settings/llm/probe")
+    def llm_probe(request: Request):  # noqa: ANN201
+        """닿는가. **저장된 값으로 시험한다** — 화면의 입력이 아니라."""
+        _, conn = dashboard()
+        try:
+            endpoint = llm_endpoint.current(conn, cfg)
+            result = llm_endpoint.probe(endpoint, api_key=cfg.llm_api_key)
+            return TEMPLATES.TemplateResponse(
+                request, "llm.html", _llm_context(conn, endpoint=endpoint, probe=result)
+            )
+        finally:
+            conn.close()
+
+    @app.post("/settings/llm/generate")
+    def llm_generate(request: Request):  # noqa: ANN201
+        """한 줄을 실제로 생성해 본다 — **pi 를 지나는 그 경로다.**
+
+        `GET /models` 와 나눈 이유는 둘이 다른 것을 답하기 때문이다. 저쪽은 주소와
+        키가 맞는가이고, 이쪽은 **지식 구축이 실제로 돌 수 있는가**다 — pi 는 우리
+        게이트웨이를 지나지 않으므로 `models.json` 이 어긋나 있으면 여기서만 드러난다.
+        """
+        _, conn = dashboard()
+        try:
+            endpoint = llm_endpoint.current(conn, cfg)
+            if not endpoint.configured:
+                return TEMPLATES.TemplateResponse(
+                    request,
+                    "llm.html",
+                    _llm_context(conn, endpoint=endpoint, error="연결이 설정되지 않았다"),
+                )
+            runner = PiHarness(endpoint.model, cfg.llm_api_key, timeout=120.0)
+            try:
+                result = runner.run("다음 문장을 그대로 돌려준다: 연결 확인")
+            except HarnessError as exc:
+                return TEMPLATES.TemplateResponse(
+                    request,
+                    "llm.html",
+                    _llm_context(conn, endpoint=endpoint, error=f"생성 시험 실패 — {exc}"),
+                )
+            # **사고만 하다 잘린 것**을 빈 응답과 가른다 — 2026-08~09 부트스트랩
+            # 실패 62건 중 59건이 그 모양이었고, 처방은 출력 한도다.
+            if result.all_thinking:
+                note = "사고만 하다 잘렸다 — 출력 한도를 올린다"
+            elif result.text.strip():
+                note = f"돌아왔다: {result.text.strip()[:200]}"
+            else:
+                note = f"빈 응답이 왔다 (stderr: {result.err[:200] or '없음'})"
+            return TEMPLATES.TemplateResponse(
+                request, "llm.html", _llm_context(conn, endpoint=endpoint, generated=note)
+            )
+        finally:
+            conn.close()
+
+    def _build_context(conn, **extra) -> dict:  # noqa: ANN001
+        board = Dashboard(repo=KnowledgeRepository(cfg.knowledge_dir), conn=conn)
+        return shell() | {
+            "beat": build_domain.heartbeat(conn),
+            "control": build_domain.control(conn),
+            "run": build_domain.running(conn),
+            "runs": build_domain.recent(conn),
+            "cursors": build_domain.cursors(conn),
+            "repos": cfg.parent_repo_urls,
+            "s": board.knowledge_status(),
+            "endpoint": llm_endpoint.current(conn, cfg),
+        } | extra
+
+    @app.get("/build")
+    def build_view(request: Request, note: str = "", error: str = ""):  # noqa: ANN201
+        """지식베이스 구축 (FR-63).
+
+        **얼마나 남았는가에 답하는 자리다.** 실측된 부트스트랩이 116묶음 ·
+        4.96시간인데 진행이 워커의 표준출력에만 있으면, 운영자는 반나절 동안
+        터미널을 지켜보는 것 말고 할 수 있는 일이 없다.
+        """
+        _, conn = dashboard()
+        try:
+            return TEMPLATES.TemplateResponse(
+                request, "build.html", _build_context(conn, note=note, error=error)
+            )
+        finally:
+            conn.close()
+
+    @app.post("/build/start")
+    def build_start():  # noqa: ANN201
+        """지금 시작한다 — **워커의 주기를 앞당긴다.**
+
+        새 프로세스를 띄우지 않는다. 워커가 없으면 아무 일도 일어나지 않고,
+        화면이 심박으로 그것을 말한다.
+        """
+        _, conn = dashboard()
+        try:
+            build_domain.request_start(conn)
+        finally:
+            conn.close()
+        return RedirectResponse(
+            "/build?note=" + quote("시작을 요청했다 — 워커가 다음 주기에 집는다"),
+            status_code=303,
+        )
+
+    @app.post("/build/stop")
+    def build_stop():  # noqa: ANN201
+        """멈춘다 — **현재 묶음을 마치고.** 커서는 옮기지 않는다."""
+        _, conn = dashboard()
+        try:
+            build_domain.request_stop(conn)
+        finally:
+            conn.close()
+        return RedirectResponse(
+            "/build?note=" + quote("멈춤을 세웠다 — 현재 묶음을 마치고 멈춘다"),
+            status_code=303,
+        )
+
+    @app.post("/build/rebuild")
+    def build_rebuild(confirm: str = Form("")):  # noqa: ANN201
+        """처음부터 다시 읽는다 — **커서를 지운다.**
+
+        되돌릴 수 없는 조작은 아니지만(지식은 지우지 않는다) 다시 읽는 데 실측
+        기준 다섯 시간이 든다. 그래서 확인을 받고, **런이 도는 중에는 거부한다** —
+        런이 끝나며 커서를 다시 쓰므로 지운 것이 조용히 되살아난다.
+        """
+        _, conn = dashboard()
+        try:
+            if confirm != "재구축":
+                return RedirectResponse(
+                    "/build?error=" + quote("확인 칸에 `재구축` 을 적어야 한다"),
+                    status_code=303,
+                )
+            try:
+                removed = build_domain.rebuild(conn)
+            except build_domain.RebuildRefused as exc:
+                return RedirectResponse("/build?error=" + quote(str(exc)), status_code=303)
+            build_domain.request_start(conn, note="재구축")
+        finally:
+            conn.close()
+        return RedirectResponse(
+            "/build?note="
+            + quote(f"커서 {removed}개를 지웠다 — 다음 주기부터 처음부터 읽는다"),
+            status_code=303,
+        )
 
     return app
 

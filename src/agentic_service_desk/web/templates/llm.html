@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}모델 연결{% endblock %}
+{% block body %}
+<h1>모델 연결</h1>
+<p class="dim small">
+  무엇으로 생성하고 검수하고 지식을 짓는가 (FR-62) ·
+  <strong>단일 출처는 운영 DB</strong> 이고 <code>.env</code> 는 씨앗이다 (ADR-009 개정)
+</p>
+
+{% if error %}<p class="warn"><strong>거부</strong> — {{ error }}</p>{% endif %}
+{% if saved %}<p class="ok">{{ saved }}</p>{% endif %}
+
+<div class="cards">
+  <div class="card">
+    <div class="dim small">지금 상태</div>
+    <div class="n {% if e.configured %}ok{% else %}warn{% endif %}">
+      {{ '붙었다' if e.configured else '안 붙었다' }}
+    </div>
+    <div class="dim small">
+      {% if e.configured %}{{ e.model }}{% else %}모델이 없으면 파이프라인이 3단계에서 멈춘다{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="dim small">값의 출처</div>
+    <div class="n">{{ e.source }}</div>
+    <div class="dim small">{{ e.updated_at or '아직 화면에서 정한 적이 없다' }}</div>
+  </div>
+  <div class="card">
+    <div class="dim small">API 키</div>
+    <div class="n">{{ '있다' if api_key_set else '없다' }}</div>
+    <div class="dim small">환경변수 <code>ASD_LLM_API_KEY</code> — 화면은 키를 다루지 않는다</div>
+  </div>
+  <div class="card">
+    <div class="dim small">실데이터에 닿는가</div>
+    <div class="n {% if exposure.has_real_data %}warn{% else %}ok{% endif %}">
+      {{ '그렇다' if exposure.has_real_data else '아니다' }}
+    </div>
+    <div class="dim small">
+      어댑터 {{ exposure.adapter }} · 소스 {{ '있음' if exposure.source_repo_url else '없음' }}
+      {%- if exposure.source_is_simulated %} (모 시스템 아님으로 선언){% endif %}
+    </div>
+  </div>
+</div>
+
+{% if probe %}
+<h2>연결 시험</h2>
+<p class="{{ 'ok' if probe.ok else 'warn' }}">
+  {{ probe.detail }}{% if probe.elapsed_ms %} · {{ probe.elapsed_ms }}ms{% endif %}
+</p>
+{% if probe.models %}
+<p class="dim small">
+  응답한 모델 {{ probe.models|length }}개
+  {% if e.model in probe.models %}· <strong class="ok">{{ e.model }} 이 목록에 있다</strong>
+  {% else %}· <strong class="warn">{{ e.model }} 은 목록에 없다</strong> — 이름이 틀렸을 수 있다{% endif %}
+</p>
+{% endif %}
+{% endif %}
+
+{% if generated %}
+<h2>생성 시험</h2>
+<p class="small">{{ generated }}</p>
+<p class="dim small">
+  이것은 <code>pi</code> 를 지나는 경로다 (ADR-009). <strong>pi 는 우리 게이트웨이를
+  지나지 않으므로</strong> <code>models.json</code> 이 어긋나 있으면 여기서만 드러난다.
+</p>
+{% endif %}
+
+<h2>고친다</h2>
+<form method="post" action="/settings/llm" style="display:block">
+  <table>
+    <tr>
+      <th style="width:14rem">엔드포인트</th>
+      <td><input name="base_url" value="{{ e.base_url }}" size="46" placeholder="http://127.0.0.1:8080/v1">
+        <div class="dim small">OpenAI 호환 주소. 실데이터에 닿는 실행이면 <strong>로컬이어야 한다</strong> (NFR-1)</div></td>
+    </tr>
+    <tr>
+      <th>모델</th>
+      <td><input name="model" value="{{ e.model }}" size="30">
+        <div class="dim small">생성·검수·지식 구축이 함께 쓴다</div></td>
+    </tr>
+    <tr>
+      <th>임베딩 모델</th>
+      <td><input name="embedding_model" value="{{ e.embedding_model }}" size="30">
+        <div class="dim small">비우면 임베딩 색인이 서지 않는다 — 검색은 어휘 축만 쓴다 (ADR-004)</div></td>
+    </tr>
+    <tr>
+      <th>임베딩 엔드포인트</th>
+      <td><input name="embedding_base_url" value="{{ e.embedding_base_url }}" size="46">
+        <div class="dim small">비우면 위 주소를 쓴다. <strong>여기도 같은 검문을 받는다</strong> — 나가는 것은 지식 본문 그 자체다</div></td>
+    </tr>
+    <tr>
+      <th>출력 한도</th>
+      <td><input name="max_output_tokens" value="{{ e.max_output_tokens }}" size="10">
+        <div class="dim small">
+          <code>maxTokens</code> 로 <code>models.json</code> 에 실린다. 정하지 않으면 pi 기본값
+          16,384 가 쓰이는데, <strong>사고를 길게 하는 모델은 그 예산을 사고에 다 쓰고 잘린다</strong>
+          — 2026-08~09 부트스트랩 실패 62건 중 59건이 그것이었다
+        </div></td>
+    </tr>
+    <tr>
+      <th>원격 허용</th>
+      <td><label><input type="checkbox" name="allow_remote" value="1" {% if e.allow_remote %}checked{% endif %}>
+        원격 제공자를 쓴다</label>
+        <div class="dim small">
+          <strong>이것만으로는 열리지 않는다.</strong> 어댑터가 mock 이고 소스 저장소가 없어야 한다
+          (또는 <code>ASD_SIMULATED_SOURCE</code> 로 모 시스템이 아니라고 선언돼야 한다)
+        </div></td>
+    </tr>
+  </table>
+  <p><button type="submit">저장한다</button></p>
+</form>
+
+<form method="post" action="/settings/llm/probe"><button type="submit">연결 시험 (빠르다)</button></form>
+<form method="post" action="/settings/llm/generate"><button type="submit">생성 시험 (pi · 최대 2분)</button></form>
+
+<h2>이 값이 닿는 곳</h2>
+<ul class="small dim">
+  <li>답변 생성·검수·<code>/ask</code> — 웹이 <strong>요청마다</strong> 읽는다</li>
+  <li>지식 구축(ingest) — 워커가 <strong>주기마다</strong> 읽는다. 재기동하지 않아도 된다</li>
+  <li>pi 하네스 — <code>{{ models_json }}</code> 를 <strong>저장하는 그 자리에서 다시 쓴다</strong>.
+      이 파일은 생성물이라 손으로 고치면 다음 저장에서 덮인다</li>
+  <li>키는 여기 없다 — <code>.env</code> 에 남고 <code>models.json</code> 에는 <code>$ASD_LLM_API_KEY</code> 참조만 들어간다</li>
+</ul>
+{% endblock %}

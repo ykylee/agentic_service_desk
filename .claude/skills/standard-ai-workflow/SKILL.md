@@ -3,7 +3,7 @@ name: standard-ai-workflow
 description: The standard AI workflow entry point for this repository. Use it when starting or resuming a session, registering/updating a task in the backlog, syncing affected documents after a change, or leaving a handoff at session close.
 ---
 
-<!-- standard-ai-workflow-kit: v1.9.0 -->
+<!-- standard-ai-workflow-kit: v1.9.1 -->
 
 # Standard AI Workflow
 
