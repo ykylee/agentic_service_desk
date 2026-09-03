@@ -170,7 +170,7 @@ class TestGeneration:
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
         assert [r.stage for r in outcome.stages] == [
-            Stage.ANALYZE, Stage.RETRIEVE, Stage.GENERATE
+            Stage.ANALYZE, Stage.RETRIEVE, Stage.GENERATE, Stage.RENDER
         ]
 
     def test_초안과_근거가_나온다(self, tmp_path) -> None:
@@ -274,7 +274,8 @@ class TestOutcome:
         item = _item(repo)
         pipeline, _, _ = _pipeline(tmp_path, FakeHarness(ANSWER % (item.id, item.id)))
 
-        assert pipeline.run("결재 한도").summary() == "분석 → 조회 → 생성"
+        # 정제(FR-61)가 생성 다음이다 — **검수 앞**이라야 검수가 본 글이 나가는 글이다.
+        assert pipeline.run("결재 한도").summary() == "분석 → 조회 → 생성 → 정제"
 
     def test_멈춘_이유가_요약에_보인다(self, tmp_path) -> None:
         pipeline, repo, _ = _pipeline(tmp_path, FakeHarness())
@@ -418,4 +419,91 @@ class TestUncertainty:
         pipeline, _, _ = _pipeline(tmp_path, FakeHarness(ANSWER % (item.id, item.id)))
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
-        assert "약한 지점 1" in outcome.stages[-1].detail
+        # **생성 기록을 콕 집어 본다** — 뒤에 정제가 붙어 마지막이 아니다.
+        generate = next(r for r in outcome.stages if r.stage is Stage.GENERATE)
+        assert "약한 지점 1" in generate.detail
+
+
+RENDERED = '{"statements": ["부서 등급에 따라 정해집니다.", "등급이 바뀌면 함께 바뀌는 것으로 보입니다."]}'
+
+
+class TestRender:
+    """4단계 정제 — 나갈 글로 다시 쓴다 (FR-61).
+
+    **정제하지 않으면 내부 구현이 그대로 나간다.** 초안은 지식의 말로 쓰이므로 파일
+    경로와 코드 식별자가 들어가는데 `Draft.body` 가 곧 게재 본문이다.
+
+    **검수 앞이라야 한다.** 뒤에 두면 검수가 본 글과 나가는 글이 달라져 FR-20 이
+    무너진다 — 검수는 `body` 를 보고 그 값이 이 단계에서 정해진다.
+    """
+
+    def test_정제된_글이_게재_본문이_된다(self, tmp_path) -> None:
+        repo = _repo(tmp_path)
+        item = _item(repo)
+        pipeline, _, _ = _pipeline(
+            tmp_path, FakeHarness(ANSWER % (item.id, item.id), RENDERED)
+        )
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert "부서 등급에 따라 정해집니다." in outcome.draft.body
+        # 원본은 남는다 — 강도 판정의 기준이고 운영자가 대조할 것이다.
+        assert outcome.draft.statements[0].text == "결재 한도는 부서 등급으로 결정됩니다."
+
+    def test_강도와_근거를_물려받는다(self, tmp_path) -> None:
+        # 정제는 판정을 **다시 하지 않는다** — 강도는 근거 원문과 대조해 정해진 것이다.
+        repo = _repo(tmp_path)
+        item = _item(repo)
+        pipeline, _, _ = _pipeline(
+            tmp_path, FakeHarness(ANSWER % (item.id, item.id), RENDERED)
+        )
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert [s.confidence for s in outcome.draft.rendered] == [
+            s.confidence for s in outcome.draft.statements
+        ]
+        assert len(outcome.draft.weak_points) == 1
+
+    def test_개수가_어긋나면_원본을_둔다(self, tmp_path) -> None:
+        # 합치거나 나눈 것은 다시 쓴 것이 아니라 **새로 쓴 것**이고, 강도를 물려줄
+        # 짝도 사라진다. 어긋난 글보다 투박한 원본이 낫다.
+        repo = _repo(tmp_path)
+        item = _item(repo)
+        pipeline, _, _ = _pipeline(
+            tmp_path,
+            FakeHarness(ANSWER % (item.id, item.id), '{"statements": ["하나로 합쳤습니다."]}'),
+        )
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert outcome.draft.rendered == ()
+        assert "결재 한도는 부서 등급으로 결정됩니다." in outcome.draft.body
+        render = next(r for r in outcome.stages if r.stage is Stage.RENDER)
+        assert "지키지 못해" in render.detail
+
+    def test_정제가_터져도_답이_남는다(self, tmp_path) -> None:
+        # 다듬기가 답을 무너뜨리지 않는다 — 투박한 답이 없는 답보다 낫다.
+        repo = _repo(tmp_path)
+        item = _item(repo)
+        pipeline, _, _ = _pipeline(
+            tmp_path, FakeHarness(ANSWER % (item.id, item.id), "JSON 이 아니다")
+        )
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert outcome.draft is not None
+        assert outcome.draft.rendered == ()
+
+    def test_생성기가_없으면_원본을_그대로_둔다(self, tmp_path) -> None:
+        repo = _repo(tmp_path)
+        _item(repo)
+        pipeline, _, _ = _pipeline(tmp_path)
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert outcome.draft is None  # 생성부터 못 한다
+
+    def test_멈춘_건은_정제하지_않는다(self, tmp_path) -> None:
+        # 초안이 없는데 다듬을 것이 없다.
+        repo = _repo(tmp_path)
+        _item(repo)
+        pipeline, _, _ = _pipeline(tmp_path, FakeHarness('{"answerable": false}'))
+
+        outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
+        assert Stage.RENDER not in [r.stage for r in outcome.stages]

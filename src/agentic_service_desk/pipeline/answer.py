@@ -34,7 +34,7 @@ from __future__ import annotations
 import enum
 import re
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from agentic_service_desk.ingest.agent import AgentOutputError, Harness, extract_json
 from agentic_service_desk.knowledge.search import Hit, Search, _matches, rerank, tokenize
@@ -46,6 +46,17 @@ class Stage(enum.StrEnum):
     ANALYZE = "분석"
     RETRIEVE = "조회"
     GENERATE = "생성"
+    RENDER = "정제"
+    """생성과 검수 **사이**다 (FR-61, 2026-09-03).
+
+    초안은 지식의 말로 쓰인다 — 파일 경로와 코드 식별자가 그대로 들어간다. 그것이
+    그대로 게재되면 **질문한 사람에게 내부 구현이 나간다.** 그래서 나가기 전에
+    질문자가 읽을 말로 다시 쓴다.
+
+    **검수 앞에 두는 것이 요점이다.** 뒤에 두면 검수가 본 글과 나가는 글이 달라져
+    FR-20("검수가 보는 것의 전부는 글에 적힌 것과 근거 원문")이 무너진다.
+    """
+
     REVIEW = "검수"
     PUBLISH = "게재"
 
@@ -149,10 +160,24 @@ class Draft:
     """**모른다고 밝힌 부분** (FR-19). 비어 있는 것이 늘 좋은 것은 아니다 —
     질문이 여러 갈래인데 전부 답했다면 억지 완성을 의심해야 한다."""
 
+    rendered: tuple[Statement, ...] = ()
+    """질문자가 읽을 말로 다시 쓴 진술 (FR-61). **비어 있으면 정제하지 않은 것**이고
+    그때는 원본이 그대로 나간다 — 모델이 없거나 정제가 규약을 어겼을 때다.
+
+    **진술 단위로 다시 쓴다.** 글 전체를 새로 쓰면 진술과 강도의 대응이 끊겨
+    ADR-007 의 강도 표시가 어디에도 붙지 못한다. 개수를 맞추는 제약이 "사실을
+    더하지 않는다"를 함께 지킨다.
+    """
+
     @property
     def body(self) -> str:
-        """게재될 본문. 강도 표시는 **운영자 화면에만** 붙고 이용자에게는 가지 않는다."""
-        return "\n\n".join(s.text for s in self.statements)
+        """게재될 본문. 강도 표시는 **운영자 화면에만** 붙고 이용자에게는 가지 않는다.
+
+        정제된 것이 있으면 그쪽이다 — **나가는 글이 곧 검수가 보는 글**이므로
+        (`ReviewInput.of` 가 이 값을 읽는다) 여기서 갈리면 검수의 판정이 나가는
+        글에 대한 것이 아니게 된다.
+        """
+        return "\n\n".join(s.text for s in (self.rendered or self.statements))
 
     @property
     def weak_points(self) -> tuple[Statement, ...]:
@@ -160,6 +185,9 @@ class Draft:
 
         **매번 다른 자리가 표시되므로 화면을 눈으로 훑어 넘기기 어렵다** —
         습관화를 깨는 것이 이 표시의 부수 효과다 (§5.6.5).
+
+        **원본 진술을 본다.** 강도는 근거 원문과 대조해 판정된 것이고, 정제는 그
+        판정을 물려받을 뿐 다시 하지 않는다.
         """
         return tuple(s for s in self.statements if s.confidence.needs_review)
 
@@ -500,6 +528,8 @@ class AnswerPipeline:
         if outcome.halted:
             return outcome
         self._generate(question, hits, analysis, outcome)
+        if outcome.draft is not None:
+            self._render(question, hits, outcome)
         return outcome
 
     def _analyze(self, question: str, outcome: Outcome) -> Analysis:
@@ -539,6 +569,58 @@ class AnswerPipeline:
             StageRecord(stage=Stage.RETRIEVE, detail=f"근거 후보 {len(hits)}건")
         )
         return hits
+
+    def _render(self, question: str, hits: list[Hit], outcome: Outcome) -> None:
+        """4단계 — 나갈 글로 다시 쓴다 (FR-61).
+
+        **정제하지 않으면 내부 구현이 그대로 나간다.** 초안은 지식의 말로 쓰이므로
+        파일 경로와 코드 식별자가 들어가는데 `Draft.body` 가 곧 게재 본문이다.
+
+        **검수 앞이다.** 뒤에 두면 검수가 본 글과 나가는 글이 달라져 FR-20 이
+        무너진다 — 검수는 `body` 를 보고, 그 값이 여기서 정해진다.
+
+        **실패하면 원본이 그대로 나간다.** 정제는 다듬는 일이지 답을 만드는 일이
+        아니므로, 못 했다고 답이 없어지면 안 된다. 투박한 답이 없는 답보다 낫다.
+        """
+        from agentic_service_desk.ingest.agent import extract_json
+        from agentic_service_desk.pipeline import audience
+
+        draft = outcome.draft
+        assert draft is not None
+        if self._harness is None:
+            outcome.stages.append(
+                StageRecord(stage=Stage.RENDER, detail="생성기가 없어 원본을 그대로 둔다")
+            )
+            return
+        try:
+            payload = extract_json(
+                self._harness.run(
+                    audience.build_customer_prompt(
+                        question, draft, hits, outcome.analysis.language
+                    )
+                ).text
+            )
+            rendered = audience.parse_customer(payload, draft)
+        except Exception as exc:  # noqa: BLE001 — 다듬기가 답을 무너뜨리지 않는다
+            outcome.stages.append(
+                StageRecord(stage=Stage.RENDER, detail=f"정제하지 못해 원본을 둔다 — {exc}")
+            )
+            return
+
+        if not rendered:
+            # 개수가 어긋났다 — 합치거나 지어낸 것이다.
+            outcome.stages.append(
+                StageRecord(
+                    stage=Stage.RENDER,
+                    detail=f"정제가 진술 {len(draft.statements)}개를 지키지 못해 원본을 둔다",
+                )
+            )
+            return
+
+        outcome.draft = replace(draft, rendered=rendered)
+        outcome.stages.append(
+            StageRecord(stage=Stage.RENDER, detail=f"질문자가 읽을 말로 진술 {len(rendered)}개")
+        )
 
     def _generate(
         self, question: str, hits: list[Hit], analysis: Analysis, outcome: Outcome

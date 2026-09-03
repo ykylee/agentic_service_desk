@@ -899,24 +899,40 @@ def _transitions(detail) -> list[tuple[str, str]]:  # noqa: ANN001
 
 
 def _renderings(question: str, outcome, harness):  # noqa: ANN001, ANN202
-    """초안을 대상 둘로 정제한다 (FR-61).
+    """화면에 나란히 둘 두 글.
 
-    **호출 하나를 더 쓴다.** 대상마다 부르면 둘이 되는데, 두 글은 같은 초안을
-    다르게 쓰는 것이라 한 번에 내는 편이 서로 어긋날 여지도 적다.
+    **고객용은 다시 만들지 않는다** — 파이프라인 4단계가 이미 만들었고 그것이
+    게재 본문이다(FR-61). 여기서 또 부르면 화면에 보이는 글과 나가는 글이 갈리고,
+    호출도 하나 더 든다.
 
-    실패하면 **빈 목록을 돌려준다** — 정제는 덤이고, 그것 때문에 조회·초안 결과가
-    화면에서 사라지면 안 된다.
+    개발자용만 부른다. 실패하면 **그 자리를 비운다** — 덤이 본체를 무너뜨리지 않는다.
     """
-    if harness is None:
-        return []
     from agentic_service_desk.ingest.agent import extract_json
 
-    review = ReviewInput.of(outcome.draft, outcome.hits)
-    prompt = audience_domain.build_prompt(question, outcome.draft, outcome.hits)
+    draft = outcome.draft
+    review = ReviewInput.of(draft, outcome.hits)
+    out = []
+    customer = audience_domain.render_of(audience_domain.CUSTOMER, draft.body, review)
+    if customer is not None:
+        out.append(customer)
+    if harness is None:
+        return out
     try:
-        return audience_domain.parse(extract_json(harness.run(prompt).text), review)
+        payload = extract_json(
+            harness.run(
+                audience_domain.build_developer_prompt(
+                    question, draft, outcome.hits, outcome.analysis.language
+                )
+            ).text
+        )
+        developer = audience_domain.render_of(
+            audience_domain.DEVELOPER, str(payload.get("developer") or ""), review
+        )
+        if developer is not None:
+            out.append(developer)
     except Exception:  # noqa: BLE001 — 덤이 본체를 무너뜨리지 않는다
-        return []
+        pass
+    return out
 
 
 def _chosen_invalidation(  # noqa: ANN001

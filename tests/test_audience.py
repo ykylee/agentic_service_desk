@@ -51,54 +51,79 @@ def _draft(*, unanswered: tuple[str, ...] = ()) -> Draft:
 HITS = [_hit("k-1", "체결 확인", "inquire_fills 로 확인한다. 한도는 3000 이다.")]
 
 
-class TestPrompt:
+class TestCustomerPrompt:
+    """게재 경로 안의 정제 — 진술 하나를 진술 하나로."""
+
     def test_초안과_근거_원문만_준다(self) -> None:
         # 검수와 같은 입력 규율이다 — 질문 밖의 무엇도 정제에 닿지 않는다.
-        p = audience.build_prompt("어떻게 확인하나요", _draft(), HITS)
+        p = audience.build_customer_prompt("어떻게 확인하나요", _draft(), HITS)
         assert "inquire_fills 로 확인한다" in p
         assert "어떻게 확인하나요" in p
 
-    def test_사실을_더하지_말라는_지시가_있다(self) -> None:
-        p = audience.build_prompt("q", _draft(), HITS)
+    def test_내부_식별자를_쓰지_말라고_한다(self) -> None:
+        p = audience.build_customer_prompt("q", _draft(), HITS)
+        assert "내부 파일 경로" in p
         assert "새 사실을 더하지 않는다" in p
 
-    def test_두_대상을_구분해_지시한다(self) -> None:
-        p = audience.build_prompt("q", _draft(), HITS)
-        assert "customer" in p and "developer" in p
-        assert "내부 파일 경로" in p
+    def test_개수를_지키라고_못_박는다(self) -> None:
+        # 합치거나 나눈 것은 다시 쓴 것이 아니라 새로 쓴 것이다.
+        p = audience.build_customer_prompt("q", _draft(), HITS)
+        assert "진술 2개를 그대로 2개로 낸다" in p
 
     def test_불확실한_진술을_단정하지_말라고_한다(self) -> None:
         # `추론` 이 정제에서 사실로 굳으면 강도 표시가 무의미해진다 (ADR-007).
-        p = audience.build_prompt("q", _draft(), HITS)
-        assert "단정하지 않는다" in p
+        assert "단정하지 않는다" in audience.build_customer_prompt("q", _draft(), HITS)
+
+    def test_질문의_언어를_못_박는다(self) -> None:
+        # FR-17 — 1단계가 판정한 언어로 3단계가 썼는데 정제가 조용히 옮기면
+        # **질문한 사람이 읽을 수 없는 답이 나간다.** 2026-09-03 라이브에서
+        # 한국어 질문의 정제가 영어로 나오며 드러났다.
+        assert "한국어 로 쓴다" in audience.build_customer_prompt("q", _draft(), HITS, "ko")
+        assert "영어 로 쓴다" in audience.build_customer_prompt("q", _draft(), HITS, "en")
+
+
+class TestParseCustomer:
+    def test_강도와_근거를_물려받는다(self) -> None:
+        out = audience.parse_customer(
+            {"statements": ["이렇게 확인합니다.", "지연이 있을 수 있어 보입니다."]}, _draft()
+        )
+        assert [s.confidence for s in out] == [s.confidence for s in _draft().statements]
+
+    def test_개수가_다르면_통째로_버린다(self) -> None:
+        assert audience.parse_customer({"statements": ["하나로 합쳤다"]}, _draft()) == ()
+
+    def test_빈_진술이_섞이면_버린다(self) -> None:
+        assert audience.parse_customer({"statements": ["있다", "  "]}, _draft()) == ()
+
+    def test_목록이_아니면_버린다(self) -> None:
+        assert audience.parse_customer({"statements": "문자열이다"}, _draft()) == ()
+
+
+class TestDeveloperPrompt:
+    """개발자용은 **나가지 않는다** — 운영자 화면 전용이다."""
+
+    def test_경로와_식별자를_살리라고_한다(self) -> None:
+        p = audience.build_developer_prompt("q", _draft(), HITS)
+        assert "그대로 살리고" in p
+        assert "새 사실을 더하지 않는다" in p
 
     def test_밝힌_경계도_함께_준다(self) -> None:
-        p = audience.build_prompt("q", _draft(unanswered=("재시도 정책은 모른다",)), HITS)
+        p = audience.build_developer_prompt("q", _draft(unanswered=("재시도 정책은 모른다",)), HITS)
         assert "재시도 정책은 모른다" in p
 
 
-class TestParse:
+class TestRenderOf:
     def _review(self) -> ReviewInput:
         return ReviewInput.of(_draft(), HITS)
 
-    def test_둘을_읽는다(self) -> None:
-        out = audience.parse({"customer": "이렇게 하세요", "developer": "여기를 보세요"},
-                             self._review())
-        assert [r.audience for r in out] == [audience.CUSTOMER, audience.DEVELOPER]
-
-    def test_한쪽이_비면_그쪽은_만들지_않는다(self) -> None:
-        # 빈 칸을 보여 주는 것보다 없다고 말하는 편이 정직하다.
-        out = audience.parse({"customer": "이렇게 하세요", "developer": "  "}, self._review())
-        assert [r.audience for r in out] == [audience.CUSTOMER]
+    def test_비면_만들지_않는다(self) -> None:
+        assert audience.render_of(audience.CUSTOMER, "  ", self._review()) is None
 
     def test_근거에_있는_수치는_잡지_않는다(self) -> None:
-        out = audience.parse({"customer": "한도는 3000 입니다."}, self._review())
-        assert out[0].ungrounded == ()
+        r = audience.render_of(audience.CUSTOMER, "한도는 3000 입니다.", self._review())
+        assert r.ungrounded == ()
 
     def test_근거에_없는_수치를_잡는다(self) -> None:
         # **정제가 사실을 보탰을 수 있다** — 검수 P1 과 같은 대조를 한 번 더 건다.
-        out = audience.parse({"customer": "한도는 9999 입니다."}, self._review())
-        assert "9999" in out[0].ungrounded
-
-    def test_아무것도_없으면_빈_목록이다(self) -> None:
-        assert audience.parse({}, self._review()) == []
+        r = audience.render_of(audience.CUSTOMER, "한도는 9999 입니다.", self._review())
+        assert "9999" in r.ungrounded
