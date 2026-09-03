@@ -145,6 +145,28 @@ class TestRun:
         assert run.seconds_per_chunk is not None
         assert "남은 시간" in run.remaining_label
 
+    def test_도는_중에는_경과가_지금까지다(self, tmp_path) -> None:
+        # 마지막 묶음 경계까지만 재면 **긴 묶음이 도는 동안 경과가 멈춘다** —
+        # 라이브에서 12분째 도는 런이 "0초"로 보였다. 진행이 멈춘 것과 표시가
+        # 멈춘 것은 화면에서 구분되지 않는다.
+        started = (datetime.now(UTC) - timedelta(minutes=12)).isoformat(timespec="seconds")
+        conn = _conn(tmp_path)
+        try:
+            conn.execute(
+                "INSERT INTO ingest_run (started_at, updated_at, chunks_done, chunks_total) "
+                "VALUES (?, ?, 1, 9)",
+                (started, started),
+            )
+            conn.commit()
+            run = build.running(conn)
+        finally:
+            conn.close()
+        assert run.elapsed_seconds > 600
+        assert "분" in run.elapsed_label
+        # 평균은 **경계까지만** 잰다 — 아직 끝낸 묶음이 없으니 낼 수 없다.
+        assert run.measured_seconds == 0
+        assert run.seconds_per_chunk is None
+
     def test_완주와_중단이_이력에서_갈린다(self, tmp_path) -> None:
         # 커밋 목록만으로는 갈리지 않는다 — 그것이 이 표가 있는 이유다.
         conn = _conn(tmp_path)

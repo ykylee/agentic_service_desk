@@ -202,8 +202,24 @@ class Run:
 
     @property
     def elapsed_seconds(self) -> float:
-        end = self.ended_at or self.updated_at
-        return max(0.0, _between(self.started_at, end))
+        """시작한 뒤로 흐른 시간. **도는 중이면 지금까지** 잰다.
+
+        마지막 묶음 경계(`updated_at`)까지만 재면 **긴 묶음이 도는 동안 경과가
+        멈춘다** — 2026-09-03 라이브에서 12분째 도는 런이 "0초"로 보였다. 진행이
+        멈춘 것과 경과 표시가 멈춘 것은 화면에서 구분되지 않는다.
+        """
+        if self.running:
+            return max(0.0, _age_seconds(self.started_at))
+        return max(0.0, _between(self.started_at, self.ended_at or self.updated_at))
+
+    @property
+    def measured_seconds(self) -> float:
+        """**묶음 경계까지만** 흐른 시간 — 평균을 내는 데 쓴다.
+
+        지금까지로 재면 도는 중인 묶음의 시간이 이미 끝난 묶음들에 얹혀 평균이
+        부풀고, 남은 시간이 묶음이 길어질수록 함께 늘어난다.
+        """
+        return max(0.0, _between(self.started_at, self.ended_at or self.updated_at))
 
     @property
     def ratio(self) -> float:
@@ -231,7 +247,7 @@ class Run:
         """
         if self.chunks_finished <= 0:
             return None
-        return self.elapsed_seconds / self.chunks_finished
+        return self.measured_seconds / self.chunks_finished
 
     @property
     def remaining_label(self) -> str:
