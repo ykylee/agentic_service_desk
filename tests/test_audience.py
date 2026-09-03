@@ -62,13 +62,19 @@ class TestCustomerPrompt:
 
     def test_내부_식별자를_쓰지_말라고_한다(self) -> None:
         p = audience.build_customer_prompt("q", _draft(), HITS)
-        assert "내부 파일 경로" in p
+        assert "내부 말을 쓰지 않는다" in p
         assert "새 사실을 더하지 않는다" in p
 
-    def test_개수를_지키라고_못_박는다(self) -> None:
-        # 합치거나 나눈 것은 다시 쓴 것이 아니라 새로 쓴 것이다.
+    def test_한_편의_글로_쓰라고_한다(self) -> None:
+        # 진술 1:1 을 강제했더니 **문단 나열이 되어 사람이 쓴 글로 읽히지 않았다**
+        # (2026-09-03 라이브). 정제의 목적을 제약이 이겼다.
         p = audience.build_customer_prompt("q", _draft(), HITS)
-        assert "진술 2개를 그대로 2개로 낸다" in p
+        assert "질문에 답하는 글 한 편" in p
+        assert "항목을 나열하지 말고" in p
+
+    def test_묻는_것에만_답하라고_한다(self) -> None:
+        # 길어질수록 답이 아니라 자료가 된다.
+        assert "아는 것을 다 늘어놓지 않는다" in audience.build_customer_prompt("q", _draft(), HITS)
 
     def test_불확실한_진술을_단정하지_말라고_한다(self) -> None:
         # `추론` 이 정제에서 사실로 굳으면 강도 표시가 무의미해진다 (ADR-007).
@@ -83,20 +89,15 @@ class TestCustomerPrompt:
 
 
 class TestParseCustomer:
-    def test_강도와_근거를_물려받는다(self) -> None:
-        out = audience.parse_customer(
-            {"statements": ["이렇게 확인합니다.", "지연이 있을 수 있어 보입니다."]}, _draft()
+    def test_글을_읽는다(self) -> None:
+        assert audience.parse_customer({"answer": " 이렇게 확인하시면 됩니다. "}, _draft()) == (
+            "이렇게 확인하시면 됩니다."
         )
-        assert [s.confidence for s in out] == [s.confidence for s in _draft().statements]
 
-    def test_개수가_다르면_통째로_버린다(self) -> None:
-        assert audience.parse_customer({"statements": ["하나로 합쳤다"]}, _draft()) == ()
-
-    def test_빈_진술이_섞이면_버린다(self) -> None:
-        assert audience.parse_customer({"statements": ["있다", "  "]}, _draft()) == ()
-
-    def test_목록이_아니면_버린다(self) -> None:
-        assert audience.parse_customer({"statements": "문자열이다"}, _draft()) == ()
+    def test_비면_빈_문자열이다(self) -> None:
+        # 비어 있으면 원본을 쓴다는 뜻이다.
+        assert audience.parse_customer({"answer": "  "}, _draft()) == ""
+        assert audience.parse_customer({}, _draft()) == ""
 
 
 class TestDeveloperPrompt:

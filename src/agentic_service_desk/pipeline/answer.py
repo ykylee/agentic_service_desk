@@ -160,13 +160,17 @@ class Draft:
     """**모른다고 밝힌 부분** (FR-19). 비어 있는 것이 늘 좋은 것은 아니다 —
     질문이 여러 갈래인데 전부 답했다면 억지 완성을 의심해야 한다."""
 
-    rendered: tuple[Statement, ...] = ()
-    """질문자가 읽을 말로 다시 쓴 진술 (FR-61). **비어 있으면 정제하지 않은 것**이고
-    그때는 원본이 그대로 나간다 — 모델이 없거나 정제가 규약을 어겼을 때다.
+    rendered: str = ""
+    """질문자가 읽을 말로 다시 쓴 **한 편의 글** (FR-61). 비어 있으면 정제하지 않은
+    것이고 그때는 진술을 이어 붙인 원본이 그대로 나간다.
 
-    **진술 단위로 다시 쓴다.** 글 전체를 새로 쓰면 진술과 강도의 대응이 끊겨
-    ADR-007 의 강도 표시가 어디에도 붙지 못한다. 개수를 맞추는 제약이 "사실을
-    더하지 않는다"를 함께 지킨다.
+    **진술 단위 1:1 을 버렸다** (2026-09-03). 강도의 대응을 지키려고 진술 하나를
+    진술 하나로 옮기게 했더니 **문단 나열이 되어 사람이 쓴 글로 읽히지 않았다** —
+    정제의 목적이 읽히는 글을 만드는 것인데 그 목적을 제약이 이겼다.
+
+    강도 표시(ADR-007)는 `statements` 에 그대로 남아 운영자 화면이 그것을 보여
+    준다. **나가는 글에 강도를 붙이지 않는 것은 원래 규약이다** — 강도는 운영자
+    화면에만 붙고 이용자에게는 가지 않는다.
     """
 
     @property
@@ -177,7 +181,7 @@ class Draft:
         (`ReviewInput.of` 가 이 값을 읽는다) 여기서 갈리면 검수의 판정이 나가는
         글에 대한 것이 아니게 된다.
         """
-        return "\n\n".join(s.text for s in (self.rendered or self.statements))
+        return self.rendered or "\n\n".join(s.text for s in self.statements)
 
     @property
     def weak_points(self) -> tuple[Statement, ...]:
@@ -608,18 +612,16 @@ class AnswerPipeline:
             return
 
         if not rendered:
-            # 개수가 어긋났다 — 합치거나 지어낸 것이다.
             outcome.stages.append(
-                StageRecord(
-                    stage=Stage.RENDER,
-                    detail=f"정제가 진술 {len(draft.statements)}개를 지키지 못해 원본을 둔다",
-                )
+                StageRecord(stage=Stage.RENDER, detail="정제가 비어 원본을 둔다")
             )
             return
 
         outcome.draft = replace(draft, rendered=rendered)
         outcome.stages.append(
-            StageRecord(stage=Stage.RENDER, detail=f"질문자가 읽을 말로 진술 {len(rendered)}개")
+            StageRecord(
+                stage=Stage.RENDER, detail=f"질문자가 읽을 글로 {len(rendered):,}자"
+            )
         )
 
     def _generate(

@@ -140,13 +140,18 @@ def _numbers_of(verdict) -> tuple[str, ...]:  # noqa: ANN001
 def build_customer_prompt(
     question: str, draft: Draft, hits: list[Hit], language: str = "ko"
 ) -> str:
-    """고객용 정제 지시 — **진술 하나를 진술 하나로.**
+    """고객용 정제 지시 — **한 편의 글로 쓴다.**
 
     검수와 같은 입력 규율이다: 초안과 근거 원문만 준다.
 
     **언어를 못 박는다** (FR-17). 1단계가 판정한 언어로 3단계가 썼는데, 정제가
     조용히 다른 언어로 옮기면 **질문한 사람이 읽을 수 없는 답이 나간다.**
     2026-09-03 라이브에서 한국어 질문의 정제 결과가 영어로 나오며 드러났다.
+
+    처음에는 진술 하나를 진술 하나로 옮기게 했다. 강도의 대응을 지키려던 것인데
+    **문단 나열이 되어 사람이 쓴 글로 읽히지 않았다** — 정제의 목적을 제약이
+    이겼다. 지금은 한 편의 글로 쓰게 하고, 강도는 원본 진술에 남겨 운영자 화면이
+    본다.
     """
     tongue = "한국어" if language == "ko" else "영어"
     grounds = "\n".join(
@@ -154,53 +159,56 @@ def build_customer_prompt(
         for h in hits
         if h.item.id in draft.grounding
     )
-    numbered = "\n".join(
-        f"{i}. [{s.confidence}] {s.text}" for i, s in enumerate(draft.statements, start=1)
+    body = "\n".join(f"- [{s.confidence}] {s.text}" for s in draft.statements)
+    boundary = (
+        "\n".join(f"- {u}" for u in draft.unanswered)
+        if draft.unanswered
+        else "(밝힌 경계 없음)"
     )
-    n = len(draft.statements)
-    return f"""아래 진술들을 **질문한 사람이 읽을 말**로 다시 쓴다.
+    return f"""아래 내용을 바탕으로 **질문에 답하는 글 한 편**을 쓴다.
+문의를 받은 담당자가 직접 답장을 쓰듯 쓴다.
 
 **{tongue} 로 쓴다.** 질문한 사람의 언어이며, 바꾸면 그 사람이 읽을 수 없다.
 
-이 글은 질문자에게 그대로 나간다. 내부 파일 경로 · 코드 식별자 · 함수명 · 커밋
-해시 · 변수명을 쓰지 않는다 — 무엇을 하면 되는지, 무엇이 원인인지를 그 사람의
-말로 적는다.
+이렇게 쓴다.
 
-**새 사실을 더하지 않는다.** 아래 진술과 근거 원문에 없는 것은 쓰지 않는다 —
+- **결론부터.** 무엇을 하면 되는지, 무엇이 원인인지를 먼저 말하고 그다음에 이유를 붙인다.
+- **이어지는 글로.** 항목을 나열하지 말고 문장이 서로 이어지게 쓴다. 절차가 여럿일
+  때만 번호를 쓴다.
+- **묻는 것에만.** 아는 것을 다 늘어놓지 않는다. 질문에 답하는 데 필요하지 않은
+  내용은 뺀다 — 길어질수록 답이 아니라 자료가 된다.
+- **내부 말을 쓰지 않는다.** 파일 경로 · 코드 식별자 · 함수명 · 커밋 해시 ·
+  변수명은 질문한 사람에게 뜻이 없다. 무엇을 하는 부분인지로 풀어 쓴다.
+- **인사와 맺음은 짧게 하거나 뺀다.** 과한 사과나 상투구는 넣지 않는다.
+
+**새 사실을 더하지 않는다.** 아래 내용과 근거 원문에 없는 것은 쓰지 않는다 —
 수치도, 고유명사도, 원인 추정도. 다시 쓰는 것이지 새로 답하는 것이 아니다.
 
-`[추론]` · `[근거 얇음]` 이 붙은 진술은 **단정하지 않는다** — "…로 보인다"처럼
-그 불확실성을 남긴다.
+`[추론]` · `[근거 얇음]` 이 붙은 것은 **단정하지 않는다** — "…로 보입니다",
+"…일 수 있습니다"처럼 그 불확실성을 남긴다. `[확인됨]` 은 그대로 단정해도 된다.
 
-**진술 {n}개를 그대로 {n}개로 낸다.** 합치거나 나누지 않는다 — 순서도 같다.
+밝힌 경계가 있으면 **글 끝에 한두 문장으로** 모르는 부분을 적는다.
 
 출력은 **JSON 하나만** 낸다.
 
-{{"statements": [{n}개의 문자열]}}
+{{"answer": "…"}}
 
 질문: {question}
 
-진술:
-{numbered}
+답에 담을 내용:
+{body}
+
+밝힌 경계:
+{boundary}
 
 근거 원문:
 {grounds}"""
 
 
-def parse_customer(payload: dict, draft: Draft) -> tuple[Statement, ...]:
-    """정제된 진술을 읽는다. **개수가 다르면 통째로 버린다.**
+def parse_customer(payload: dict, draft: Draft) -> str:
+    """정제된 글을 읽는다. 비어 있으면 원본을 쓴다는 뜻이다.
 
-    합치거나 나눈 것은 "다시 쓴 것"이 아니라 새로 쓴 것이고, 강도를 물려줄 짝도
-    사라진다. 어긋난 글보다 투박한 원본이 낫다.
+    `draft` 를 받는 것은 **호출부의 규약을 지키기 위해서**다 — 정제는 초안을
+    다시 쓰는 일이므로 무엇을 다시 썼는지가 서명에 남아야 한다.
     """
-    texts = payload.get("statements")
-    if not isinstance(texts, list) or len(texts) != len(draft.statements):
-        return ()
-    out: list[Statement] = []
-    for text, base in zip(texts, draft.statements, strict=True):
-        text = str(text or "").strip()
-        if not text:
-            return ()
-        # **강도와 근거는 물려받는다** — 정제는 판정을 다시 하지 않는다.
-        out.append(Statement(text=text, confidence=base.confidence, grounding=base.grounding))
-    return tuple(out)
+    return str(payload.get("answer") or "").strip()

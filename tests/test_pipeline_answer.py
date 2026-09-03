@@ -424,7 +424,7 @@ class TestUncertainty:
         assert "약한 지점 1" in generate.detail
 
 
-RENDERED = '{"statements": ["부서 등급에 따라 정해집니다.", "등급이 바뀌면 함께 바뀌는 것으로 보입니다."]}'
+RENDERED = '{"answer": "부서 등급에 따라 정해집니다. 등급이 바뀌면 한도도 함께 바뀌는 것으로 보입니다."}'
 
 
 class TestRender:
@@ -445,12 +445,13 @@ class TestRender:
         )
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
-        assert "부서 등급에 따라 정해집니다." in outcome.draft.body
+        assert outcome.draft.body.startswith("부서 등급에 따라 정해집니다.")
         # 원본은 남는다 — 강도 판정의 기준이고 운영자가 대조할 것이다.
         assert outcome.draft.statements[0].text == "결재 한도는 부서 등급으로 결정됩니다."
 
-    def test_강도와_근거를_물려받는다(self, tmp_path) -> None:
-        # 정제는 판정을 **다시 하지 않는다** — 강도는 근거 원문과 대조해 정해진 것이다.
+    def test_강도는_원본에_남는다(self, tmp_path) -> None:
+        # **나가는 글에는 강도를 붙이지 않는다** — 원래 규약이다(운영자 화면 전용).
+        # 정제는 판정을 다시 하지 않으므로 약한 지점은 원본 진술로 센다.
         repo = _repo(tmp_path)
         item = _item(repo)
         pipeline, _, _ = _pipeline(
@@ -458,26 +459,22 @@ class TestRender:
         )
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
-        assert [s.confidence for s in outcome.draft.rendered] == [
-            s.confidence for s in outcome.draft.statements
-        ]
         assert len(outcome.draft.weak_points) == 1
+        assert outcome.draft.rendered
 
-    def test_개수가_어긋나면_원본을_둔다(self, tmp_path) -> None:
-        # 합치거나 나눈 것은 다시 쓴 것이 아니라 **새로 쓴 것**이고, 강도를 물려줄
-        # 짝도 사라진다. 어긋난 글보다 투박한 원본이 낫다.
+    def test_정제가_비면_원본을_둔다(self, tmp_path) -> None:
+        # 다듬지 못했다고 답이 없어지면 안 된다 — 투박한 답이 없는 답보다 낫다.
         repo = _repo(tmp_path)
         item = _item(repo)
         pipeline, _, _ = _pipeline(
-            tmp_path,
-            FakeHarness(ANSWER % (item.id, item.id), '{"statements": ["하나로 합쳤습니다."]}'),
+            tmp_path, FakeHarness(ANSWER % (item.id, item.id), '{"answer": "  "}')
         )
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
-        assert outcome.draft.rendered == ()
+        assert outcome.draft.rendered == ""
         assert "결재 한도는 부서 등급으로 결정됩니다." in outcome.draft.body
         render = next(r for r in outcome.stages if r.stage is Stage.RENDER)
-        assert "지키지 못해" in render.detail
+        assert "원본을 둔다" in render.detail
 
     def test_정제가_터져도_답이_남는다(self, tmp_path) -> None:
         # 다듬기가 답을 무너뜨리지 않는다 — 투박한 답이 없는 답보다 낫다.
@@ -489,7 +486,7 @@ class TestRender:
 
         outcome = pipeline.run("결재 한도가 어떻게 정해지나요")
         assert outcome.draft is not None
-        assert outcome.draft.rendered == ()
+        assert outcome.draft.rendered == ""
 
     def test_생성기가_없으면_원본을_그대로_둔다(self, tmp_path) -> None:
         repo = _repo(tmp_path)
