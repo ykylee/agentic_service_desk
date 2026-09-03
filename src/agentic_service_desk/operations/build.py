@@ -18,11 +18,25 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-HEARTBEAT_STALE_SECONDS = 180
-"""이만큼 심박이 없으면 **워커가 살아 있다고 말하지 않는다.**
+from agentic_service_desk.ingest.harness_runner import DEFAULT_TIMEOUT as HARNESS_TIMEOUT
 
-기본 주기가 60초이므로 두어 주기의 여유다. 짧게 잡으면 긴 묶음 하나가 도는 동안
-(중앙값 124초) 워커가 죽은 것처럼 보이고, 그러면 화면이 늑대를 부른다.
+IDLE_STALE_SECONDS = 180
+"""**놀고 있을 때** 이만큼 심박이 없으면 워커가 살아 있다고 말하지 않는다.
+
+기본 주기가 60초이므로 세 주기의 여유다.
+"""
+
+BUSY_STALE_SECONDS = HARNESS_TIMEOUT + 300
+"""**묶음 하나가 도는 중일 때**의 여유. 놀 때와 나눈 이유는 실물에서 밟았다.
+
+심박은 묶음 **경계**에서만 찍힌다 — 모델 호출은 블로킹 서브프로세스라 그 사이에
+심박이 낄 자리가 없다. 그런데 한 묶음의 실측 중앙값이 124초이고 한도는
+`DEFAULT_TIMEOUT`(600초)이라, 놀 때의 임계(180초)를 그대로 쓰면 **묶음이 조금만
+길어도 화면이 "워커가 떠 있지 않다"고 말한다.** 2026-09-03 라이브에서 묶음 2 가
+도는 동안 실제로 그렇게 나왔다 — 워커도 pi 도 멀쩡히 살아 있었다.
+
+**늑대를 부르는 화면은 곧 아무도 안 보는 화면이 된다.** 그래서 도는 중에는 한
+번의 호출이 끝까지 갈 수 있는 시간만큼 기다린다.
 """
 
 
@@ -36,6 +50,9 @@ class Heartbeat:
     beat_at: str = ""
     stage: str = ""
     doing: str = ""
+    busy: bool = False
+    """묶음이 도는 중인가. **기다려 줄 시간을 정한다** — 그 사이에는 심박이 낄
+    자리가 없다."""
 
     @property
     def seen(self) -> bool:
@@ -46,10 +63,14 @@ class Heartbeat:
         return _age_seconds(self.beat_at)
 
     @property
+    def tolerance(self) -> int:
+        return BUSY_STALE_SECONDS if self.busy else IDLE_STALE_SECONDS
+
+    @property
     def alive(self) -> bool:
         """**모르면 살아 있다고 하지 않는다.** 진행 0 이 "할 일이 없다"인지
         "아무도 안 돈다"인지 구분되지 않는 것이 이 화면이 생긴 이유다."""
-        return self.seen and self.age_seconds <= HEARTBEAT_STALE_SECONDS
+        return self.seen and self.age_seconds <= self.tolerance
 
     @property
     def label(self) -> str:
@@ -75,10 +96,16 @@ def beat(conn: sqlite3.Connection, *, stage: str, doing: str = "") -> None:
 
 
 def heartbeat(conn: sqlite3.Connection) -> Heartbeat:
+    """심박. **도는 중인지 함께 본다** — 기다려 줄 시간이 그것으로 갈린다."""
     row = conn.execute("SELECT * FROM worker_heartbeat WHERE id = 1").fetchone()
     if row is None:
         return Heartbeat()
-    return Heartbeat(beat_at=row["beat_at"], stage=row["stage"], doing=row["doing"])
+    return Heartbeat(
+        beat_at=row["beat_at"],
+        stage=row["stage"],
+        doing=row["doing"],
+        busy=running(conn) is not None,
+    )
 
 
 # --- 제어 ---------------------------------------------------------------------
@@ -180,7 +207,20 @@ class Run:
 
     @property
     def ratio(self) -> float:
-        return (self.chunks_done / self.chunks_total) if self.chunks_total else 0.0
+        """얼마나 왔는가. **끝낸 것으로 센다** — 시작한 것으로 세면 마지막 묶음이
+        도는 동안 화면이 100% 를 보여 준다."""
+        return (self.chunks_finished / self.chunks_total) if self.chunks_total else 0.0
+
+    @property
+    def chunks_finished(self) -> int:
+        """**끝낸** 묶음 수.
+
+        `chunks_done` 은 워커가 *지금 시작한* 묶음의 번호다 (`on_chunk` 가 묶음
+        머리에서 불린다) — 도는 중이라면 끝난 것은 그보다 하나 적다. 이 구분을
+        빠뜨리면 첫 묶음을 시작한 순간 "묶음당 1초"가 나오고, 화면이 남은 시간을
+        1초로 말한다. 2026-09-03 라이브에서 실제로 그렇게 나왔다.
+        """
+        return max(0, self.chunks_done - 1) if self.running else self.chunks_done
 
     @property
     def seconds_per_chunk(self) -> float | None:
@@ -189,9 +229,9 @@ class Run:
         남은 시간을 재는 데는 평균으로 족하고, 묶음별 시각까지 남기면 긴 런 하나가
         표를 수백 줄로 채운다. 실측 중앙값이 필요하면 워커 로그가 진다.
         """
-        if self.chunks_done <= 0:
+        if self.chunks_finished <= 0:
             return None
-        return self.elapsed_seconds / self.chunks_done
+        return self.elapsed_seconds / self.chunks_finished
 
     @property
     def remaining_label(self) -> str:
@@ -199,7 +239,7 @@ class Run:
         per = self.seconds_per_chunk
         if not self.running or per is None or self.chunks_total <= 0:
             return ""
-        left = max(0, self.chunks_total - self.chunks_done)
+        left = max(0, self.chunks_total - self.chunks_finished)
         return f"남은 시간 약 {_age_label(left * per)}"
 
     @property

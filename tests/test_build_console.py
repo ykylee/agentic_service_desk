@@ -60,21 +60,50 @@ class TestHeartbeat:
         assert beat.alive
         assert "지식 구축" in beat.label
 
+    def _stamp(self, conn, seconds_ago: int) -> None:  # noqa: ANN001
+        when = datetime.now(UTC) - timedelta(seconds=seconds_ago)
+        conn.execute(
+            "INSERT INTO worker_heartbeat (id, beat_at, stage, doing) VALUES (1, ?, 'S1', '') "
+            "ON CONFLICT(id) DO UPDATE SET beat_at = excluded.beat_at",
+            (when.isoformat(timespec="seconds"),),
+        )
+        conn.commit()
+
     def test_오래된_심박은_죽은_것으로_본다(self, tmp_path) -> None:
-        old = (datetime.now(UTC) - timedelta(seconds=build.HEARTBEAT_STALE_SECONDS + 60))
         conn = _conn(tmp_path)
         try:
-            conn.execute(
-                "INSERT INTO worker_heartbeat (id, beat_at, stage, doing) VALUES (1, ?, 'S1', '')",
-                (old.isoformat(timespec="seconds"),),
-            )
-            conn.commit()
+            self._stamp(conn, build.IDLE_STALE_SECONDS + 60)
             beat = build.heartbeat(conn)
         finally:
             conn.close()
         assert beat.seen
         assert not beat.alive
         assert "떠 있지 않다" in beat.label
+
+    def test_묶음이_도는_중에는_더_기다린다(self, tmp_path) -> None:
+        # **심박은 묶음 경계에서만 찍힌다** — 모델 호출은 블로킹이라 그 사이에 낄
+        # 자리가 없다. 놀 때의 임계를 그대로 쓰면 긴 묶음 하나가 워커를 죽은 것으로
+        # 만든다. 2026-09-03 라이브에서 실제로 그렇게 나왔다.
+        conn = _conn(tmp_path)
+        try:
+            self._stamp(conn, build.IDLE_STALE_SECONDS + 60)
+            build.start_run(conn)
+            beat = build.heartbeat(conn)
+        finally:
+            conn.close()
+        assert beat.busy
+        assert beat.alive
+
+    def test_도는_중이어도_한도를_넘기면_죽은_것으로_본다(self, tmp_path) -> None:
+        # 기다려 주는 것은 **한 번의 호출이 끝까지 갈 수 있는 시간**까지다.
+        conn = _conn(tmp_path)
+        try:
+            self._stamp(conn, build.BUSY_STALE_SECONDS + 60)
+            build.start_run(conn)
+            beat = build.heartbeat(conn)
+        finally:
+            conn.close()
+        assert not beat.alive
 
 
 class TestRun:
@@ -89,18 +118,30 @@ class TestRun:
         assert run is not None
         assert (run.chunks_done, run.chunks_total) == (43, 116)
         assert run.running
-        assert 0.37 < run.ratio < 0.38
+        # 43번째가 **도는 중**이므로 끝난 것은 42다 — 시작한 것으로 세면 마지막
+        # 묶음이 도는 동안 화면이 100% 를 보여 준다.
+        assert run.chunks_finished == 42
+        assert 0.36 < run.ratio < 0.37
 
     def test_남은_시간은_묶음이_끝나야_잰다(self, tmp_path) -> None:
+        # `chunks_done` 은 **지금 시작한 묶음의 번호**다 — 1/10 은 하나도 끝내지
+        # 않은 상태이고, 그때 평균을 내면 "남은 시간 1초"가 나온다.
         conn = _conn(tmp_path)
         try:
             run_id = build.start_run(conn)
             assert build.running(conn).remaining_label == ""
             build.note_chunk(conn, run_id, repo_url="r", done=1, total=10)
+            first = build.running(conn)
+            assert first.chunks_finished == 0
+            assert first.seconds_per_chunk is None
+            assert first.remaining_label == ""
+
+            build.note_chunk(conn, run_id, repo_url="r", done=2, total=10)
             run = build.running(conn)
         finally:
             conn.close()
-        # 묶음 하나가 지났으므로 이제 평균이 있다 — 값 자체는 시각에 달렸다.
+        # 이제 하나를 끝냈으므로 평균이 있다 — 값 자체는 시각에 달렸다.
+        assert run.chunks_finished == 1
         assert run.seconds_per_chunk is not None
         assert "남은 시간" in run.remaining_label
 

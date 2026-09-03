@@ -51,7 +51,9 @@
 <table>
   <tr><th style="width:9rem">진행</th>
       <td><strong>묶음 {{ run.chunks_done }}/{{ run.chunks_total or '?' }}</strong>
-        {%- if run.chunks_total %} · {{ '%.0f'|format(run.ratio * 100) }}%{% endif %}
+        {%- if run.chunks_total %} · {{ '%.0f'|format(run.ratio * 100) }}%
+          <span class="dim small">({{ run.chunks_finished }} 끝남 · {{ run.chunks_done }}번째가 도는 중)</span>
+        {%- endif %}
         <div class="dim small">{{ run.repo_url or '—' }}</div></td></tr>
   <tr><th>경과</th><td>{{ run.elapsed_label }}
       <span class="dim small">· 시작 {{ run.started_at[:16].replace('T', ' ') }}</span></td></tr>
