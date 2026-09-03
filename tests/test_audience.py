@@ -76,6 +76,18 @@ class TestCustomerPrompt:
         # 길어질수록 답이 아니라 자료가 된다.
         assert "아는 것을 다 늘어놓지 않는다" in audience.build_customer_prompt("q", _draft(), HITS)
 
+    def test_없는_이름을_지어내지_말라고_한다(self) -> None:
+        # 2026-09-03 라이브: `overview 엔드포인트` 를 **"개요 화면"** 이라고 옮겼다.
+        # API 를 묻는 사람에게 "화면"이라고 답하면 다른 것을 가리킨다 —
+        # **뜻이 바뀌면 그것은 정제가 아니라 오답이다.** P1 은 수치만 보므로 못 잡는다.
+        p = audience.build_customer_prompt("q", _draft(), HITS)
+        assert "없는 이름을 지어내지 않는다" in p
+        assert "정제가 아니라 오답이다" in p
+
+    def test_갈리면_문단을_나누라고_한다(self) -> None:
+        # 원인이 여럿인데 한 덩어리로 몰아쓰면 어디서 갈리는지 알 수 없다.
+        assert "문단을 나눈다" in audience.build_customer_prompt("q", _draft(), HITS)
+
     def test_불확실한_진술을_단정하지_말라고_한다(self) -> None:
         # `추론` 이 정제에서 사실로 굳으면 강도 표시가 무의미해진다 (ADR-007).
         assert "단정하지 않는다" in audience.build_customer_prompt("q", _draft(), HITS)
